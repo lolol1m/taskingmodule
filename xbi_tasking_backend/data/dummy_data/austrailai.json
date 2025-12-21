@@ -1,0 +1,47 @@
+{
+  "images": [
+    {
+      "imgId": 21,
+      "imageFileName": "australia.gif",
+      "sensorName": "sensor21",
+      "uploadDate": "2023-02-21T09:59:33.333Z",
+      "imageDateTime": "2023-02-21T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 47,
+          "areaName": "area_47"
+        }
+      ]
+    },
+    {
+      "imgId": 22,
+      "imageFileName": "wakanda.gif",
+      "sensorName": "sensor22",
+      "uploadDate": "2023-03-22T09:59:33.333Z",
+      "imageDateTime": "2023-03-22T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 54,
+          "areaName": "area_54"
+        }
+      ]
+    },
+    {
+      "imgId": 23,
+      "imageFileName": "marvel.gif",
+      "sensorName": "sensor23",
+      "uploadDate": "2023-04-22T09:59:33.333Z",
+      "imageDateTime": "2023-04-22T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 12,
+          "areaName": "area_12"
+        },
+        {
+          "areaId": 24,
+          "areaName": "area_24"
+        }
+      ]
+    }
+  ]
+}

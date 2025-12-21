@@ -1,0 +1,51 @@
+{
+  "images": [
+    {
+      "imgId": 6,
+      "imageFileName": "zy.gif",
+      "sensorName": "sensor1",
+      "uploadDate": "2023-05-08T09:59:33.333Z",
+      "imageDateTime": "2023-05-08T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 4,
+          "areaName": "area_4"
+        },
+        {
+          "areaId": 10,
+          "areaName": "area_10"
+        }
+      ]
+    },
+    {
+      "imgId": 7,
+      "imageFileName": "zhenzhi.gif",
+      "sensorName": "sensor5",
+      "uploadDate": "2023-06-08T09:59:33.333Z",
+      "imageDateTime": "2023-06-08T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 69,
+          "areaName": "area_69"
+        },
+        {
+          "areaId": 123,
+          "areaName": "mediell_house"
+        }
+      ]
+    },
+    {
+      "imgId": 8,
+      "imageFileName": "layla.gif",
+      "sensorName": "sensor2",
+      "uploadDate": "2023-07-08T09:59:33.333Z",
+      "imageDateTime": "2023-07-08T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 8,
+          "areaName": "area_8"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+import configparser
+from configparser import SafeConfigParser
+
+class Singleton(object):
+    _instance = None
+    def __new__(class_, config_file_path, *args, **kwargs):
+        if not isinstance(class_._instance, class_):
+            class_._instance = object.__new__(class_, *args, **kwargs)
+        return class_._instance
+
+class ConfigClass(Singleton):
+    '''
+    ConfigClass contains all the functions to read the config file
+    '''
+    def __init__(self,config_file_path):
+        self.config = configparser.ConfigParser()
+        self.config.read(config_file_path)
+    
+    def getDatabaseName(self):
+        return self.config.get('Database', 'database_name')
+
+    def getIPAddress(self):
+        return self.config.get('Database', 'ip_address')
+
+    def getPort(self):
+        return self.config.get('Database', 'port')
+
+    def getUser(self):
+        return self.config.get('Database', 'user')
+
+    def getPassword(self):
+        return self.config.get('Database', 'password')
+    
+
+

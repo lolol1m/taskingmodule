@@ -1,0 +1,47 @@
+{
+  "images": [
+    {
+      "imgId": 30,
+      "imageFileName": "love.gif",
+      "sensorName": "sensor30",
+      "uploadDate": "2023-02-30T09:59:33.333Z",
+      "imageDateTime": "2023-02-30T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 9,
+          "areaName": "area_9"
+        }
+      ]
+    },
+    {
+      "imgId": 31,
+      "imageFileName": "pledge.gif",
+      "sensorName": "sensor31",
+      "uploadDate": "2023-03-31T09:59:33.333Z",
+      "imageDateTime": "2023-03-31T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 58,
+          "areaName": "area_58"
+        }
+      ]
+    },
+    {
+      "imgId": 32,
+      "imageFileName": "kupa.gif",
+      "sensorName": "sensor32",
+      "uploadDate": "2023-04-32T09:59:33.333Z",
+      "imageDateTime": "2023-04-32T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 20,
+          "areaName": "best_partners_in_the_world"
+        },
+        {
+          "areaId": 55,
+          "areaName": "area_55"
+        }
+      ]
+    }
+  ]
+}

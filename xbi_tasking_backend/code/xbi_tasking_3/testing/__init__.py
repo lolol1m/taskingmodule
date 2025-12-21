@@ -1,0 +1,4 @@
+from testing.ConfigClass_unittest import ConfigClass_unittest
+from testing.Database_unittest import Database_unittest
+from testing.QueryManager_unittest import QueryManager_unittest
+from testing.MainController_unittest import MainController_unittest

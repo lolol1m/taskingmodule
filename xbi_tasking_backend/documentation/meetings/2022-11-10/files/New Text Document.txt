@@ -1,0 +1,13 @@
+from fastapi.responses import FileResponse
+
+
+def generate_excel():
+
+    excel_file_path = EG.run_excel_generator()
+
+    return FileResponse(path=excel_file_path, filename=excel_file_path)
+
+@router.get("/download_excel")
+async def download_excel(request: Request):
+
+ return generate_excel()

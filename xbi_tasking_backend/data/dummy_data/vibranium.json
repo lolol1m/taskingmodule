@@ -1,0 +1,47 @@
+{
+  "images": [
+    {
+      "imgId": 24,
+      "imageFileName": "vibranium.gif",
+      "sensorName": "sensor24",
+      "uploadDate": "2023-02-24T09:59:33.333Z",
+      "imageDateTime": "2023-02-08T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 66,
+          "areaName": "area_66"
+        }
+      ]
+    },
+    {
+      "imgId": 25,
+      "imageFileName": "forever.gif",
+      "sensorName": "sensor25",
+      "uploadDate": "2023-03-25T09:59:33.333Z",
+      "imageDateTime": "2023-03-25T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 59,
+          "areaName": "area_59"
+        }
+      ]
+    },
+    {
+      "imgId": 26,
+      "imageFileName": "titanium.gif",
+      "sensorName": "sensor26",
+      "uploadDate": "2023-04-26T09:59:33.333Z",
+      "imageDateTime": "2023-04-26T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 19,
+          "areaName": "area_19"
+        },
+        {
+          "areaId": 23,
+          "areaName": "area_23"
+        }
+      ]
+    }
+  ]
+}

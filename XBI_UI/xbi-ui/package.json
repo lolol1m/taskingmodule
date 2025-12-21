@@ -1,0 +1,67 @@
+{
+  "name": "react-app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@date-io/dayjs": "^2.16.0",
+    "@emotion/react": "^11.10.5",
+    "@emotion/styled": "^11.10.5",
+    "@fontsource/roboto": "^4.5.8",
+    "@material/ripple": "^14.0.0",
+    "@mui/icons-material": "^5.10.9",
+    "@mui/material": "^5.11.6",
+    "@mui/x-data-grid": "^5.17.21",
+    "@mui/x-data-grid-pro": "^5.17.21",
+    "@mui/x-date-pickers": "^5.0.18",
+    "@mui/x-date-pickers-pro": "^5.0.18",
+    "@patternfly/react-core": "^4.276.6",
+    "@syncfusion/ej2-react-pivotview": "^20.4.48",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.1.3",
+    "babel-runtime": "^6.26.0",
+    "copy-to-clipboard": "^3.3.3",
+    "date-fns": "^2.29.3",
+    "dayjs": "^1.11.7",
+    "jquery": "^3.6.3",
+    "lodash": "^4.17.21",
+    "pivottable": "^2.23.0",
+    "react": "^18.2.0",
+    "react-csv": "^2.2.2",
+    "react-datasheet-grid": "^4.10.0",
+    "react-dom": "^18.2.0",
+    "react-modal": "^3.16.1",
+    "react-pivottable": "^0.11.0",
+    "react-router-dom": "^6.4.2",
+    "react-scripts": "^5.0.1",
+    "react-table": "^7.8.0",
+    "styled-components": "^5.3.6",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

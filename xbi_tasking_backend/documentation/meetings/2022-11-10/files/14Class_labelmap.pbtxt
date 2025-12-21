@@ -1,0 +1,70 @@
+item {
+  id: 1
+  name: 'non_MGV'
+}
+
+item {
+  id: 2
+  name: 'KILAT CLASS RHIB'
+}
+
+item {
+  id: 3
+  name: 'MV POLARIS'
+}
+
+item {
+  id: 4
+  name: 'BAGAN DATUK CLASS NGPC'
+}
+
+item {
+  id: 5
+  name: 'RAMUNIA CLASS PC'
+}
+
+item {
+  id: 6
+  name: 'PERWIRA CLASS PC'
+}
+
+item {
+  id: 7
+  name: 'TUGAU CLASS PC'
+}
+
+item {
+  id: 8
+  name: 'PENGAWAL CLASS PB'
+}
+
+item {
+  id: 9
+  name: 'GEMIA CLASS PC'
+}
+
+item {
+  id: 10
+  name: 'MV PEDOMAN'
+}
+
+item {
+  id: 11
+  name: 'PA-51 (PC)'
+}
+
+item {
+  id: 12
+  name: 'PC-4 (PC)'
+}
+
+item {
+  id: 13
+  name: 'TANJUNG PUTERI'
+}
+
+item {
+  id: 14
+  name: 'PAR-6 (PSC)'
+}
+

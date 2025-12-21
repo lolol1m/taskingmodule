@@ -1,0 +1,34 @@
+date is yyyy-mm-ddTHH:mm:ss.SSS
+example: 2022-11-18T09:10:11.231
+
+get_image(start_date, end_date) ->
+{
+	'images':[
+			{
+				'image_id':123
+				'sensor':'sensor 1',
+				'imaging_date':'2022-11-18T09:10:11.231'
+				'upload_date':'2022-11-18T09:10:11.231'
+				'file_name':'name1.png'
+				'pass_id':123
+			},
+			{
+				'image_id':124
+				'sensor':'sensor 2',
+				'imaging_date':'2022-11-18T09:10:11.231'
+				'upload_date':'2022-11-18T09:10:11.231'
+				'file_name':'name2.png'
+				'pass_id':123
+			}
+	]
+}
+
+get_area(image_id) ->
+{
+	'areas':['area_name1','area_name2']
+}
+
+get_user(username) ->
+{
+	"is_admin":True
+}

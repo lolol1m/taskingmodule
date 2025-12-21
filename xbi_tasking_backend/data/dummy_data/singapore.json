@@ -1,0 +1,47 @@
+{
+  "images": [
+    {
+      "imgId": 15,
+      "imageFileName": "singapore.gif",
+      "sensorName": "sensor15",
+      "uploadDate": "2023-02-15T09:59:33.333Z",
+      "imageDateTime": "2023-02-15T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 29,
+          "areaName": "area_29"
+        }
+      ]
+    },
+    {
+      "imgId": 16,
+      "imageFileName": "malaysia.gif",
+      "sensorName": "sensor16",
+      "uploadDate": "2023-03-16T09:59:33.333Z",
+      "imageDateTime": "2023-03-16T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 50,
+          "areaName": "area_50"
+        }
+      ]
+    },
+    {
+      "imgId": 17,
+      "imageFileName": "indonesia.gif",
+      "sensorName": "sensor17",
+      "uploadDate": "2023-04-17T09:59:33.333Z",
+      "imageDateTime": "2023-04-17T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 16,
+          "areaName": "area_16"
+        },
+        {
+          "areaId": 22,
+          "areaName": "area_22"
+        }
+      ]
+    }
+  ]
+}

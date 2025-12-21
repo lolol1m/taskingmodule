@@ -1,0 +1,47 @@
+{
+  "images": [
+    {
+      "imgId": 18,
+      "imageFileName": "japan.gif",
+      "sensorName": "sensor18",
+      "uploadDate": "2023-02-18T09:59:33.333Z",
+      "imageDateTime": "2023-02-18T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 43,
+          "areaName": "area_43"
+        }
+      ]
+    },
+    {
+      "imgId": 19,
+      "imageFileName": "korea.gif",
+      "sensorName": "sensor19",
+      "uploadDate": "2023-03-19T09:59:33.333Z",
+      "imageDateTime": "2023-03-19T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 56,
+          "areaName": "area_56"
+        }
+      ]
+    },
+    {
+      "imgId": 20,
+      "imageFileName": "usa.gif",
+      "sensorName": "sensor20",
+      "uploadDate": "2023-04-20T09:59:33.333Z",
+      "imageDateTime": "2023-04-20T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 11,
+          "areaName": "area_11"
+        },
+        {
+          "areaId": 21,
+          "areaName": "area_21"
+        }
+      ]
+    }
+  ]
+}

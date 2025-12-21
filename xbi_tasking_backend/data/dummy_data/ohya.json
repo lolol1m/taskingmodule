@@ -1,0 +1,44 @@
+{
+  "images": [
+    {
+      "imgId": 12,
+      "imageFileName": "ohya.gif",
+      "sensorName": "sensor7",
+      "uploadDate": "2023-11-08T09:59:33.333Z",
+      "imageDateTime": "2023-11-08T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 81,
+          "areaName": "perfect_9"
+        }
+      ]
+    },
+    {
+      "imgId": 13,
+      "imageFileName": "wassup.gif",
+      "sensorName": "master_sensor",
+      "uploadDate": "2023-12-08T09:59:33.333Z",
+      "imageDateTime": "2023-12-08T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 66,
+          "areaName": "area_66"
+        }
+      ]
+    },
+    {
+      "imgId": 14,
+      "imageFileName": "lol.gif",
+      "sensorName": "sensor_junior",
+      "uploadDate": "2023-02-09T09:59:33.333Z",
+      "imageDateTime": "2023-02-09T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 345,
+          "areaName": "mediell_location"
+        }
+      ]
+    }
+
+  ]
+}
