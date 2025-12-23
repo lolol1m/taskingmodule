@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2 import sql
 
 from main_classes import ConfigClass
 
@@ -7,15 +8,278 @@ class Database():
     Database class connects to the SQL database to execute queries
     '''
     def __init__(self):
-        self.conn = psycopg2.connect(
-            database=ConfigClass._instance.getDatabaseName(),
-            user=ConfigClass._instance.getUser(),
-            password=ConfigClass._instance.getPassword(),
-            host=ConfigClass._instance.getIPAddress(),
-            port=ConfigClass._instance.getPort())
+        db_name = ConfigClass._instance.getDatabaseName()
+        try:
+            # Try to connect to the target database
+            self.conn = psycopg2.connect(
+                database=db_name,
+                user=ConfigClass._instance.getUser(),
+                password=ConfigClass._instance.getPassword(),
+                host=ConfigClass._instance.getIPAddress(),
+                port=ConfigClass._instance.getPort(),
+                connect_timeout=5)
+        except psycopg2.OperationalError as e:
+            # If database doesn't exist, try to create it
+            if "does not exist" in str(e) or "database" in str(e).lower():
+                try:
+                    # Connect to default postgres database to create the target database
+                    temp_conn = psycopg2.connect(
+                        database='postgres',
+                        user=ConfigClass._instance.getUser(),
+                        password=ConfigClass._instance.getPassword(),
+                        host=ConfigClass._instance.getIPAddress(),
+                        port=ConfigClass._instance.getPort(),
+                        connect_timeout=5)
+                    temp_conn.autocommit = True
+                    temp_cursor = temp_conn.cursor()
+                    temp_cursor.execute(sql.SQL("CREATE DATABASE {}").format(
+                        sql.Identifier(db_name)
+                    ))
+                    temp_cursor.close()
+                    temp_conn.close()
+                    print(f"✅ Created database '{db_name}'")
+                    
+                    # Now connect to the newly created database
+                    self.conn = psycopg2.connect(
+                        database=db_name,
+                        user=ConfigClass._instance.getUser(),
+                        password=ConfigClass._instance.getPassword(),
+                        host=ConfigClass._instance.getIPAddress(),
+                        port=ConfigClass._instance.getPort(),
+                        connect_timeout=5)
+                except Exception as create_error:
+                    print(f"   Failed to create database: {create_error}")
+                    print(f"   Original connection error: {e}")
+                    print(f"   Host: {ConfigClass._instance.getIPAddress()}")
+                    print(f"   Port: {ConfigClass._instance.getPort()}")
+                    print(f"   Database: {db_name}")
+                    print(f"   User: {ConfigClass._instance.getUser()}")
+                    raise
+            else:
+                print(f"   Database connection failed: {e}")
+                print(f"   Host: {ConfigClass._instance.getIPAddress()}")
+                print(f"   Port: {ConfigClass._instance.getPort()}")
+                print(f"   Database: {db_name}")
+                print(f"   User: {ConfigClass._instance.getUser()}")
+                print("\nPlease check:")
+                print("1. PostgreSQL service is running")
+                print("2. Database credentials are correct")
+                raise
 
         self.conn.autocommit = True
         self.cursor = None
+        
+        # Check if tables exist, if not create them
+        self._initializeDatabase()
+    
+    def _initializeDatabase(self):
+        '''
+        Initialize database schema if tables don't exist
+        '''
+        try:
+            self.openCursor()
+            # Check if users table exists
+            self.cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'users'
+                )
+            """)
+            tables_exist = self.cursor.fetchone()[0]
+            self.closeCursor()
+            
+            if not tables_exist:
+                print("Creating database schema...")
+                self._createSchema()
+                self._insertInitialData()
+                print("✅ Database schema created and initialized")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not check/initialize database schema: {e}")
+    
+    def _createSchema(self):
+        '''
+        Create all database tables
+        '''
+        self.openCursor()
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sensor_category (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sensor (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL,
+                category_id INTEGER REFERENCES sensor_category(id)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS priority (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cloud_cover (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS image_category (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS report (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ew_status (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL,
+                is_recent BOOLEAN DEFAULT FALSE
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS area (
+                scvu_area_id SERIAL PRIMARY KEY,
+                area_name VARCHAR(255) UNIQUE NOT NULL,
+                v10 BOOLEAN DEFAULT FALSE,
+                opsv BOOLEAN DEFAULT FALSE
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS image (
+                scvu_image_id SERIAL PRIMARY KEY,
+                image_id BIGINT UNIQUE,
+                image_file_name VARCHAR(255),
+                sensor_id INTEGER REFERENCES sensor(id),
+                upload_date TIMESTAMP,
+                image_datetime TIMESTAMP,
+                completed_date TIMESTAMP,
+                priority_id INTEGER REFERENCES priority(id),
+                report_id INTEGER REFERENCES report(id),
+                image_category_id INTEGER REFERENCES image_category(id),
+                image_quality VARCHAR(255),
+                cloud_cover_id INTEGER REFERENCES cloud_cover(id),
+                ew_status_id INTEGER REFERENCES ew_status(id),
+                target_tracing BOOLEAN,
+                vetter_id INTEGER REFERENCES users(id)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS image_area (
+                scvu_image_area_id SERIAL PRIMARY KEY,
+                scvu_image_id INTEGER REFERENCES image(scvu_image_id),
+                scvu_area_id INTEGER REFERENCES area(scvu_area_id),
+                UNIQUE(scvu_image_id, scvu_area_id)
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_status (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task (
+                scvu_task_id SERIAL PRIMARY KEY,
+                scvu_image_area_id INTEGER UNIQUE REFERENCES image_area(scvu_image_area_id),
+                assignee_id INTEGER REFERENCES users(id),
+                task_status_id INTEGER REFERENCES task_status(id),
+                remarks TEXT
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                account VARCHAR(255) PRIMARY KEY,
+                password VARCHAR(255) NOT NULL
+            )
+        """)
+        
+        self.closeCursor()
+    
+    def _insertInitialData(self):
+        '''
+        Insert initial data into lookup tables
+        '''
+        self.openCursor()
+        
+        self.cursor.execute("INSERT INTO cloud_cover(id, name) VALUES (0, null) ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO cloud_cover(id, name) VALUES (1, 'UTC') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO cloud_cover(id, name) VALUES (2, '0C') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO cloud_cover(id, name) VALUES (3, '10-90C') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO cloud_cover(id, name) VALUES (4, '100C') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO ew_status(id, name) VALUES (1, 'ttg done') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO ew_status(id, name) VALUES (2, 'xbi done') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO image_category(id, name) VALUES (0, null) ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO image_category(id, name) VALUES (1, 'Detection') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO image_category(id, name) VALUES (2, 'Classification') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO image_category(id, name) VALUES (3, 'Identification') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO image_category(id, name) VALUES (4, 'Recognition') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO priority(id, name) VALUES (0, null) ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO priority(id, name) VALUES (1, 'Low') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO priority(id, name) VALUES (2, 'Medium') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO priority(id, name) VALUES (3, 'High') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (0, null) ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (1, 'DS(OF)') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (2, 'DS(SF)') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (3, 'I-IIRS 0') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (4, 'IIR') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (5, 'Re-DL') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (6, 'Research') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (7, 'TOS') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (8, 'No Findings') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (9, 'Downgrade') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (10, 'Failed') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO report(id, name) VALUES (11, 'Img Error') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO task_status(id, name) VALUES (1, 'Incomplete') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO task_status(id, name) VALUES (2, 'In Progress') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO task_status(id, name) VALUES (3, 'Verifying') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO task_status(id, name) VALUES (4, 'Completed') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO area(scvu_area_id, area_name, v10) VALUES (0, 'OTHERS', false) ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('II', '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('Senior II', 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35') ON CONFLICT DO NOTHING")
+        self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('IA', '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce') ON CONFLICT DO NOTHING")
+        
+        self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('II User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
+        self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('Senior II User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
+        self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('IA User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
+        
+        self.closeCursor()
     
     def openCursor(self):
         '''

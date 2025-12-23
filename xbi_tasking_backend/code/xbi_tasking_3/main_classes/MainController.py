@@ -40,7 +40,6 @@ class MainController():
                 dateutil.parser.isoparse(image['uploadDate']),
                 dateutil.parser.isoparse(image['imageDateTime'])
             )
-            self.qm.insertImageAreaDSTA(image['imgId'], "OTHERS")
             for area in image['areas']:
                 self.qm.insertArea(
                     area['areaName']
@@ -63,7 +62,6 @@ class MainController():
             dateutil.parser.isoparse(json['uploadDate']),
             dateutil.parser.isoparse(json['imageDateTime'])
         )
-        self.qm.insertImageAreaTTG(scvu_image_id, "OTHERS")
         for area_name in json['areas']:
             self.qm.insertArea(area_name)
             self.qm.insertImageAreaTTG(scvu_image_id, area_name)
@@ -134,7 +132,10 @@ class MainController():
             area_datas = self.qm.getTaskingSummaryAreaData(image_id)
             output[image_id] = self.formatTaskingSummaryImage(image_data, area_datas)
             for area_data in area_datas:
-                output[area_data[0]] = self.formatTaskingSummaryArea(area_data, image_id)
+                task_id = area_data[0]
+                # Use a negative key for tasks to avoid conflicts with image IDs
+                # Frontend will still work because it uses Parent ID to identify child rows
+                output[-task_id] = self.formatTaskingSummaryArea(area_data, image_id)
         return output
 
     def formatTaskingSummaryImage(self, image, areas):
@@ -146,21 +147,45 @@ class MainController():
         Input:      areas is nested list with id, area_name, task_status, task_remarks, username
         Output:     json in the format that UI wants
         '''
+        if not areas or len(areas) == 0:
+            # Return empty/default values if no areas found
+            return {
+                "Sensor Name": image[1],
+                "Image File Name": image[2],
+                "Image ID": image[3],
+                "Upload Date": image[4].strftime(datetime_format),
+                "Image Datetime": image[5].strftime(datetime_format),
+                "Report": image[6],
+                "Priority": image[7],
+                "Image Category": image[8],
+                "Image Quality": image[9],
+                "Cloud Cover": image[10],
+                "EW Status": image[11],
+                "Target Tracing": image[12],
+                "Area": "No areas",
+                "Task Completed": "0/0",
+                "V10": False,
+                "OPS V": False,
+                "Remarks": "",
+                "Child ID": [],
+                "Assignee": "Unassigned"
+            }
+        
         count = 0
         remarks = ""
         child_id = []
-        assignee = areas[0][4]
+        assignee = areas[0][4] if len(areas[0]) > 4 else "Unassigned"
         V10 = False
         OPSV = False
         for area in areas:
             child_id.append(area[0])
-            remarks += area[3] + "\n"
+            remarks += (area[3] if area[3] else "") + "\n"
             if area[2] == "Completed":
                 count += 1
             if assignee != area[4]:
                 assignee = "multiple"
-            V10 = V10 or area[5]
-            OPSV = OPSV or area[6]
+            V10 = V10 or (area[5] if len(area) > 5 else False)
+            OPSV = OPSV or (area[6] if len(area) > 6 else False)
 
         output = {
             "Sensor Name": image[1],
@@ -175,7 +200,7 @@ class MainController():
             "Cloud Cover": image[10],
             "EW Status": image[11],
             "Target Tracing": image[12],
-            "Area": areas[0][1],
+            "Area": areas[0][1] if len(areas[0]) > 1 else "Unknown",
             "Task Completed": str(count) + "/" + str(len(areas)),
             "V10": V10,
             "OPS V": OPSV,
@@ -197,6 +222,7 @@ class MainController():
             "Assignee": area[4],
             "Task Status": area[2],
             "Remarks": area[3],
+            "SCVU Task ID": area[0],  # Include the actual task ID for frontend use
             "Parent ID": parent_id
         }
         return output
@@ -218,7 +244,8 @@ class MainController():
             output[image[0]] = self.formatTaskingManagerImage(image, image_areas)
 
             for area in areas:
-                output[area[0]] = self.formatTaskingManagerArea(image, area, image_areas)
+                # Use negative area ID to avoid conflicts with image IDs
+                output[-area[0]] = self.formatTaskingManagerArea(image, area, image_areas)
                 
             
         return output
@@ -262,6 +289,7 @@ class MainController():
         data = {
             'Area Name': area_data[1],
             'Parent ID': image_data[0],
+            'SCVU Image Area ID': area_data[0],  # Include the actual scvu_image_area_id for frontend use
             'Assignee': assignee,
             'Remarks': remarks
         }
@@ -332,11 +360,15 @@ class MainController():
         '''
         Function:   Runs completeImage for all the images in the list
         Input:      json is a dictionary with the required data
-        Output:     NIL
+        Output:     Dictionary with results for each image
         '''
         current_datetime = datetime.datetime.today()
+        results = {}
         for i in range(len(json["SCVU Image ID"])):
-            self.completeImage(json["SCVU Image ID"][i], json["Vetter"], current_datetime)
+            image_id = json["SCVU Image ID"][i]
+            result = self.completeImage(image_id, json["Vetter"], current_datetime)
+            results[image_id] = result
+        return results
     
     def completeImage(self, scvu_image_id, vetter, current_datetime):
         '''
@@ -346,10 +378,15 @@ class MainController():
         '''
         tasks = self.qm.getAllTaskStatusForImage(scvu_image_id)
         completed_task_id = self.qm.getTaskStatusID("Completed")
+        incomplete_tasks = []
         for task in tasks:
             if task[1] != completed_task_id:
-                return {}
+                incomplete_tasks.append(task[0])
+        if incomplete_tasks:
+            # Return error message instead of empty dict
+            return {"error": f"Cannot complete image {scvu_image_id}: Tasks {incomplete_tasks} are not completed"}
         self.qm.completeImage(scvu_image_id, vetter, current_datetime)
+        return {"success": True}
     
     def uncompleteImages(self, json):
         '''
@@ -413,13 +450,13 @@ class MainController():
             'Image ID' : image_data[3],
             'Upload Date' : image_data[4].strftime(datetime_format),
             'Image Datetime' : image_data[5].strftime(datetime_format),
-            'Area' : area_data[0][1],
-            'Assignee' : area_data[0][3],
-            'Report' : image_data[6],
-            'Priority' : image_data[7],
-            'Image Category' : image_data[8],
+            'Area' : area_data[0][1] if area_data and len(area_data) > 0 else '',
+            'Assignee' : area_data[0][3] if area_data and len(area_data) > 0 else 'Unassigned',
+            'Report' : image_data[6],  # report_name (COALESCE)
+            'Priority' : image_data[7],  # priority_name (COALESCE)
+            'Image Category' : image_data[8],  # image_category_name (COALESCE)
             'Image Quality' : image_data[9],
-            'Cloud Cover' : image_data[10],
+            'Cloud Cover' : image_data[10],  # cloud_cover_name (COALESCE)
             'EW Status' : image_data[11],
             'Vetter': image_data[12]
         }
@@ -450,7 +487,8 @@ class MainController():
             areaData = self.qm.getImageAreaData(image_id)
             output[image_id] = self.formatCompleteImageImage(image, areaData)
             for area in areaData:
-                output[area[0]] = self.formatCompleteImageArea(area, image_id)
+                # Use negative task ID to avoid conflicts with image IDs
+                output[-area[0]] = self.formatCompleteImageArea(area, image_id)
         return output               
 
     def getSensorCategory(self):

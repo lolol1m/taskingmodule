@@ -49,24 +49,28 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
 
             let inputDataByKey = completedImagesData[key]
 
-            if (inputDataByKey["Child ID"]) { // will only set data for this row if it is an image (i.e. has no parent ID, and has only a child ID.)
+            // Only show image rows - skip area/task entries (entries with "Parent ID")
+            if (inputDataByKey["Child ID"] && !inputDataByKey["Parent ID"]) { // Only image entries (has Child ID, no Parent ID)
+              const imageFileName = inputDataByKey["Image File Name"] || `Image_${key}`;
               output.push({
-                groupName: [inputDataByKey["Image File Name"]], sensorName: inputDataByKey["Sensor Name"],
-                imageId: inputDataByKey["Image ID"], uploadDate: inputDataByKey["Upload Date"],
-                imageDateTime: inputDataByKey["Image Datetime"], areaName: inputDataByKey["Area"],
-                assignee: inputDataByKey["Assignee"], vetter: inputDataByKey["Vetter"],
-                report: inputDataByKey["Report"], imageCategory: inputDataByKey["Image Category"],
-                imageQuality: inputDataByKey["Image Quality"], cloudCover: inputDataByKey["Cloud Cover"],
-                id: parseInt(key), childId: inputDataByKey["Child ID"], priority: inputDataByKey["Priority"]
-              },)
-            } else { // will only set data for this row if it is a task (i.e. has no child ID)
-              let parentDict = completedImagesData[inputDataByKey["Parent ID"]]
-              let parentName = parentDict["Image File Name"]
-              output.push({
-                groupName: [parentName, inputDataByKey["Area Name"]], assignee: inputDataByKey["Assignee"],
-                remarks: inputDataByKey["Remarks"], id: parseInt(key), parentId: inputDataByKey["Parent ID"]
+                imageFileName: imageFileName, // Simple field name for display
+                sensorName: inputDataByKey["Sensor Name"],
+                imageId: inputDataByKey["Image ID"], 
+                uploadDate: inputDataByKey["Upload Date"],
+                imageDateTime: inputDataByKey["Image Datetime"], 
+                areaName: inputDataByKey["Area"],
+                assignee: inputDataByKey["Assignee"], 
+                vetter: inputDataByKey["Vetter"],
+                report: inputDataByKey["Report"], 
+                imageCategory: inputDataByKey["Image Category"],
+                imageQuality: inputDataByKey["Image Quality"], 
+                cloudCover: inputDataByKey["Cloud Cover"],
+                id: parseInt(key), 
+                childId: inputDataByKey["Child ID"], 
+                priority: inputDataByKey["Priority"]
               },)
             }
+            // Skip all area/task entries - don't show them in Completed Images
           });
           return output;
         });
@@ -75,6 +79,7 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
   )
 
   const columns = [ // headers for data
+    { field: 'imageFileName', headerName: 'Image File Name', width: 200 },
     { field: 'sensorName', headerName: 'Sensor Name' },
     { field: 'imageId', headerName: 'Image ID' },
     { field: 'uploadDate', headerName: 'Upload Date' },
@@ -89,7 +94,6 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
     { field: 'cloudCover', headerName: 'Cloud Cover' },
   ]
 
-  const getTreeDataPath = (row) => row.groupName;
 
   const processImage = (apiPath) => { // function is run to uncomplete any images based off selected rows
     let isImage = true // changes to false if fails any checks, if passes all, uncomplete image will proceed
@@ -125,15 +129,12 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
         <Button variant="contained" onClick={() => { processImage('/uncompleteImages') }}>Uncomplete Image</Button>
       </Box>
       {<DataGridPro
-        treeData
         rows={rows}
         columns={columns}
         components={{ Toolbar: GridToolbar }}
-        getTreeDataPath={getTreeDataPath}
         rowHeight={80}
         checkboxSelection
         onSelectionModelChange={ids => setSelectedRow(ids)}
-        isRowSelectable={(params) => params.row.groupName.length == 1}
       />}
     </div>
   );

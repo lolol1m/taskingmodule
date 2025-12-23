@@ -81,6 +81,11 @@ const DatePickerModal = (props) => {
 
 
   const getDates = () => {
+    // Check if both dates are selected
+    if (!value[0] || !value[1]) {
+      alert('Please select both start and end dates');
+      return;
+    }
     processDate(value[0]["$d"], value[1]["$d"]) // value is some weird thing so data needs to be extracted, can console.log to check
   }
 
@@ -97,25 +102,18 @@ const DatePickerModal = (props) => {
   }
 
   const processDate = (startDate, endDate) => {
-    let isDate = true // check whether date is valid
-    if (startDate.length == 0 || endDate.length == 0) {
-      isDate = false
+    // Check if dates are valid Date objects
+    if (!startDate || !endDate || !(startDate instanceof Date) || !(endDate instanceof Date)) {
+      alert('Invalid date selection. Please select both dates again.');
+      return;
     }
 
-    if (isDate) {
-      let json = {
-        "Start Date": toISOLocal(startDate),
-        "End Date": toISOLocal(endDate)
-      }
-      setDateRange(json);
-      // axios.post("/test", json)
-      //   .then(function (response) {
-      //     console.log(response);
-      //   })
-      //   .catch(function (error) {
-      //     console.log(error);
-      //   });
-    };
+    let json = {
+      "Start Date": toISOLocal(startDate),
+      "End Date": toISOLocal(endDate)
+    }
+    setDateRange(json);
+    handleClose(); // Close the modal after setting the date range
   }
 
   return (

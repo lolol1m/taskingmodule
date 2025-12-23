@@ -17,20 +17,27 @@ function InsertJson() {
 
     const handleSubmit = async(event) => {
         event.preventDefault();
+        
+        if (!selectedFile) {
+            alert('Please select a file first');
+            return;
+        }
+        
         const formData = new FormData();
-        formData.append('selectedFile', selectedFile);
-
-        console.log('hello', selectedFile);
+        formData.append('file', selectedFile); // Backend expects 'file' as the key
         
         try {
             const response = await Axios({
                 method: 'post',
                 url: "/insertDSTAData",
-                data: {'file':selectedFile},
+                data: formData,
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
+            alert('Data uploaded successfully!');
+            console.log('Upload response:', response);
         } catch(error) {
-            console.log(error);
+            console.error('Upload error:', error);
+            alert('Error uploading file: ' + (error.response?.data?.detail || error.message));
         }
     }
 

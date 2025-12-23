@@ -34,8 +34,9 @@ class QueryManager():
         Input:      image_id, image_file_name, sensor_name, upload_date, image_datetime
         Output:     NIL
         '''
-        query = f"INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id) \
-        VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done')) \
+        # Set default values for required foreign keys (0 = null in lookup tables)
+        query = f"INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) \
+        VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) \
         ON CONFLICT (image_id) DO NOTHING"
         self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
     
@@ -158,12 +159,12 @@ class QueryManager():
         Input:      NIL
         Output:     list of tuple, each containing scvu_image_id, sensor.name, image_file_name, image_id, upload_date, image_datetime, priority.name
         '''
-        query = f"SELECT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, priority.name \
-        FROM image, sensor, priority \
+        query = f"SELECT image.scvu_image_id, COALESCE(sensor.name, 'Unknown') as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, COALESCE(priority.name, NULL) as priority_name \
+        FROM image \
+        LEFT JOIN sensor ON sensor.id = image.sensor_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
         WHERE image.completed_date IS NULL \
-        AND (image.upload_date >= %s AND image.upload_date < %s) \
-        AND sensor.id = image.sensor_id \
-        AND priority.id = image.priority_id"
+        AND (image.upload_date >= %s AND image.upload_date < %s)"
         cursor = self.db.executeSelect(query, (start_date, end_date))
         return cursor
     
@@ -269,18 +270,20 @@ class QueryManager():
         Input:      NIL
         Output:     nested list with id, sensor_name, image_file_name, image_id, upload_date, image_datetime, report, priority, image_category, quality, cloud_cover, ew_status, target_tracing
         '''
-        query = f"SELECT DISTINCT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, report.name, priority.name, \
-        image_category.name, image.image_quality, cloud_cover.name, ew_status.name, image.target_tracing \
-        FROM sensor, image, report, priority, image_category, cloud_cover, ew_status, image_area, task \
-        WHERE sensor.id = image.sensor_id \
-        AND report.id = image.report_id \
-        AND priority.id = image.priority_id \
-        AND image_category.id = image.image_category_id \
-        AND cloud_cover.id = image.cloud_cover_id \
-        AND ew_status.id = image.ew_status_id \
-        AND image_area.scvu_image_id = image.scvu_image_id \
-        AND image_area.scvu_image_area_id = task.scvu_image_area_id \
-        AND image.completed_date is null \
+        query = f"SELECT DISTINCT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, COALESCE(cloud_cover.name, NULL) as cloud_cover_name, \
+        ew_status.name, image.target_tracing \
+        FROM image \
+        JOIN sensor ON sensor.id = image.sensor_id \
+        JOIN ew_status ON ew_status.id = image.ew_status_id \
+        LEFT JOIN report ON report.id = image.report_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
+        LEFT JOIN image_category ON image_category.id = image.image_category_id \
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id \
+        JOIN image_area ON image_area.scvu_image_id = image.scvu_image_id \
+        JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id \
+        WHERE image.completed_date IS NULL \
         AND (image.upload_date >= %s AND image.upload_date < %s)"
         return self.db.executeSelect(query, (start_date, end_date))
 
@@ -290,14 +293,14 @@ class QueryManager():
         Input:      NIL
         Output:     nested list with id, area_name, task_status, task_remarks, username
         '''
-        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, task.remarks, users.name, area.v10, area.opsv \
-        FROM task, area, image_area, image, task_status, users \
-        WHERE task.scvu_image_area_id = image_area.scvu_image_area_id \
-        AND image_area.scvu_image_id = image.scvu_image_id \
-        AND image_area.scvu_area_id = area.scvu_area_id \
-        AND task.task_status_id = task_status.id \
-        AND task.assignee_id = users.id \
-        AND image.scvu_image_id = %s \
+        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, COALESCE(users.name, 'Unassigned') as username, area.v10, area.opsv \
+        FROM task \
+        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
+        JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
+        JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
+        JOIN task_status ON task.task_status_id = task_status.id \
+        LEFT JOIN users ON task.assignee_id = users.id \
+        WHERE image.scvu_image_id = %s \
         ORDER BY area.area_name"
         return self.db.executeSelect(query, (image_id,))
 
@@ -374,11 +377,13 @@ class QueryManager():
         Input: scvu_image_id
         Output: scvu_task_id, area name, remarks, assignee name
         '''
-        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, task.remarks, users.name FROM task, area, image_area, image, users \
-        WHERE task.scvu_image_area_id = image_area.scvu_image_area_id \
-        AND image_area.scvu_image_id = image.scvu_image_id \
-        AND image_area.scvu_area_id = area.scvu_area_id \
-        AND image.scvu_image_id = %s \
+        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, COALESCE(users.name, 'Unassigned') as assignee_name \
+        FROM task \
+        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
+        JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
+        JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
+        LEFT JOIN users ON task.assignee_id = users.id \
+        WHERE image.scvu_image_id = %s \
         ORDER BY area.area_name"
         cursor = self.db.executeSelect(imageAreaQuery, (scvu_image_id, ))
         return cursor
@@ -389,19 +394,21 @@ class QueryManager():
         Input: start_date, end_date
         Output: scvu image id, sensor name, image file name, image id, image upload date, image date time, report name, priority name, image category name, image quality, cloud cover, ew status
         '''
-        imageQuery = f"SELECT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, report.name, \
-        priority.name, image_category.name, image.image_quality, cloud_cover.name, ew_status.name, users.name \
-        FROM sensor, image, priority, image_category, cloud_cover, ew_status, report, users \
+        imageQuery = f"SELECT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, \
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, ew_status.name, users.name \
+        FROM image \
+        JOIN sensor ON sensor.id = image.sensor_id \
+        JOIN ew_status ON ew_status.id = image.ew_status_id \
+        JOIN users ON users.id = image.vetter_id \
+        LEFT JOIN report ON report.id = image.report_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
+        LEFT JOIN image_category ON image_category.id = image.image_category_id \
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id \
         WHERE (image.upload_date >= %s AND image.upload_date < %s) \
-        AND sensor.id = image.sensor_id \
-        AND priority.id = image.priority_id \
-        AND image_category.id = image.image_category_id \
-        AND cloud_cover.id = image.cloud_cover_id \
-        AND ew_status.id = image.ew_status_id \
-        AND report.id = image.report_id \
         AND image.vetter_id IS NOT NULL \
-        AND users.id = image.vetter_id \
-        AND completed_date IS NOT NULL"
+        AND image.completed_date IS NOT NULL"
 
         cursor = self.db.executeSelect(imageQuery, (start_date, end_date))
         return cursor

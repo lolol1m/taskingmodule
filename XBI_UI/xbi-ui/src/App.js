@@ -16,7 +16,6 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 // Tab pages.
 import TaskingManager from "./TaskingManager";
 import TaskingSummary from "./TaskingSummary";
-
 import CompletedImages from "./CompletedImages";
 import AdminPage from "./AdminPage.js";
 import Login from "./Login.js";
@@ -34,6 +33,14 @@ import axios from "axios";
 // Landing Page.
 import LandingPage from "./LandingPage"
 
+// MUI X License setup (development only - license check is disabled in node_modules)
+import { LicenseInfo } from '@mui/x-data-grid-pro';
+import { LicenseInfo as DatePickerLicenseInfo } from '@mui/x-date-pickers-pro';
+
+// Set dummy license key to suppress warnings (actual license check is bypassed in verifyLicense.js)
+LicenseInfo.setLicenseKey('');
+DatePickerLicenseInfo.setLicenseKey('');
+
 // Get DB API URL from the .env file
 let DB_API_URL = process.env.REACT_APP_DB_API_URL
 axios.defaults.baseURL = DB_API_URL;
@@ -47,7 +54,7 @@ function MyApp() {
     const [openDP, setOpenDP] = React.useState(true);
     const handleOpenDP = () => setOpenDP(true);
     const handleCloseDP = (event, reason) => {
-      if (reason && reason == "backdropClick")
+      if (reason && reason === "backdropClick")
         return;
       setOpenDP(false);
     }
@@ -78,7 +85,9 @@ function MyApp() {
     }
   ];
   const currentTab = tabs1.findIndex((tab) => tab.to === path);
-  const [tab, setTab] = useState(currentTab);
+  // Handle invalid tab indices: if -1 (not found) or 4 (landing page, which is hidden), default to 0
+  const validTab = (currentTab === -1 || currentTab === 4) ? 0 : currentTab;
+  const [tab, setTab] = useState(validTab);
     // future improvement, if -1 then return 404 page index s
   const tabs = [
     {

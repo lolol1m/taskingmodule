@@ -83,17 +83,22 @@ const TaskingSummary = (dateRange) => {
             let inputDataByKey = inputData[key]
 
             if (inputDataByKey["Child ID"]){
-              rows.push({ groupName: [inputDataByKey["Image File Name"]], sensorName: inputDataByKey["Sensor Name"], imageId: inputDataByKey["Image ID"],  
+              const imageFileName = inputDataByKey["Image File Name"] || `Image_${key}`;
+              rows.push({ groupName: [imageFileName], sensorName: inputDataByKey["Sensor Name"], imageId: inputDataByKey["Image ID"],  
                               uploadDate: inputDataByKey["Upload Date"], imageDateTime: inputDataByKey["Image Datetime"], areaName: inputDataByKey["Area"], 
                               assignee: inputDataByKey["Assignee"], report: inputDataByKey["Report"], taskStatus: inputDataByKey["Task Completed"], 
                               priority: inputDataByKey["Priority"], imageCategory: inputDataByKey["Image Category"], imageQuality: inputDataByKey["Image Quality"],
                               cloudCover: inputDataByKey["Cloud Cover"], ewStatus: inputDataByKey["EW Status"], targetTracing: inputDataByKey["Target Tracing"],
                               v10: inputDataByKey["V10"], opsV: inputDataByKey["OPS V"], remarks: inputDataByKey["Remarks"], id: parseInt(key) , childId: inputDataByKey["Child ID"]},)
-            } else {
-              let parentDict = inputData[inputDataByKey["Parent ID"]]
-              let parentName = parentDict["Image File Name"]
-              rows.push({ groupName: [parentName, inputDataByKey["Area Name"]], taskStatus: inputDataByKey["Task Status"], 
-                        assignee: inputDataByKey["Assignee"], remarks: inputDataByKey["Remarks"], id: parseInt(key) , parentId: inputDataByKey["Parent ID"]},)
+            } else if (inputDataByKey["Parent ID"] !== undefined) {
+              // Convert Parent ID to integer for dictionary lookup (backend returns it as string or int)
+              const parentId = parseInt(inputDataByKey["Parent ID"]);
+              let parentDict = inputData[parentId] || inputData[inputDataByKey["Parent ID"]];
+              let parentName = parentDict ? (parentDict["Image File Name"] || `Image_${parentId}`) : `Image_${parentId}`;
+              let areaName = inputDataByKey["Area Name"] || `Area_${key}`;
+              rows.push({ groupName: [parentName, areaName], taskStatus: inputDataByKey["Task Status"], 
+                        assignee: inputDataByKey["Assignee"], remarks: inputDataByKey["Remarks"], 
+                        id: parseInt(key), parentId: parentId, scvuTaskId: inputDataByKey["SCVU Task ID"] || null},)
             }
           });
           return rows
@@ -325,6 +330,9 @@ const TaskingSummary = (dateRange) => {
       width: 200 ,
       valueGetter: (params) => {
         const hierarchy = params.row.groupName;
+        if (!hierarchy || !Array.isArray(hierarchy) || hierarchy.length === 0) {
+          return params.row.id?.toString() || 'Unknown';
+        }
         return hierarchy[hierarchy.length - 1]; 
         /* return the last name in groupName, which is where the treePath is. So if its the first row ([image1]), it will return itself
           If it is the 2nd row, it will be the last of [image1, area2].
@@ -463,19 +471,41 @@ const TaskingSummary = (dateRange) => {
       }
     })
     if (isTask){
-      let json = {
-        "SCVU Task ID": selectedRow
+      // Get the actual task IDs from the selected rows
+      let taskIds = [];
+      selectedRow.forEach((rowId) => {
+        // Find the row in the rows array to get the scvuTaskId
+        const row = rows.find(r => r.id === rowId);
+        if (row && row.scvuTaskId) {
+          taskIds.push(row.scvuTaskId);
+        } else {
+          console.warn(`Row ${rowId} does not have a task ID, using row ID as fallback`);
+          taskIds.push(rowId); // Fallback to row ID if task ID not found
+        }
+      });
+      
+      if (taskIds.length === 0) {
+        alert("No valid task IDs found. Please select task rows.");
+        return;
       }
+      
+      let json = {
+        "SCVU Task ID": taskIds
+      }
+      console.log("Sending task IDs:", json);
       axios.post(apiPath, json)
       .then(function (response) {
         console.log(response);
+        alert("Task(s) completed successfully!");
       })
       .catch(function (error) {
-        console.log(error);
+        console.error("Error completing task:", error);
+        const errorMsg = error.response?.data?.error || error.response?.data?.detail || error.message || "Unknown error";
+        alert("Error completing task: " + errorMsg);
       });
-      };
       setReloadRows(true)
     }
+  }
 
   const processImage = (apiPath) => { // function to call the DB for all Image related queries, apiPath will determine the exact DB API to call
     let isImage = true
@@ -493,23 +523,85 @@ const TaskingSummary = (dateRange) => {
     }
 
     if (isImage){ // semi hardcoded to be used for complete image, this means that processImage cant rly be used for other button to process image.
-      let sessionUsername = sessionStorage.getItem('username');
-      let usernameString = JSON.parse(sessionUsername);
-      let json = {
-        "SCVU Image ID": selectedRow,
-        "Vetter": usernameString 
-      } // ^ this is why its semi hardcoded, because complete image needs a vetter, it suffices for the current design.
-
-      axios.post(apiPath, json)
-      .then(function (response) {
-        console.log(response);
-      })
-      .catch(function (error) {
-        console.log(error);
+      // First, save any pending changes (image category, cloud cover, remarks, etc.) for the selected images
+      let dataToSave = {};
+      let hasChanges = false;
+      selectedRow.forEach((rowId) => {
+        let dataRow = _.get(workingData, rowId);
+        if (dataRow && dataRow["Child ID"]) {
+          // This is an image row - save its data
+          dataToSave[rowId] = dataRow;
+          hasChanges = true;
+        }
       });
-      console.log("###posted to CI###", json)
+      
+      // Also save task remarks for areas under these images
+      Object.keys(workingData).forEach((key) => {
+        let dataRow = _.get(workingData, key);
+        if (dataRow && dataRow["Parent ID"] !== undefined) {
+          // This is a task/area row
+          let parentId = dataRow["Parent ID"];
+          if (selectedRow.includes(parentId)) {
+            // This task belongs to one of the selected images - save its remarks
+            if (!dataToSave[key]) {
+              dataToSave[key] = {};
+            }
+            dataToSave[key]["Remarks"] = dataRow["Remarks"];
+            hasChanges = true;
+          }
+        }
+      });
+      
+      // Save changes first, then complete the image
+      const saveAndComplete = () => {
+        let sessionUsername = sessionStorage.getItem('username');
+        let usernameString = JSON.parse(sessionUsername);
+        let json = {
+          "SCVU Image ID": selectedRow,
+          "Vetter": usernameString 
+        }
+
+        axios.post(apiPath, json)
+        .then(function (response) {
+          console.log(response);
+          // Check for errors in response
+          if (response.data) {
+            const imageIds = json["SCVU Image ID"];
+            for (let i = 0; i < imageIds.length; i++) {
+              const imageId = imageIds[i];
+              const result = response.data[imageId];
+              if (result && result.error) {
+                alert(`Image ${imageId}: ${result.error}`);
+              } else if (result && result.success) {
+                console.log(`Image ${imageId} completed successfully`);
+              }
+            }
+          }
+          setReloadRows(true); // refresh the DOM as the row that was completed would be gone and into CI
+        })
+        .catch(function (error) {
+          console.log(error);
+          alert("Error completing image: " + (error.response?.data?.detail || error.message));
+        });
+        console.log("###posted to CI###", json)
+      };
+      
+      if (hasChanges && Object.keys(dataToSave).length > 0) {
+        // Save changes first, then complete
+        axios.post("/updateTaskingSummaryData", dataToSave)
+          .then(function (response) {
+            console.log("Changes saved before completing image:", response);
+            saveAndComplete();
+          })
+          .catch(function (error) {
+            console.error("Error saving changes:", error);
+            alert("Error saving changes. Image will not be completed. Please try again.");
+          });
+      } else {
+        // No changes to save, just complete the image
+        saveAndComplete();
+      }
     };
-    setReloadRows(true) // refresh the DOM as the row that was completed would be gone and into CI
   } 
 
   const processSendData = () => {
@@ -556,7 +648,28 @@ const TaskingSummary = (dateRange) => {
 
   const [pageSize, setPageSize] = React.useState(10);
 
-  const getTreeDataPath = (row) => row.groupName; // this defines what value should make up the dropdown table. So currently groupname is what merges the two rows together to form a dropdwon
+  const getTreeDataPath = (row) => {
+    // Ensure groupName exists and is an array, filter out undefined values
+    if (!row.groupName || !Array.isArray(row.groupName)) {
+      return [row.id?.toString() || 'unknown'];
+    }
+    let path = row.groupName.filter(item => item != null).map(item => item?.toString() || '');
+    
+    // For image rows (groupName length === 1), append the row ID to ensure uniqueness
+    // This prevents errors when multiple images have the same file name
+    if (path.length === 1 && row.id !== undefined && row.id !== null) {
+      path[0] = `${path[0]}_${row.id}`;
+    }
+    // For area rows (groupName length === 2), match the parent's path format
+    // Parent image's path is [imageFileName_id], so area should be [imageFileName_id, areaName]
+    else if (path.length === 2 && row.parentId !== undefined && row.parentId !== null) {
+      // Reconstruct the parent's unique path format
+      const parentImagePath = `${path[0]}_${row.parentId}`;
+      path[0] = parentImagePath;
+    }
+    
+    return path;
+  }; // this defines what value should make up the dropdown table. Images get unique paths, areas nest under their parent
   const groupingColDef = {
     headerName: "",
     hideDescendantCount: true,

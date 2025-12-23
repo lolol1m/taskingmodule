@@ -23,13 +23,10 @@ app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 origins = [
-    "*"
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
 ]
 mc = MainController()
-
-origins = [
-    "*"
-]
 
 app.add_middleware(
     CORSMiddleware,
@@ -350,8 +347,18 @@ async def getTaskingSummaryData(request: Request):
                     },
         }
     '''
-    data = await request.json()
-    return mc.getTaskingSummaryData(data)
+    try:
+        data = await request.json()
+        return mc.getTaskingSummaryData(data)
+    except Exception as e:
+        import traceback
+        error_msg = f"Error in getTaskingSummaryData: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e), "detail": error_msg}
+        )
     
 @app.post("/getTaskingManagerData")
 async def getTaskingManagerData(request: Request):
@@ -478,8 +485,15 @@ async def assignTask(request: Request):
             ]
         }
     '''
-    data = await request.json()
-    return mc.assignTask(data)
+    try:
+        data = await request.json()
+        return mc.assignTask(data)
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 @app.post("/startTasks")
 async def startTasks(request: Request):

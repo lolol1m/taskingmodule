@@ -110,19 +110,61 @@ export default function TaskingManager({ dateRange }) {
     formattedData = Object.keys(inputData).map((key) => {
       let inputDataByKey = inputData[key];
 
-      if (inputDataByKey["Parent ID"]) {
-        let parentDict = inputData[inputDataByKey["Parent ID"]];
-        let parentName = parentDict["Image File Name"];
-        return {
-          groupName: [`${parentName} (${inputDataByKey["Parent ID"]})`, inputDataByKey["Area Name"]],
-          assignee: inputDataByKey['Assignee'],
-          parentId: inputDataByKey["Parent ID"],
-          id: parseInt(key)
-        };
+      // Determine entry type: area entries have "Area Name" and "Parent ID", image entries have "Image File Name"
+      const hasAreaName = inputDataByKey["Area Name"] !== undefined && inputDataByKey["Area Name"] !== null && inputDataByKey["Area Name"] !== "";
+      const hasImageFileName = inputDataByKey["Image File Name"] !== undefined && inputDataByKey["Image File Name"] !== null && inputDataByKey["Image File Name"] !== "";
+      const hasParentId = inputDataByKey["Parent ID"] !== undefined && inputDataByKey["Parent ID"] !== null;
+      
+      // Area entries: have Area Name, may or may not have Parent ID
+      // Note: Area entries now use negative keys to avoid conflicts with image IDs
+      if (hasAreaName && !hasImageFileName) {
+        // This is an area/task entry
+        if (hasParentId) {
+          // Convert Parent ID to integer for dictionary lookup
+          const parentId = parseInt(inputDataByKey["Parent ID"]);
+          // Look up parent - try both integer and string keys
+          let parentDict = inputData[parentId] || inputData[String(parentId)];
+          
+          // Verify parent is an image entry, not another area entry
+          if (parentDict && parentDict["Image File Name"]) {
+            let parentName = parentDict["Image File Name"];
+            let areaName = inputDataByKey["Area Name"];
+            // Parse key as integer (may be negative for area entries)
+            const areaId = parseInt(key);
+            // Use parent's ID to create unique tree path
+            return {
+              groupName: [parentName, areaName], // For display
+              treePath: [`img_${parentId}`, areaName], // Use parent's unique tree path identifier
+              assignee: inputDataByKey['Assignee'] || null,
+              parentId: parentId,
+              id: areaId, // Use the actual key (negative for area entries) for display
+              scvuImageAreaId: inputDataByKey['SCVU Image Area ID'] || null, // Store the actual positive ID for backend
+              // Area rows don't have image-specific fields, but we can inherit some from parent for display
+              imageName: null,
+              imageDatetime: null,
+              sensorName: null,
+              uploadDate: null,
+              priority: null,
+              ttg: null
+            };
+          } else {
+            // Parent image not found or parent is also an area entry - skip this area entry
+            console.warn(`[TaskingManager] Skipping area entry ${key} - parent image ${parentId} not found or invalid:`, parentDict);
+            return null;
+          }
+        } else {
+          // Area entry without Parent ID - this shouldn't happen, but skip it
+          console.warn(`[TaskingManager] Skipping area entry ${key} - missing Parent ID:`, inputDataByKey);
+          return null;
+        }
       }
-      else {
+      // Image entries: have Image File Name
+      else if (hasImageFileName) {
+        const imageFileName = inputDataByKey["Image File Name"];
+        const imageId = parseInt(key);
         return {
-          groupName: [`${inputDataByKey["Image File Name"]} (${parseInt(key)})`],
+          groupName: [imageFileName], // For display
+          treePath: [`img_${imageId}`], // Unique path for tree structure (prevents grouping of duplicate filenames)
           assignee: inputDataByKey['Assignee'],
           sensorName: inputDataByKey["Sensor Name"],
           imageName: inputDataByKey["Image File Name"],
@@ -130,12 +172,32 @@ export default function TaskingManager({ dateRange }) {
           imageDatetime: inputDataByKey["Image Datetime"],
           priority: inputDataByKey["Priority"],
           ttg: inputDataByKey["TTG"],
-          id: parseInt(key)
+          id: imageId
         };
-      };
+      }
+      else {
+        // Unknown entry type - skip it
+        console.warn(`[TaskingManager] Skipping entry with key ${key} - missing required fields. Has Area Name: ${hasAreaName}, Has Image File Name: ${hasImageFileName}:`, inputDataByKey);
+        return null;
+      }
+    }).filter(item => item !== null); // Remove null entries
+
+    // Sort data: images first, then areas (so tree structure displays correctly)
+    formattedData.sort((a, b) => {
+      // If both are images (groupName length === 1), sort by image name
+      if (a.groupName.length === 1 && b.groupName.length === 1) {
+        return a.groupName[0].localeCompare(b.groupName[0]);
+      }
+      // If one is image and one is area, image comes first
+      if (a.groupName.length === 1) return -1;
+      if (b.groupName.length === 1) return 1;
+      // Both are areas, sort by parent then area name
+      if (a.groupName[0] !== b.groupName[0]) {
+        return a.groupName[0].localeCompare(b.groupName[0]);
+      }
+      return a.groupName[1].localeCompare(b.groupName[1]);
     });
 
-    console.log(formattedData);
     return formattedData;
   }
 
@@ -288,7 +350,7 @@ export default function TaskingManager({ dateRange }) {
       setRows(newRows);
     }
 
-    if (params.row.groupName.length === 1) {
+    if (params.row.groupName && params.row.groupName.length === 1) {
       return (
         <Autocomplete
           disablePortal
@@ -396,7 +458,11 @@ export default function TaskingManager({ dateRange }) {
     });
     for (let task of tasks) {
       console.log(task);
-      output['Tasks'].push({ 'SCVU Image Area ID': task.id, 'Assignee': task.assignee });
+      // Use the actual positive scvu_image_area_id, not the negative display ID
+      const areaId = task.scvuImageAreaId || task.id;
+      if (areaId && task.assignee) {
+        output['Tasks'].push({ 'SCVU Image Area ID': areaId, 'Assignee': task.assignee });
+      }
     };
     return output;
   }
@@ -416,26 +482,54 @@ export default function TaskingManager({ dateRange }) {
   /* Send data to the backend */
   function postData(postTasks, postTm) {
     console.log(postTasks, postTm);
+    
+    // Check if there are tasks to assign
+    if (!postTasks || !postTasks.Tasks || postTasks.Tasks.length === 0) {
+      alert("No tasks to assign. Please select areas and assignees first.");
+      return;
+    }
+
+    // Track if both requests succeed
+    let assignTaskSuccess = false;
+    let updateTaskSuccess = false;
+
+    // Assign tasks
     axios.post('/assignTask', postTasks)
       .then(
         res => {
           console.log(res);
+          assignTaskSuccess = true;
+          if (updateTaskSuccess) {
+            alert("Tasks assigned successfully! Refreshing data...");
+            reloadTMTable(); // Refresh the table after successful assignment
+          }
         }
       )
       .catch(
         err => {
-          console.log(err);
+          console.error("Error assigning tasks:", err);
+          const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Unknown error";
+          alert("Error assigning tasks: " + errorMsg);
         }
       );
+    
+    // Update tasking manager data (priority, etc.)
     axios.post('/updateTaskingManagerData', postTm)
       .then(
         res => {
           console.log(res);
+          updateTaskSuccess = true;
+          if (assignTaskSuccess) {
+            alert("Tasks assigned successfully! Refreshing data...");
+            reloadTMTable(); // Refresh the table after successful update
+          }
         }
       )
       .catch(
         err => {
-          console.log(err);
+          console.error("Error updating tasking manager data:", err);
+          const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Unknown error";
+          alert("Error updating tasking manager data: " + errorMsg);
         }
       );
   }
@@ -496,7 +590,37 @@ export default function TaskingManager({ dateRange }) {
   const tokenString = JSON.parse(tokenName)
 
   /* Tree data path for nesting of areas to each image */
-  const getTreeDataPath = (row) => row.groupName;
+  const getTreeDataPath = (row) => {
+    // Use treePath if available (unique identifier), otherwise fall back to groupName
+    if (row.treePath && Array.isArray(row.treePath)) {
+      return row.treePath.filter(item => item != null).map(item => item?.toString() || '');
+    }
+    // Fallback to groupName if treePath not available
+    if (row.groupName && Array.isArray(row.groupName)) {
+      let path = row.groupName.filter(item => item != null).map(item => item?.toString() || '');
+      // For image rows, create unique path using ID
+      if (path.length === 1 && row.id !== undefined && row.id !== null) {
+        return [`img_${row.id}`];
+      }
+      return path;
+    }
+    return [row.id?.toString() || 'unknown'];
+  };
+
+  /* Customize the grouping column to show clean names */
+  const groupingColDef = {
+    headerName: "Group",
+    width: 200,
+    valueGetter: (params) => {
+      // Display only the last part of groupName (the actual image/area name)
+      // For images: shows just the filename
+      // For areas: shows just the area name (not "filename > area")
+      if (params.row.groupName && Array.isArray(params.row.groupName)) {
+        return params.row.groupName[params.row.groupName.length - 1];
+      }
+      return params.row.id?.toString() || 'unknown';
+    }
+  };
   if (tokenString === "II") {
     return (
       <p> You do not have permission to view this page. <br /> Please login with the appropriate account. </p>
@@ -523,13 +647,14 @@ export default function TaskingManager({ dateRange }) {
           columns={columns}
           components={{ ToolBar: GridToolbar }}
           getTreeDataPath={getTreeDataPath}
+          groupingColDef={groupingColDef}
           rowHeight={80}
           checkboxSelection
           onSelectionModelChange={(newSelectionModel) => {
             setSelectionModel(newSelectionModel);
           }}
           selectionModel={selectionModel}
-          isRowSelectable={(params) => params.row.groupName.length === 1}
+          isRowSelectable={(params) => params.row.groupName && params.row.groupName.length === 1}
           disableSelectionOnClick
           getCellClassName={(params) => handleClassName(params)}
         />
