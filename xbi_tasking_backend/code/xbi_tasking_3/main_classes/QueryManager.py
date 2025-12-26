@@ -1,4 +1,12 @@
 from main_classes import Database
+import os
+import requests
+
+KEYCLOAK_URL = "http://localhost:8080"
+REALM = "xbi-tasking"
+CLIENT_ID = "xbi-tasking-admin"
+# EDIT THIS BEFORE RUNNING
+ADMIN_SECRET = "nOJMcD30RVTVkBgI1rJCdaGUref818cg"
 
 class QueryManager():
     '''
@@ -20,6 +28,25 @@ class QueryManager():
         }
         # Try to map the username, fallback to original if no mapping exists
         return username_mapping.get(keycloak_username.lower(), keycloak_username)
+    
+    def get_keycloak_admin_token(self):
+        '''
+        Obtain Keycloak admin token of xbi-tasking-admin client
+        Input: NIL
+        Output: Admin client token
+        '''
+        url = f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token"
+
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": CLIENT_ID,
+            "client_secret": ADMIN_SECRET
+        }
+
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        return response.json()["access_token"]
+
     
     def accountLogin(self, hashed_password):
         '''
@@ -277,12 +304,32 @@ class QueryManager():
     
     def getUsers(self):
         '''
-        Function:   Gets users from the db
+        Function:   Gets II users from the db
         Input:      None
-        Output:     nested list of all the users
+        Output:     nested list of all the II users
         '''
+
+        # Obtains usernames of all II users from Keycloak
+        token = self.get_keycloak_admin_token()
+        url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/roles/II/users"
+
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        response = requests.get(url, headers = headers)
+        response.raise_for_status()
+        usernames = [user["username"] for user in response.json()]
+        
+        # Obtains all users stored in db 'users' table
         query = "SELECT name FROM users WHERE is_recent = True"
-        return self.db.executeSelect(query)
+        db_users = self.db.executeSelect(query)
+        db_users = [u[0] for u in db_users]
+
+        # Find all II users where is_recent = true
+        intersection = [(u,) for u in usernames if u in db_users]
+
+        return intersection
     
 
     def getTaskingSummaryImageData(self, start_date, end_date):
