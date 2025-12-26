@@ -19,8 +19,10 @@ import TaskingSummary from "./TaskingSummary";
 import CompletedImages from "./CompletedImages";
 import AdminPage from "./AdminPage.js";
 import Login from "./Login.js";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useToken from "./useToken.js";
+import keycloak from "./keycloak";
+import AuthGuard from "./AuthGuard.js";
 
 // Modal for Date Picker Form
 import DatePickerModal from "./DatePicker.js"
@@ -44,6 +46,31 @@ DatePickerLicenseInfo.setLicenseKey('');
 // Get DB API URL from the .env file
 let DB_API_URL = process.env.REACT_APP_DB_API_URL
 axios.defaults.baseURL = DB_API_URL;
+
+// Add Keycloak token to all axios requests
+axios.interceptors.request.use(
+  (config) => {
+    if (keycloak.authenticated && keycloak.token) {
+      config.headers.Authorization = `Bearer ${keycloak.token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Handle 401 responses - token might be expired
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid, logout user
+      keycloak.logout();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Helper function.
 function MyApp() {
@@ -118,47 +145,46 @@ function MyApp() {
   ];
 
   const {token, setToken} = useToken(); // this useToken() is from useToken.js and it will return, the token (if any) & a func to set the sessionStorage
-  if(!token) { // return login page if there is no token set
-    return <Login toSetToken={setToken} /> // pass in the setToken function into the login component 
-  }
 
-  if (!dateRange) {
-    return <DatePickerModal
-      openDP={openDP}
-      handleCloseDP={handleCloseDP}
-      setDateRange={setDateRange}
-    />
-  }
-
+  // AuthGuard handles authentication and redirects to Keycloak before UI loads
   return (
-    <Router>
-      <Box
-        sx={{
-          width: 'auto',
-          bgcolor: "background.default",
-          color: "text.primary",
-          p: 3,
-        }}
-      >
-        <div className="App">
-
-          {/* Routing. */}
-          <NavTabs tabs={tabs} currentTab={tab} handleChange={setTab} />
-          <Routes>
-            {tabs.map((route, index) => {
-              return (
-                <Route
-                  key={index}
-                  exact
-                  path={route.to}
-                  element={route.element}
-                />
-              );
-            })}
-          </Routes>
-        </div>
-      </Box>
-    </Router>
+    <AuthGuard onAuthSuccess={setToken}>
+      {!dateRange ? (
+        <DatePickerModal
+          openDP={openDP}
+          handleCloseDP={handleCloseDP}
+          setDateRange={setDateRange}
+        />
+      ) : (
+        <Router>
+          <Box
+            sx={{
+              width: 'auto',
+              bgcolor: "background.default",
+              color: "text.primary",
+              p: 3,
+            }}
+          >
+            <div className="App">
+              {/* Routing. */}
+              <NavTabs tabs={tabs} currentTab={tab} handleChange={setTab} />
+              <Routes>
+                {tabs.map((route, index) => {
+                  return (
+                    <Route
+                      key={index}
+                      exact
+                      path={route.to}
+                      element={route.element}
+                    />
+                  );
+                })}
+              </Routes>
+            </div>
+          </Box>
+        </Router>
+      )}
+    </AuthGuard>
   );
 }
 

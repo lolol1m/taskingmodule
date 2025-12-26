@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, File, UploadFile
+from fastapi import FastAPI, Request, File, UploadFile, Depends
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import argparse
@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from main_classes import MainController, ConfigClass
+import os
 
 parser = argparse.ArgumentParser(description="runs xbi tasking backend server")
 parser.add_argument("config_path", help="file path of the config file to be used")
@@ -27,6 +28,93 @@ origins = [
     "http://127.0.0.1:3000"
 ]
 mc = MainController()
+
+# Keycloak authentication - can be enabled/disabled via environment variable
+KEYCLOAK_ENABLED = os.getenv('KEYCLOAK_ENABLED', 'false').lower() == 'true'
+
+# Middleware to validate tokens for ALL routes (except excluded ones)
+@app.middleware("http")
+async def keycloak_auth_middleware(request: Request, call_next):
+    """
+    Middleware that validates Keycloak tokens for all requests
+    Excludes: /docs, /redoc, /openapi.json, /static, / (health check)
+    """
+    # List of paths that don't require authentication
+    excluded_paths = ["/docs", "/redoc", "/openapi.json", "/", "/static"]
+    
+    # Check if path is excluded
+    if any(request.url.path.startswith(path) for path in excluded_paths):
+        response = await call_next(request)
+        return response
+    
+    # If Keycloak is disabled, allow all requests
+    if not KEYCLOAK_ENABLED:
+        response = await call_next(request)
+        return response
+    
+    # Validate token for all other routes
+    try:
+        from main_classes.KeycloakAuth import keycloak_auth
+        
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Not authenticated. Missing or invalid Authorization header."},
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
+        token = auth_header.split(" ")[1]
+        token_info = await keycloak_auth.verify_token(token)
+        
+        if not token_info:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or expired token"},
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
+        # Attach user info to request state for use in route handlers
+        request.state.user = token_info
+        
+        # Continue with the request
+        response = await call_next(request)
+        return response
+        
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"detail": e.detail},
+            headers=e.headers
+        )
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=401,
+            content={"detail": f"Authentication failed: {str(e)}"},
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+# Optional authentication dependency for routes that need user info
+async def get_current_user(request: Request):
+    """
+    Dependency to get current authenticated user from request state
+    (set by middleware)
+    """
+    if not KEYCLOAK_ENABLED:
+        return {"sub": "anonymous", "preferred_username": "anonymous"}
+    
+    user = getattr(request.state, 'user', None)
+    if not user:
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 app.add_middleware(
     CORSMiddleware,
@@ -98,7 +186,7 @@ async def accountLogin(request: Request):
     return mc.accountLogin(data)
 
 @app.post("/insertDSTAData")
-async def insertDSTAData(file: UploadFile):
+async def insertDSTAData(file: UploadFile, user: dict = Depends(get_current_user)):
     '''
     Function: Imports data from DSTA (in a json file) and inserts it into db
     
@@ -164,7 +252,7 @@ async def insertDSTAData(file: UploadFile):
     return mc.insertDSTAData(json.loads(contents.decode('utf-8')))
 
 @app.post("/insertTTGData")
-async def insertTTGData(request: Request):
+async def insertTTGData(request: Request, user: dict = Depends(get_current_user)):
     '''
     Function: Inserts TTG Data into DB
     
@@ -459,7 +547,7 @@ async def updateTaskingManagerData(request: Request):
     return mc.updateTaskingManagerData(data)
 
 @app.post("/assignTask")
-async def assignTask(request: Request):
+async def assignTask(request: Request, user: dict = Depends(get_current_user)):
     '''
     Function: Assigns the Task to someone
     
@@ -576,7 +664,7 @@ async def verifyFail(request: Request):
     return mc.verifyFail(data)
 
 @app.post("/completeImages")
-async def completeImages(request: Request):
+async def completeImages(request: Request, user: dict = Depends(get_current_user)):
     '''
     Function: Checks if all tasks for images have Completed status, then updates completed_date of image to current datetime
     
@@ -888,7 +976,7 @@ async def getXBIReportDataForExcel(request: Request):
     return FileResponse(path=excel_file_path, filename=excel_file_path)
 
 @app.post("/deleteImage")
-async def deleteImage(request: Request):
+async def deleteImage(request: Request, user: dict = Depends(get_current_user)):
     '''
     Function: Deletes an image and its associated image_areas and tasks from db
     Input:
