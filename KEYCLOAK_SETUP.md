@@ -33,30 +33,89 @@ The application has been integrated with Keycloak for authentication. Keycloak p
 
 ### 2. Create a Client for Frontend
 
+**IMPORTANT**: The frontend client MUST be PUBLIC (not confidential). Client secrets should NEVER be used in frontend code.
+
 1. Go to **Clients** → **Create client**
-2. Client ID: `xbi-tasking-frontend`
-3. Client protocol: `openid-connect`
-4. Access type: `public` (for frontend applications)
-5. Valid redirect URIs: `http://localhost:3000/*` (add your production URLs)
-6. Web origins: `http://localhost:3000` (add your production origins)
-7. Save
+2. Fill in the form:
+   - **Client type**: OpenID Connect
+   - **Client ID**: `xbi-tasking-frontend`
+   - Click **Next**
+3. In **Capability config**:
+   - **DO NOT** enable **Client authentication** (keep it as PUBLIC)
+   - Enable **Standard flow** (Authorization Code Flow)
+   - Enable **PKCE Method** S256
+   - Click **Next**
+4. In **Login settings**:
+   - **Root URL**: `http://localhost:3000`
+   - **Home URL**: `http://localhost:3000`
+   - **Valid redirect URIs**: `http://localhost:3000/*` and `http://localhost:3000`
+   - **Web origins**: `http://localhost:3000`
+   - Click **Save**
+
+**Note**: Since this is a public client, there is NO client secret. Do not look for one in the Credentials tab.
 
 ### 3. Create a Client for Backend
 
 1. Go to **Clients** → **Create client**
-2. Client ID: `xbi-tasking-backend`
-3. Client protocol: `openid-connect`
-4. Access type: `confidential` (for backend applications)
-5. Valid redirect URIs: `http://localhost:5000/*`
-6. Save
-7. Go to the **Credentials** tab and copy the **Secret** (you'll need this for `KEYCLOAK_CLIENT_SECRET`)
+2. Fill in the form:
+   - **Client type**: OpenID Connect
+   - **Client ID**: `xbi-tasking-backend`
+   - Click **Next**
+3. In **Capability config**:
+   - Enable **Client authentication** (this makes it confidential)
+   - Enable **Standard flow**
+   - Click **Next**
+4. In **Login settings**:
+   - **Valid redirect URIs**: Leave empty or set to your backend URL
+   - Click **Save**
+5. Go to the **Credentials** tab
+6. Copy the **Client secret** - you'll need to set this as an environment variable:
+   ```bash
+   set KEYCLOAK_CLIENT_SECRET=your_client_secret
+   ```
+   **Backend Client Secret**: `your_client_secret`
 
-### 4. Create Users
+### 4. Create Realm Roles
 
-1. Go to **Users** → **Add user**
-2. Create users as needed (e.g., `admin`, `analyst`, etc.)
-3. Set passwords in the **Credentials** tab
-4. Optionally assign roles in the **Role Mappings** tab
+1. Go to **Realm roles**
+2. Click **Create role**
+3. Create the following roles:
+   - **Role name**: `admin`
+   - Click **Save**
+   - Repeat to create: **Role name**: `user`
+   - Click **Create**
+
+### 5. Create Users
+
+#### Regular User
+
+1. Go to **Users** → **Create new user**
+2. Fill in:
+   - **Username**: `testuser`
+   - **Email**: `testuser@example.com`
+   - **Email verified**: ON (check this)
+   - Click **Create**
+3. Go to the **Credentials** tab
+4. Set a password (e.g., `password123`)
+   - **Temporary**: OFF (uncheck this)
+   - Click **Save** 
+5. Go to the **Role mapping** tab
+6. Click **Assign role**
+7. Leave the filter as **Filter by realm roles** (do NOT filter by clients)
+8. Select **user** role from the realm roles list
+9. Click **Assign**
+
+#### Admin User
+
+1. Repeat steps above but with:
+   - **Username**: `admin`
+   - **Email**: `admin@example.com`
+   - **Password**: `admin123`
+2. In the **Role mapping** tab:
+   - Click **Assign role**
+   - Leave filter as **Filter by realm roles**
+   - Select **admin** role (instead of user role)
+   - Click **Assign**
 
 ## Frontend Configuration
 
@@ -223,4 +282,5 @@ The old `/accountLogin` endpoint is still available but deprecated. To fully mig
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
 - [Keycloak JavaScript Adapter](https://www.keycloak.org/docs/latest/securing_apps/#_javascript_adapter)
 - [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
+
 

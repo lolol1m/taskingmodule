@@ -141,3 +141,4 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = security)
     """
     return await keycloak_auth.get_current_user(credentials)
 
+

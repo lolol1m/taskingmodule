@@ -34,8 +34,8 @@ export default function Login({ toSetToken }) { // receives the setToken functio
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Initialize Keycloak
-    keycloak.init({
+    // Initialize Keycloak - use initOnce to prevent multiple initializations
+    keycloak.initOnce({
       onLoad: 'check-sso', // Check if user is already authenticated
       checkLoginIframe: false,
       pkceMethod: 'S256'

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import keycloak from './keycloak';
+import keycloak, { keycloakConfigForDebug as keycloakConfig } from './keycloak';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -26,10 +26,12 @@ export default function AuthGuard({ children, onAuthSuccess }) {
     const checkAuth = async () => {
       try {
         // Initialize Keycloak with login-required (forces redirect if not authenticated)
-        const authenticated = await keycloak.init({
-          onLoad: 'login-required', // Force login - redirects immediately if not authenticated
+        // Use initOnce to prevent multiple initializations
+        const authenticated = await keycloak.initOnce({
+          onLoad: 'login-required',
           checkLoginIframe: false,
-          pkceMethod: 'S256'
+          pkceMethod: 'S256', // Re-enable - Keycloak 26.4.7 may require this
+          enableLogging: true
         });
         
         setIsInitialized(true);
@@ -77,6 +79,29 @@ export default function AuthGuard({ children, onAuthSuccess }) {
         }
       } catch (error) {
         console.error('Keycloak initialization failed:', error);
+        console.error('Error details:', {
+          message: error.message,
+          url: keycloakConfig.url,
+          realm: keycloakConfig.realm,
+          clientId: keycloakConfig.clientId,
+          errorType: error.constructor.name
+        });
+        
+        // Try to get more details from the error
+        if (error.xhr) {
+          console.error('HTTP Response:', {
+            status: error.xhr.status,
+            statusText: error.xhr.statusText,
+            responseText: error.xhr.responseText
+          });
+        }
+        
+        
+        // Check if it's a 401 error - this means client configuration is wrong
+        if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+          console.error('401 Unauthorized Error during token exchange:');
+        }
+        
         setIsInitialized(true);
         setIsAuthenticated(false);
       }
