@@ -248,8 +248,17 @@ async def insertDSTAData(file: UploadFile, user: dict = Depends(get_current_user
     
     contents = await file.read()
     if file.content_type != "application/json":
-        return {}
-    return mc.insertDSTAData(json.loads(contents.decode('utf-8')))
+        return {"error": "File must be JSON format"}
+    try:
+        json_data = json.loads(contents.decode('utf-8'))
+        result = mc.insertDSTAData(json_data)
+        return result
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e), "detail": "Failed to insert data"}
+        )
 
 @app.post("/insertTTGData")
 async def insertTTGData(request: Request, user: dict = Depends(get_current_user)):

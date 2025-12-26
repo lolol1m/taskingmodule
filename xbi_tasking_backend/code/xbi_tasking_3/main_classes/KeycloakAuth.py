@@ -83,13 +83,28 @@ class KeycloakAuth:
                 if response.status_code == 200:
                     result = response.json()
                     if result.get('active', False):
+                        # Extract roles from token
+                        realm_access = result.get('realm_access', {})
+                        realm_roles = realm_access.get('roles', [])
+                        
+                        # Determine account type from roles (priority: IA > Senior II > II)
+                        account_type = None
+                        if 'IA' in realm_roles:
+                            account_type = 'IA'
+                        elif 'Senior II' in realm_roles:
+                            account_type = 'Senior II'
+                        elif 'II' in realm_roles:
+                            account_type = 'II'
+                        
                         # Token is valid, return the token info
                         return {
                             'sub': result.get('sub'),
                             'preferred_username': result.get('preferred_username'),
                             'email': result.get('email'),
-                            'realm_access': result.get('realm_access', {}),
-                            'resource_access': result.get('resource_access', {})
+                            'realm_access': realm_access,
+                            'resource_access': result.get('resource_access', {}),
+                            'account_type': account_type,  # Add account type for backward compatibility
+                            'roles': realm_roles
                         }
                     else:
                         return None

@@ -1,4 +1,5 @@
 import React from "react";
+import useKeycloakRole from "./useKeycloakRole";
 
 // Radio buttons.
 import Radio from '@mui/material/Radio';
@@ -25,13 +26,14 @@ function AdminPage({ dateRange }) {
     const [showUpdateSensorCategory,setShowUpdateSensorCategory]=React.useState(false)
     const [showParadeState,setShowParadeState]=React.useState(false)
     const [showInsertJson,setShowInsertJson]=React.useState(false)
-    const tokenName = String(sessionStorage.getItem('token'))
-    const tokenString = JSON.parse(tokenName)
-    if (tokenString === "II" || tokenString === "Senior II") {
+    // Get role from Keycloak token
+    const role = useKeycloakRole();
+    
+    if (role === "II" || role === "Senior II") {
         return (
             <p> You do not have permission to view this page. <br/> Please login with the appropriate account. </p>
         )
-    } else if (tokenString === "IA") {
+    } else if (role === "IA") {
         return (
             <div>
                 <div>

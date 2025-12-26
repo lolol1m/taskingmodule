@@ -8,11 +8,9 @@ function InsertJson() {
     let formData = new FormData();
 
     const onFileChange = (e) => {
-        console.log(e.target.files[0])
         if(e.target && e.target.files[0]) {
             formData.append('file', e.target.files[0]);
         }
-        console.log(formData, 'asdf');
     }
 
     const handleSubmit = async(event) => {
@@ -33,11 +31,19 @@ function InsertJson() {
                 data: formData,
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            alert('Data uploaded successfully!');
-            console.log('Upload response:', response);
+            if (response.data) {
+                if (response.data.success) {
+                    const msg = response.data.message || 'Data uploaded successfully!';
+                    alert(msg);
+                } else {
+                    alert('Upload failed: ' + (response.data.error || 'Unknown error'));
+                }
+            } else {
+                alert('Data uploaded successfully!');
+            }
         } catch(error) {
-            console.error('Upload error:', error);
-            alert('Error uploading file: ' + (error.response?.data?.detail || error.message));
+            const errorMsg = error.response?.data?.detail || error.response?.data?.error || error.message || 'Unknown error';
+            alert('Error uploading file: ' + errorMsg);
         }
     }
 

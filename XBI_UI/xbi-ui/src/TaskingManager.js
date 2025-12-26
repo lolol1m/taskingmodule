@@ -5,6 +5,7 @@ import {
   GridToolbar
 } from '@mui/x-data-grid-pro';
 import { useAxios } from "./useAxios";
+import useKeycloakRole from "./useKeycloakRole";
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import { memo, useEffect, useState, useMemo } from 'react';
@@ -69,11 +70,9 @@ export default function TaskingManager({ dateRange }) {
   /* useEffect for initialising stuff */
   useEffect(
     () => {
-      console.log("USEEFFECT TM");
       axios.get('/getUsers')
         .then(
           res => {
-            console.log(res);
             if (res['data']['Users']) {
               setAssignee(['Multiple'].concat(res['data']['Users']));
             }
@@ -82,11 +81,9 @@ export default function TaskingManager({ dateRange }) {
       axios.post('/getTaskingManagerData', dateRange)
         .then(
           res => {
-            console.log(res);
             if (res['data'] && res['data'] !== undefined) {
-              console.log(res['data']);
               setRows(formatData(res['data']));
-            };
+            }
           }
         )
         .catch(
@@ -94,12 +91,11 @@ export default function TaskingManager({ dateRange }) {
             console.log(err);
           }
         );
-    }, [reload]);
+    }, [reload, dateRange]); // Refresh when reload changes OR when dateRange changes
 
   /* Functions */
   /* Reload TM table when the  */
   function reloadTMTable() {
-    console.log("refreshed")
     setReload(!reload);
   }
 
@@ -585,9 +581,8 @@ export default function TaskingManager({ dateRange }) {
     reloadTMTable();
   }
 
-  /* Token stuff to check if user is authorised  */
-  const tokenName = String(sessionStorage.getItem('token'))
-  const tokenString = JSON.parse(tokenName)
+  /* Get role from Keycloak token */
+  const role = useKeycloakRole();
 
   /* Tree data path for nesting of areas to each image */
   const getTreeDataPath = (row) => {
@@ -621,12 +616,12 @@ export default function TaskingManager({ dateRange }) {
       return params.row.id?.toString() || 'unknown';
     }
   };
-  if (tokenString === "II") {
+  if (role === "II") {
     return (
       <p> You do not have permission to view this page. <br /> Please login with the appropriate account. </p>
     )
   }
-  else if (tokenString === "Senior II" || tokenString === "IA") {
+  else if (role === "Senior II" || role === "IA") {
     return (
       <div style={{ height: 600, width: '100%' }}>
         <Box display="flex" justifyContent="space-evenly" alignItems='center' sx={{ width: "60%", margin: 'auto', paddingBottom: '10px', paddingTop: '10px', }} >

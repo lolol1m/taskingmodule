@@ -32,10 +32,9 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
         .catch(function (error) {
           console.log(error);
         })
-    }, [reload]); // when reload changes (reloadCITable() function is run), this useEffect runs
+    }, [reload, dateRange]); // when reload changes (reloadCITable() function is run) or dateRange changes, this useEffect runs
 
   function reloadCITable() {
-    console.log("refreshed")
     setReload(!reload); // toggles reload between true and false to reload the page as "reload" is used as a dependency for useEffect hooks
   }
 

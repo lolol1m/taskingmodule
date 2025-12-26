@@ -7,612 +7,557 @@ class QueryManager():
     def __init__(self):
         self.db = Database()
     
+    def _mapKeycloakUsernameToDBUsername(self, keycloak_username):
+        '''
+        Helper function to map Keycloak usernames to database usernames
+        Input: Keycloak username (e.g., "iiuser", "iisenior", "iauser")
+        Output: Database username (e.g., "II User", "Senior II User", "IA User")
+        '''
+        username_mapping = {
+            'iiuser': 'II User',
+            'iisenior': 'Senior II User',
+            'iauser': 'IA User'
+        }
+        # Try to map the username, fallback to original if no mapping exists
+        return username_mapping.get(keycloak_username.lower(), keycloak_username)
+    
     def accountLogin(self, hashed_password):
         '''
-        Function:   validates password and returns account type
-        Input:      hashed_password string
-        Output:     string of account type (II, Senior II, IA) or empty string if password is invalid
+        Function:   Inserts sensor into db if it doesn't already exist
+        Input:      sensor_name
+        Output:     NIL
         '''
-        result = self.db.executeSelect(
-            "SELECT account FROM accounts WHERE password = %s",
-            (hashed_password,)
-        )
-        if result:
-            return result[0][0]
-        return ""
+        query = f"SELECT account FROM accounts WHERE password = %s"
+        cursor = self.db.executeSelect(query, (hashed_password, ))
+        if len(cursor) == 0:
+            return ''
+        return cursor[0][0]
     
     def insertSensor(self, sensor_name):
         '''
-        Function:   Inserts sensor into database if not already existing
-        Input:      sensor_name string
+        Function:   Inserts sensor into db if it doesn't already exist
+        Input:      sensor_name
         Output:     NIL
         '''
-        self.db.executeInsert(
-            "INSERT INTO sensor(name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
-            (sensor_name,)
-        )
+        query = f"INSERT INTO sensor (name) VALUES (%s) ON CONFLICT (name) DO NOTHING"
+        self.db.executeInsert(query, (sensor_name,))
     
     def insertImage(self, image_id, image_file_name, sensor_name, upload_date, image_datetime):
         '''
-        Function:   Inserts image into database if not already existing
+        Function:   Inserts image from DSTA into db
         Input:      image_id, image_file_name, sensor_name, upload_date, image_datetime
         Output:     NIL
         '''
-        sensor_id = self.db.executeSelect("SELECT id FROM sensor WHERE name = %s", (sensor_name,))[0][0]
-        ew_status_id = 2  # xbi done
-        self.db.executeInsert(
-            """INSERT INTO image(image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id)
-               VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (image_id) DO NOTHING""",
-            (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id)
-        )
+        # Set default values for required foreign keys (0 = null in lookup tables)
+        query = f"INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) \
+        VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) \
+        ON CONFLICT (image_id) DO NOTHING"
+        self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
     
     def insertArea(self, area_name):
         '''
-        Function:   Inserts area into database if not already existing
-        Input:      area_name string
+        Function:   Inserts area from DSTA / TTG into db
+        Input:      area_name
         Output:     NIL
         '''
-        self.db.executeInsert(
-            "INSERT INTO area(area_name) VALUES (%s) ON CONFLICT (area_name) DO NOTHING",
-            (area_name,)
-        )
+        query = f"INSERT INTO area (area_name) \
+        VALUES (%s) \
+        ON CONFLICT (area_name) DO NOTHING"
+        self.db.executeInsert(query, (area_name, ))
     
     def insertImageAreaDSTA(self, image_id, area_name):
         '''
-        Function:   Inserts image_area relationship for DSTA format
+        Function:   Inserts image_area for DSTA into db 
         Input:      image_id, area_name
         Output:     NIL
         '''
-        scvu_image_id = self.db.executeSelect(
-            "SELECT scvu_image_id FROM image WHERE image_id = %s",
-            (image_id,)
-        )[0][0]
-        scvu_area_id = self.db.executeSelect(
-            "SELECT scvu_area_id FROM area WHERE area_name = %s",
-            (area_name,)
-        )[0][0]
-        self.db.executeInsert(
-            """INSERT INTO image_area(scvu_image_id, scvu_area_id)
-               VALUES (%s, %s) ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING""",
-            (scvu_image_id, scvu_area_id)
-        )
+        query = f"INSERT INTO image_area (scvu_image_id, scvu_area_id) \
+        VALUES ((SELECT scvu_image_id FROM image WHERE image_id = %s), (SELECT scvu_area_id FROM area WHERE area_name = %s)) \
+        ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
+        self.db.executeInsert(query, (image_id, area_name))
     
     def insertTTGImageReturnsId(self, image_file_name, sensor_name, upload_date, image_datetime):
         '''
-        Function:   Inserts TTG image and returns the scvu_image_id
+        Function:   Inserts TTG image into db
         Input:      image_file_name, sensor_name, upload_date, image_datetime
-        Output:     scvu_image_id
+        Output:     scvu_image_id of the inserted image
         '''
-        sensor_id = self.db.executeSelect("SELECT id FROM sensor WHERE name = %s", (sensor_name,))[0][0]
-        ew_status_id = 1  # ttg done
-        scvu_image_id = self.db.executeInsertReturningID(
-            """INSERT INTO image(image_file_name, sensor_id, upload_date, image_datetime, ew_status_id)
-               VALUES (%s, %s, %s, %s, %s) RETURNING scvu_image_id""",
-            (image_file_name, sensor_id, upload_date, image_datetime, ew_status_id)
-        )
-        return scvu_image_id
+        query = f"INSERT INTO image (image_file_name, sensor_id, upload_date, image_datetime, ew_status_id) \
+        VALUES (%s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'ttg done')) \
+        RETURNING scvu_image_id"
+        return self.db.executeInsertReturningID(query, (image_file_name, sensor_name, upload_date, image_datetime))
     
     def insertImageAreaTTG(self, scvu_image_id, area_name):
         '''
-        Function:   Inserts image_area relationship for TTG format
-        Input:      scvu_image_id, area_name
+        Function:   Inserts image_area for DSTA into db 
+        Input:      image_id, area_name
         Output:     NIL
         '''
-        scvu_area_id = self.db.executeSelect(
-            "SELECT scvu_area_id FROM area WHERE area_name = %s",
-            (area_name,)
-        )[0][0]
-        self.db.executeInsert(
-            """INSERT INTO image_area(scvu_image_id, scvu_area_id)
-               VALUES (%s, %s) ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING""",
-            (scvu_image_id, scvu_area_id)
-        )
-    
-    def getPriority(self):
-        '''
-        Function:   Gets list of priority for drop down
-        Input:      None
-        Output:     list of all priorities (excluding null)
-        '''
-        return self.db.executeSelect("SELECT name FROM priority WHERE name IS NOT NULL ORDER BY id")
-    
-    def getCloudCover(self):
-        '''
-        Function:   Gets list of cloud cover for drop down
-        Input:      None
-        Output:     list of all cloud cover (excluding null)
-        '''
-        return self.db.executeSelect("SELECT name FROM cloud_cover WHERE name IS NOT NULL ORDER BY id")
-    
-    def getImageCategory(self):
-        '''
-        Function:   Gets list of image category for drop down
-        Input:      None
-        Output:     list of all image categories (excluding null)
-        '''
-        return self.db.executeSelect("SELECT name FROM image_category WHERE name IS NOT NULL ORDER BY id")
-    
-    def getReport(self):
-        '''
-        Function:   Gets list of report for drop down
-        Input:      None
-        Output:     list of all reports (excluding null)
-        '''
-        return self.db.executeSelect("SELECT name FROM report WHERE name IS NOT NULL ORDER BY id")
-    
-    def getUsers(self):
-        '''
-        Function:   Gets list of users for drop down
-        Input:      None
-        Output:     list of all users with is_recent = True
-        '''
-        return self.db.executeSelect("SELECT name FROM users WHERE is_recent = True ORDER BY name")
-    
-    def getTaskingSummaryImageData(self, start_date, end_date):
-        '''
-        Function:   Gets image data for tasking summary
-        Input:      start_date, end_date strings in YYYY-MM-DD format
-        Output:     list of image data tuples
-        '''
-        query = """
-            SELECT i.scvu_image_id, s.name, i.image_file_name, i.image_id,
-                   i.upload_date, i.image_datetime, r.name, p.name,
-                   ic.name, i.image_quality, cc.name, ew.name, i.target_tracing
-            FROM image i
-            LEFT JOIN sensor s ON i.sensor_id = s.id
-            LEFT JOIN priority p ON i.priority_id = p.id
-            LEFT JOIN report r ON i.report_id = r.id
-            LEFT JOIN image_category ic ON i.image_category_id = ic.id
-            LEFT JOIN cloud_cover cc ON i.cloud_cover_id = cc.id
-            LEFT JOIN ew_status ew ON i.ew_status_id = ew.id
-            WHERE i.upload_date >= %s AND i.upload_date < %s
-            ORDER BY i.upload_date
-        """
-        return self.db.executeSelect(query, (start_date, end_date))
-    
-    def getTaskingSummaryAreaData(self, scvu_image_id):
-        '''
-        Function:   Gets area data for tasking summary for a specific image
-        Input:      scvu_image_id
-        Output:     list of area data tuples
-        '''
-        query = """
-            SELECT t.scvu_task_id, a.area_name, ts.name, t.remarks, u.name, a.v10, a.opsv
-            FROM image_area ia
-            JOIN area a ON ia.scvu_area_id = a.scvu_area_id
-            LEFT JOIN task t ON ia.scvu_image_area_id = t.scvu_image_area_id
-            LEFT JOIN task_status ts ON t.task_status_id = ts.id
-            LEFT JOIN users u ON t.assignee_id = u.id
-            WHERE ia.scvu_image_id = %s
-            ORDER BY a.area_name
-        """
-        return self.db.executeSelect(query, (scvu_image_id,))
-    
-    def getIncompleteImages(self, start_date, end_date):
-        '''
-        Function:   Gets incomplete images (no completed_date) within date range
-        Input:      start_date, end_date strings in YYYY-MM-DD format
-        Output:     list of image data tuples
-        '''
-        query = """
-            SELECT i.scvu_image_id, s.name, i.image_file_name, i.image_id,
-                   i.upload_date, i.image_datetime, p.name
-            FROM image i
-            LEFT JOIN sensor s ON i.sensor_id = s.id
-            LEFT JOIN priority p ON i.priority_id = p.id
-            WHERE i.upload_date >= %s AND i.upload_date < %s
-            AND i.completed_date IS NULL
-            ORDER BY i.upload_date
-        """
-        return self.db.executeSelect(query, (start_date, end_date))
-    
-    def getTaskingManagerDataForImage(self, scvu_image_id):
-        '''
-        Function:   Gets image_area data for a specific image
-        Input:      scvu_image_id
-        Output:     list of image_area data tuples
-        '''
-        query = """
-            SELECT ia.scvu_image_area_id, a.area_name
-            FROM image_area ia
-            JOIN area a ON ia.scvu_area_id = a.scvu_area_id
-            WHERE ia.scvu_image_id = %s
-            ORDER BY a.area_name
-        """
-        return self.db.executeSelect(query, (scvu_image_id,))
-    
-    def getTaskingManagerDataForTask(self, scvu_image_id):
-        '''
-        Function:   Gets task data for a specific image
-        Input:      scvu_image_id
-        Output:     list of task data tuples
-        '''
-        query = """
-            SELECT ia.scvu_image_area_id, u.name, t.remarks
-            FROM image_area ia
-            LEFT JOIN task t ON ia.scvu_image_area_id = t.scvu_image_area_id
-            LEFT JOIN users u ON t.assignee_id = u.id
-            WHERE ia.scvu_image_id = %s
-            ORDER BY ia.scvu_image_area_id
-        """
-        return self.db.executeSelect(query, (scvu_image_id,))
-    
-    def updateTaskingManagerData(self, scvu_image_id, priority_name):
-        '''
-        Function:   Updates priority of an image
-        Input:      scvu_image_id, priority_name
-        Output:     NIL
-        '''
-        priority_id = self.db.executeSelect(
-            "SELECT id FROM priority WHERE name = %s",
-            (priority_name,)
-        )[0][0]
-        self.db.executeUpdate(
-            "UPDATE image SET priority_id = %s WHERE scvu_image_id = %s",
-            (priority_id, scvu_image_id)
-        )
-    
-    def getAssigneeID(self, assignee_name):
-        '''
-        Function:   Gets assignee ID from name
-        Input:      assignee_name string
-        Output:     list with tuple containing assignee_id
-        '''
-        return self.db.executeSelect(
-            "SELECT id FROM users WHERE name = %s",
-            (assignee_name,)
-        )
-    
-    def getTaskStatusID(self, status_name):
-        '''
-        Function:   Gets task status ID from name
-        Input:      status_name string
-        Output:     task_status_id integer
-        '''
-        result = self.db.executeSelect(
-            "SELECT id FROM task_status WHERE name = %s",
-            (status_name,)
-        )
-        if result:
-            return result[0][0]
-        return None
-    
-    def assignTask(self, scvu_image_area_id, assignee_id, task_status_id):
-        '''
-        Function:   Creates or updates a task assignment
-        Input:      scvu_image_area_id, assignee_id, task_status_id
-        Output:     NIL
-        '''
-        self.db.executeInsert(
-            """INSERT INTO task(scvu_image_area_id, assignee_id, task_status_id)
-               VALUES (%s, %s, %s)
-               ON CONFLICT (scvu_image_area_id) 
-               DO UPDATE SET assignee_id = %s, task_status_id = %s""",
-            (scvu_image_area_id, assignee_id, task_status_id, assignee_id, task_status_id)
-        )
-    
-    def startTask(self, scvu_task_id):
-        '''
-        Function:   Updates task status to In Progress
-        Input:      scvu_task_id
-        Output:     NIL
-        '''
-        task_status_id = self.getTaskStatusID('In Progress')
-        self.db.executeUpdate(
-            "UPDATE task SET task_status_id = %s WHERE scvu_task_id = %s",
-            (task_status_id, scvu_task_id)
-        )
-    
-    def completeTask(self, scvu_task_id):
-        '''
-        Function:   Updates task status to Verifying
-        Input:      scvu_task_id
-        Output:     NIL
-        '''
-        task_status_id = self.getTaskStatusID('Verifying')
-        self.db.executeUpdate(
-            "UPDATE task SET task_status_id = %s WHERE scvu_task_id = %s",
-            (task_status_id, scvu_task_id)
-        )
-    
-    def verifyPass(self, scvu_task_id):
-        '''
-        Function:   Updates task status to Completed
-        Input:      scvu_task_id
-        Output:     NIL
-        '''
-        task_status_id = self.getTaskStatusID('Completed')
-        self.db.executeUpdate(
-            "UPDATE task SET task_status_id = %s WHERE scvu_task_id = %s",
-            (task_status_id, scvu_task_id)
-        )
-    
-    def verifyFail(self, scvu_task_id):
-        '''
-        Function:   Updates task status to In Progress (revert from Verifying)
-        Input:      scvu_task_id
-        Output:     NIL
-        '''
-        task_status_id = self.getTaskStatusID('In Progress')
-        self.db.executeUpdate(
-            "UPDATE task SET task_status_id = %s WHERE scvu_task_id = %s",
-            (task_status_id, scvu_task_id)
-        )
+        query = f"INSERT INTO image_area (scvu_image_id, scvu_area_id) \
+        VALUES (%s, (SELECT scvu_area_id FROM area WHERE area_name = %s)) \
+        ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
+        self.db.executeInsert(query, (scvu_image_id, area_name))
     
     def getAllTaskStatusForImage(self, scvu_image_id):
         '''
-        Function:   Gets all task statuses for an image
-        Input:      scvu_image_id
-        Output:     list of tuples (scvu_task_id, task_status_id)
+        Function:   Gets all tasks and their statuses for an image
+        Input:      scvu image id
+        Output:     list of tasks with their status
         '''
-        query = """
-            SELECT t.scvu_task_id, t.task_status_id
-            FROM image_area ia
-            JOIN task t ON ia.scvu_image_area_id = t.scvu_image_area_id
-            WHERE ia.scvu_image_id = %s
-        """
-        return self.db.executeSelect(query, (scvu_image_id,))
+        query = f"SELECT task.scvu_task_id, task.task_status_id \
+        FROM image_area, task \
+        WHERE image_area.scvu_image_area_id = task.scvu_image_area_id \
+        AND image_area.scvu_image_id = %s"
+        
+        cursor = self.db.executeSelect(query, (scvu_image_id, ))
+        if len(cursor) == 0:
+            return None
+        return cursor
+    
+    def getTaskStatusID(self, status_name):
+        '''
+        Function:   Gets status id by status name
+        Input:      status name
+        Output:     status id
+        '''
+        
+        query = f"SELECT id FROM task_status WHERE name = %s"
+        cursor = self.db.executeSelect(query, (status_name, ))
+        if len(cursor) == 0:
+            return None
+        return cursor[0][0]
     
     def completeImage(self, scvu_image_id, vetter, current_datetime):
         '''
-        Function:   Sets completed_date and vetter_id for an image
-        Input:      scvu_image_id, vetter (username), current_datetime
+        Function:   Sets completion date for image to current date
+        Input:      scvu image id, vetter (Keycloak username), current_datetime
         Output:     NIL
+        Note:       Maps Keycloak usernames (iiuser, iisenior, iauser) to users table names (II User, Senior II User, IA User)
         '''
-        vetter_id = None
-        if vetter:
-            vetter_result = self.db.executeSelect(
-                "SELECT id FROM users WHERE name = %s",
-                (vetter,)
-            )
-            if vetter_result:
-                vetter_id = vetter_result[0][0]
+        # Map Keycloak username to database username
+        mapped_username = self._mapKeycloakUsernameToDBUsername(vetter)
         
-        self.db.executeUpdate(
-            "UPDATE image SET completed_date = %s, vetter_id = %s WHERE scvu_image_id = %s",
-            (current_datetime, vetter_id, scvu_image_id)
-        )
-    
+        query = f"UPDATE image SET completed_date = %s, vetter_id = (SELECT id FROM users WHERE name = %s) WHERE scvu_image_id = %s"
+        cursor = self.db.executeUpdate(query, (current_datetime, mapped_username, scvu_image_id))
+
     def uncompleteImage(self, scvu_image_id):
         '''
-        Function:   Sets completed_date to NULL for an image
-        Input:      scvu_image_id
+        Function:   Sets the completed date of an image to None
+        Input:      scvu image id
         Output:     NIL
         '''
-        self.db.executeUpdate(
-            "UPDATE image SET completed_date = NULL, vetter_id = NULL WHERE scvu_image_id = %s",
-            (scvu_image_id,)
-        )
+        query = f"UPDATE image SET completed_date = null WHERE scvu_image_id = %s"
+        cursor = self.db.executeUpdate(query, (scvu_image_id, ))
+
+    def getImageCompleteDate(self, scvu_image_id):
+        '''
+        Function:   Gets the completed date of an image
+        Input:      scvu image id
+        Output:     nested list with image completed date
+        '''
+        query = f"SELECT completed_date FROM image WHERE scvu_image_id = %s"
+        return self.db.executeSelect(query, (scvu_image_id, ))
+
+    def getAssigneeID(self, assignee):
+        '''
+        Function:   Gets the id of the given assignee name
+        Input:      Assignee Name (Keycloak username or database username)
+        Output:     nested list with Assignee ID
+        '''
+        # Map Keycloak username to database username if needed
+        mapped_username = self._mapKeycloakUsernameToDBUsername(assignee)
+        query = f"SELECT id FROM users WHERE name = %s"
+        cursor = self.db.executeSelect(query, (mapped_username, ))
+        if len(cursor) == 0:
+            return None
+        return cursor
+
+    def getIncompleteImages(self, start_date, end_date):
+        '''
+        Function:   Gets data for incomplete images from db
+        Input:      start_date, end_date (date strings in YYYY-MM-DD format)
+        Output:     list of tuple, each containing scvu_image_id, sensor.name, image_file_name, image_id, upload_date, image_datetime, priority.name
+        Note:       Returns images that are incomplete (no completed_date) and have upload_date within the specified date range
+        '''
+        query = f"SELECT image.scvu_image_id, COALESCE(sensor.name, 'Unknown') as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, COALESCE(priority.name, NULL) as priority_name \
+        FROM image \
+        LEFT JOIN sensor ON sensor.id = image.sensor_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
+        WHERE image.completed_date IS NULL \
+        AND (image.upload_date >= %s AND image.upload_date < %s) \
+        ORDER BY image.upload_date DESC"
+        cursor = self.db.executeSelect(query, (start_date, end_date))
+        return cursor
     
-    def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, 
-                                   image_quality, cloud_cover_name, target_tracing):
+    def getTaskingManagerDataForImage(self, scvu_image_id):
         '''
-        Function:   Updates image fields in tasking summary
-        Input:      scvu_image_id, report_name, image_category_name, image_quality, cloud_cover_name, target_tracing
+        Function:   Gets data for tasking manager from area and task for a given image
+        Input:      NIL
+        Output:     list of tuple, each containing image_area.scvu_image_area_id, area.area_name
+        '''
+        query = f"SELECT image_area.scvu_image_area_id, area.area_name \
+        FROM area, image_area \
+        WHERE image_area.scvu_image_id = %s \
+        AND area.scvu_area_id = image_area.scvu_area_id"
+        cursor = self.db.executeSelect(query, (scvu_image_id,))
+        return cursor
+
+    def getTaskingManagerDataForTask(self, scvu_image_id):
+        '''
+        Function:   Gets data for tasking manager for task
+        Input:      NIL
+        Output:     list of tuple, each containing imageareaid, assignee name and remarks
+        '''
+        query = f"SELECT image_area.scvu_image_area_id, users.name, task.remarks \
+        FROM users, task, image_area, image \
+        WHERE image.scvu_image_id = image_area.scvu_image_id \
+        AND task.scvu_image_area_id = image_area.scvu_image_area_id \
+        AND task.assignee_id = users.id \
+        AND image_area.scvu_image_id = %s"
+        cursor = self.db.executeSelect(query, (scvu_image_id,))
+        return cursor
+
+    def updateTaskingManagerData(self, scvu_image_id, priority_name):
+        '''
+        Function:   Updates priority_id of image
+        Input:      scvu_image_id, priority.name
         Output:     NIL
         '''
-        report_id = None
-        if report_name:
-            report_result = self.db.executeSelect("SELECT id FROM report WHERE name = %s", (report_name,))
-            if report_result:
-                report_id = report_result[0][0]
+        query = f"UPDATE image SET priority_id = (SELECT id FROM priority WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)) \
+        WHERE scvu_image_id = %s"
+        self.db.executeUpdate(query, (priority_name, priority_name, scvu_image_id))
+
+    def assignTask(self, image_area_id, assignee_id, task_status_id):
+        '''
+        Function:   Creates and inserts a task into the database as well as initialise that task with the assignee 
+        Input:      image_area_id, assignee name
+        Output:     NIL
+        '''
+        insertTaskQuery = "INSERT INTO task (assignee_id, scvu_image_area_id, task_status_id) \
+        VALUES (%s, %s, %s) \
+        ON CONFLICT (scvu_image_area_id) \
+        DO UPDATE SET assignee_id = EXCLUDED.assignee_id"
+        cursor = self.db.executeInsert(insertTaskQuery, (assignee_id, image_area_id, task_status_id))
+    
+    def getPriority(self):
+        '''
+        Function:   Gets priority from the db
+        Input:      None
+        Output:     nested list of all the priorities
+        '''
+        query = "SELECT name FROM priority WHERE name IS NOT NULL"
+        return self.db.executeSelect(query)
+
+    def getCloudCover(self):
+        '''
+        Function:   Gets cloud cover from the db
+        Input:      None
+        Output:     nested list of all the cloud cover
+        '''
+        query = "SELECT name FROM cloud_cover WHERE name IS NOT NULL"
+        return self.db.executeSelect(query)
+    
+    def getImageCategory(self):
+        '''
+        Function:   Gets image category from the db
+        Input:      None
+        Output:     nested list of all the image category
+        '''
+        query = "SELECT name FROM image_category WHERE name IS NOT NULL"
+        return self.db.executeSelect(query)
+
+    def getReport(self):
+        '''
+        Function:   Gets report from the db
+        Input:      None
+        Output:     nested list of all the report
+        '''
+        query = "SELECT name FROM report WHERE name IS NOT NULL"
+        return self.db.executeSelect(query)
+    
+    def getUsers(self):
+        '''
+        Function:   Gets users from the db
+        Input:      None
+        Output:     nested list of all the users
+        '''
+        query = "SELECT name FROM users WHERE is_recent = True"
+        return self.db.executeSelect(query)
+    
+
+    def getTaskingSummaryImageData(self, start_date, end_date):
+        '''
+        Function:   Gets data for tasking summary
+        Input:      NIL
+        Output:     nested list with id, sensor_name, image_file_name, image_id, upload_date, image_datetime, report, priority, image_category, quality, cloud_cover, ew_status, target_tracing
+        '''
+        query = f"SELECT DISTINCT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, COALESCE(cloud_cover.name, NULL) as cloud_cover_name, \
+        ew_status.name, image.target_tracing \
+        FROM image \
+        JOIN sensor ON sensor.id = image.sensor_id \
+        JOIN ew_status ON ew_status.id = image.ew_status_id \
+        LEFT JOIN report ON report.id = image.report_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
+        LEFT JOIN image_category ON image_category.id = image.image_category_id \
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id \
+        JOIN image_area ON image_area.scvu_image_id = image.scvu_image_id \
+        JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id \
+        WHERE image.completed_date IS NULL \
+        AND (image.upload_date >= %s AND image.upload_date < %s)"
+        return self.db.executeSelect(query, (start_date, end_date))
+
+    def getTaskingSummaryAreaData(self, image_id):
+        '''
+        Function:   Gets data for tasking summary area
+        Input:      NIL
+        Output:     nested list with id, area_name, task_status, task_remarks, username
+        '''
+        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, COALESCE(users.name, 'Unassigned') as username, area.v10, area.opsv \
+        FROM task \
+        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
+        JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
+        JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
+        JOIN task_status ON task.task_status_id = task_status.id \
+        LEFT JOIN users ON task.assignee_id = users.id \
+        WHERE image.scvu_image_id = %s \
+        ORDER BY area.area_name"
+        return self.db.executeSelect(query, (image_id,))
+
+    def startTask(self, task_id):
+        '''
+        Function:   Updates task status to In Progress if it is currently Incomplete
+        Input:      task_id is the id of the task to be updated
+        Output:     NIL
+        '''
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='In Progress') \
+        WHERE scvu_task_id = %s \
+        AND task_status_id = (SELECT id FROM task_status WHERE name='Incomplete')"
+        self.db.executeUpdate(query, (task_id, ))
+    
+    def completeTask(self, task_id):
+        '''
+        Function:   Updates task status to Verifying if it is currently In Progress
+        Input:      task_id is the id of the task to be updated
+        Output:     NIL
+        '''
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='Verifying') \
+        WHERE scvu_task_id = %s \
+        AND task_status_id = (SELECT id FROM task_status WHERE name='In Progress')"
+        self.db.executeUpdate(query, (task_id, ))
+    
+    def verifyPass(self, task_id):
+        '''
+        Function:   Updates task status to Complete if it is currently Verifying
+        Input:      task_id is the id of the task to be updated
+        Output:     NIL
+        '''
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='Completed') \
+        WHERE scvu_task_id = %s \
+        AND task_status_id = (SELECT id FROM task_status WHERE name='Verifying')"
+        self.db.executeUpdate(query, (task_id, ))
         
-        image_category_id = None
-        if image_category_name:
-            cat_result = self.db.executeSelect("SELECT id FROM image_category WHERE name = %s", (image_category_name,))
-            if cat_result:
-                image_category_id = cat_result[0][0]
-        
-        cloud_cover_id = None
-        if cloud_cover_name:
-            cc_result = self.db.executeSelect("SELECT id FROM cloud_cover WHERE name = %s", (cloud_cover_name,))
-            if cc_result:
-                cloud_cover_id = cc_result[0][0]
-        
-        self.db.executeUpdate(
-            """UPDATE image SET report_id = %s, image_category_id = %s, 
-               image_quality = %s, cloud_cover_id = %s, target_tracing = %s
-               WHERE scvu_image_id = %s""",
-            (report_id, image_category_id, image_quality, cloud_cover_id, target_tracing, scvu_image_id)
-        )
+    def verifyFail(self, task_id):
+        '''
+        Function:   Updates task status to In Progress if it is currently Verifying
+        Input:      task_id is the id of the task to be updated
+        Output:     NIL
+        '''
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='In Progress') \
+        WHERE scvu_task_id = %s \
+        AND task_status_id = (SELECT id FROM task_status WHERE name='Verifying')"
+        self.db.executeUpdate(query, (task_id, ))
+
+    def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing):
+        '''
+        Function:   Updates scvu_image_id, report_id, image_category_id, image_quality, cloud_cover_id, target_tracing of image
+        Input:      scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing
+        Output:     NIL
+        '''
+        query = f"UPDATE image SET report_id = (SELECT id FROM report WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)), \
+        image_category_id = (SELECT id FROM image_category WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)), \
+        image_quality = %s, \
+        cloud_cover_id = (SELECT id FROM cloud_cover WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)), \
+        target_tracing = %s \
+        WHERE scvu_image_id = %s"
+        self.db.executeUpdate(query, (report_name, report_name, image_category_name, image_category_name, image_quality_name, cloud_cover_name, cloud_cover_name, target_tracing, scvu_image_id))
     
     def updateTaskingSummaryTask(self, scvu_task_id, remarks):
         '''
-        Function:   Updates task remarks
+        Function:   Updates remarks of task
         Input:      scvu_task_id, remarks
         Output:     NIL
         '''
-        self.db.executeUpdate(
-            "UPDATE task SET remarks = %s WHERE scvu_task_id = %s",
-            (remarks, scvu_task_id)
-        )
-    
-    def getImageData(self, start_date, end_date):
-        '''
-        Function:   Gets completed image data within date range
-        Input:      start_date, end_date strings in YYYY-MM-DD format
-        Output:     list of image data tuples
-        '''
-        query = """
-            SELECT i.scvu_image_id
-            FROM image i
-            WHERE i.completed_date >= %s AND i.completed_date < %s
-            ORDER BY i.completed_date
-        """
-        return self.db.executeSelect(query, (start_date, end_date))
-    
+        query = f"UPDATE task SET remarks = %s WHERE scvu_task_id = %s"
+        self.db.executeUpdate(query, (remarks, scvu_task_id))
+
     def getImageAreaData(self, scvu_image_id):
         '''
-        Function:   Gets area data for a completed image
-        Input:      scvu_image_id
-        Output:     list of area data tuples
+        Function: Gets image area data for completed images
+        Input: scvu_image_id
+        Output: scvu_task_id, area name, remarks, assignee name
         '''
-        query = """
-            SELECT ia.scvu_image_area_id, a.area_name
-            FROM image_area ia
-            JOIN area a ON ia.scvu_area_id = a.scvu_area_id
-            WHERE ia.scvu_image_id = %s
-            ORDER BY a.area_name
-        """
-        return self.db.executeSelect(query, (scvu_image_id,))
-    
-    def getCategories(self):
+        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, COALESCE(users.name, 'Unassigned') as assignee_name \
+        FROM task \
+        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
+        JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
+        JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
+        LEFT JOIN users ON task.assignee_id = users.id \
+        WHERE image.scvu_image_id = %s \
+        ORDER BY area.area_name"
+        cursor = self.db.executeSelect(imageAreaQuery, (scvu_image_id, ))
+        return cursor
+
+    def getImageData(self, start_date, end_date):
         '''
-        Function:   Gets list of sensor categories
-        Input:      None
-        Output:     list of category names
+        Function: Gets image data for completed images
+        Input: start_date, end_date
+        Output: scvu image id, sensor name, image file name, image id, image upload date, image date time, report name, priority name, image category name, image quality, cloud cover, ew status
         '''
-        return self.db.executeSelect("SELECT name FROM sensor_category ORDER BY name")
-    
+        imageQuery = f"SELECT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, \
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, ew_status.name, COALESCE(users.name, 'Unknown') as vetter_name \
+        FROM image \
+        JOIN sensor ON sensor.id = image.sensor_id \
+        JOIN ew_status ON ew_status.id = image.ew_status_id \
+        LEFT JOIN users ON users.id = image.vetter_id \
+        LEFT JOIN report ON report.id = image.report_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
+        LEFT JOIN image_category ON image_category.id = image.image_category_id \
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id \
+        WHERE image.completed_date IS NOT NULL \
+        AND ((image.completed_date >= %s AND image.completed_date < %s) \
+             OR (image.upload_date >= %s AND image.upload_date < %s))"
+
+        cursor = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date))
+        return cursor
+
+    def getXBIReportImage(self, start_date, end_date):
+        '''
+        Function: Gets image data for xbi
+        Input: start_date, end_date
+        Output: sensor name, category name, report name
+        '''
+        query = f"SELECT sensor.name, sensor_category.name, report.name \
+        FROM image, sensor, sensor_category, report \
+        WHERE (image.upload_date >= %s AND image.upload_date < %s) \
+        AND sensor.id = image.sensor_id \
+        AND sensor.category_id = sensor_category.id \
+        AND report.id = image.report_id \
+        AND completed_date IS NOT NULL"
+        cursor = self.db.executeSelect(query, (start_date, end_date))
+        return cursor
+
     def getSensors(self):
         '''
-        Function:   Gets list of sensors with their categories
-        Input:      None
-        Output:     list of tuples (sensor_name, category_name)
+        Function: Gets sensor data from db
+        Input: None
+        Output: sensor name, sensor_category_name in nested list
         '''
-        query = """
-            SELECT s.name, COALESCE(sc.name, 'UNCATEGORISED')
-            FROM sensor s
-            LEFT JOIN sensor_category sc ON s.category_id = sc.id
-            ORDER BY s.name
-        """
-        return self.db.executeSelect(query)
-    
-    def updateSensorCategory(self, query_inputs):
+        query = f"SELECT sensor.name, sensor_category.name FROM sensor, sensor_category WHERE sensor.category_id = sensor_category.id"
+        cursor = self.db.executeSelect(query)
+        return cursor
+
+    def getCategories(self):
         '''
-        Function:   Updates sensor categories
-        Input:      query_inputs list of tuples (category_name, sensor_name)
-        Output:     NIL
+        Function: Gets category names from the db
+        Input: None
+        Output: sensor category names in nested list
         '''
-        for category_name, sensor_name in query_inputs:
-            category_id = None
-            if category_name:
-                cat_result = self.db.executeSelect(
-                    "SELECT id FROM sensor_category WHERE name = %s",
-                    (category_name,)
-                )
-                if cat_result:
-                    category_id = cat_result[0][0]
-            
-            self.db.executeUpdate(
-                "UPDATE sensor SET category_id = %s WHERE name = %s",
-                (category_id, sensor_name)
-            )
-    
+        query = f"SELECT sensor_category.name FROM sensor_category"
+        cursor = self.db.executeSelect(query)
+        return cursor
+
     def getAreas(self):
         '''
-        Function:   Gets list of all areas
-        Input:      None
-        Output:     list of area data tuples
+        Function: Gets all the areas as well as their OpsV state
+        Input: NIL
+        Output: Query results of all the areas
         '''
-        return self.db.executeSelect("SELECT scvu_area_id, area_name, v10, opsv FROM area ORDER BY area_name")
+        query = f"SELECT area.scvu_area_id, area.area_name, area.opsv FROM area ORDER BY area_name ASC"
+        cursor = self.db.executeSelect(query)
+        return cursor
     
     def setOpsvFalse(self):
         '''
-        Function:   Sets all areas' opsv to False
-        Input:      None
-        Output:     NIL
+        Function: Sets all the areas opsv to False
+        Input: NIL
+        Outpu: NIL
         '''
-        self.db.executeUpdate("UPDATE area SET opsv = False")
-    
-    def setOpsvAreas(self, opsvAreas):
+
+        query = f"UPDATE area SET opsv = False"
+        self.db.executeUpdate(query)
+
+    def setOpsvAreas(self, area_list):
         '''
-        Function:   Sets opsv to True for specified areas
-        Input:      opsvAreas list of tuples (area_name,)
-        Output:     NIL
+        Function: Sets specified areas opsv to True
+        Input: List of areas
+        Output: NIL
         '''
-        for area_tuple in opsvAreas:
-            area_name = area_tuple[0]
-            self.db.executeUpdate(
-                "UPDATE area SET opsv = True WHERE area_name = %s",
-                (area_name,)
-            )
-    
+        query = f"UPDATE area SET opsv = True WHERE area_name = %s"
+        cursor = self.db.executeUpdateMany(query, area_list)
+
     def resetRecentUsers(self):
         '''
-        Function:   Sets all users' is_recent to False
-        Input:      None
-        Output:     NIL
+        Function: Resets the isRecent flag on all users
+        Input: NIL
+        Output: NIL
         '''
-        self.db.executeUpdate("UPDATE users SET is_recent = False")
+        query = f"UPDATE users SET is_recent = False"
+        self.db.executeUpdate(query)
+
+    def addUsers(self, user_list):
+        '''
+        Function: Adds unique new users to the database
+        Input: List of users
+        Output: NIL
+        '''
+        query = f"INSERT INTO users (name) VALUES (%s) ON CONFLICT (name) DO NOTHING"
+        self.db.executeInsertMany(query, user_list)
     
-    def addUsers(self, userList):
+    def updateExistingUsers(self, user_list):
         '''
-        Function:   Adds new users or updates existing ones to set is_recent = True
-        Input:      userList list of tuples (user_name,)
-        Output:     NIL
+        Function: Updates existing users isRecent flag
+        Input: List of users
+        Output: NIL
         '''
-        for user_tuple in userList:
-            user_name = user_tuple[0]
-            self.db.executeInsert(
-                """INSERT INTO users(name, is_recent) VALUES (%s, True)
-                   ON CONFLICT (name) DO UPDATE SET is_recent = True""",
-                (user_name,)
-            )
-    
-    def updateExistingUsers(self, userList):
+        query = f"UPDATE users SET is_recent = True WHERE name = %s"
+        cursor = self.db.executeUpdateMany(query, user_list)
+
+    def updateSensorCategory(self, category_sensor_list):
         '''
-        Function:   Updates existing users to set is_recent = True
-        Input:      userList list of tuples (user_name,)
-        Output:     NIL
+        Function: Updates sensor to the new category given
+        Input: category_sensor_list is a nested list with category sensor
+        Output: NIL
         '''
-        for user_tuple in userList:
-            user_name = user_tuple[0]
-            self.db.executeUpdate(
-                "UPDATE users SET is_recent = True WHERE name = %s",
-                (user_name,)
-            )
-    
-    def getXBIReportImage(self, start_date, end_date):
-        '''
-        Function:   Gets image data for XBI report
-        Input:      start_date, end_date strings in YYYY-MM-DD format
-        Output:     list of tuples (sensor_name, category_name, report_name)
-        '''
-        query = """
-            SELECT s.name, COALESCE(sc.name, 'UNCATEGORISED'), COALESCE(r.name, '')
-            FROM image i
-            JOIN sensor s ON i.sensor_id = s.id
-            LEFT JOIN sensor_category sc ON s.category_id = sc.id
-            LEFT JOIN report r ON i.report_id = r.id
-            WHERE i.completed_date >= %s AND i.completed_date < %s
-            ORDER BY i.completed_date
-        """
-        return self.db.executeSelect(query, (start_date, end_date))
+        query = f"UPDATE sensor SET category_id = (SELECT id FROM sensor_category WHERE name = %s) WHERE name = %s"
+        cursor = self.db.executeUpdateMany(query, category_sensor_list)
     
     def deleteTasksForImage(self, scvu_image_id):
         '''
-        Function:   Deletes all tasks for an image
-        Input:      scvu_image_id
-        Output:     NIL
+        Function: Deletes all tasks for an certain image
+        Input: scvu_image_id
+        Output: NIL
         '''
-        query = """
-            DELETE FROM task
-            WHERE scvu_image_area_id IN (
-                SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s
-            )
-        """
-        self.db.executeDelete(query, (scvu_image_id,))
+        query = f"DELETE FROM task WHERE scvu_image_area_id IN (SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s)"
+        cursor = self.db.executeDelete(query, (scvu_image_id, ))
     
     def deleteImageAreasForImage(self, scvu_image_id):
         '''
-        Function:   Deletes all image_area relationships for an image
-        Input:      scvu_image_id
-        Output:     NIL
+        Function: Deletes all image_areas for an certain image
+        Input: scvu_image_id
+        Output: NIL
         '''
-        self.db.executeDelete(
-            "DELETE FROM image_area WHERE scvu_image_id = %s",
-            (scvu_image_id,)
-        )
+        query = f"DELETE FROM image_area WHERE scvu_image_id = %s"
+        cursor = self.db.executeDelete(query, (scvu_image_id, ))
     
     def deleteImage(self, scvu_image_id):
         '''
-        Function:   Deletes an image
-        Input:      scvu_image_id
-        Output:     NIL
+        Function: Deletes an image
+        Input: scvu_image_id
+        Output: NIL
         '''
-        self.db.executeDelete(
-            "DELETE FROM image WHERE scvu_image_id = %s",
-            (scvu_image_id,)
-        )
-
+        query = f"DELETE FROM image WHERE scvu_image_id = %s"
+        cursor = self.db.executeDelete(query, (scvu_image_id, ))

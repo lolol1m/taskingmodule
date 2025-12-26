@@ -10,6 +10,7 @@
 */
 
 import * as React from 'react';
+import useKeycloakRole from "./useKeycloakRole";
 
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro';
 import TextField from '@mui/material/TextField';
@@ -69,7 +70,7 @@ const TaskingSummary = (dateRange) => {
       .catch(function (error) {
         console.log(error);
       });
-    }, [reloadRows]); // reloadRows is a useState to trigger a refresh of data on the DOM
+    }, [reloadRows, dateRange.dateRange]); // reloadRows is a useState to trigger a refresh of data on the DOM, also refresh when dateRange changes
 
   useEffect(
     () => {
@@ -634,15 +635,15 @@ const TaskingSummary = (dateRange) => {
       alert("your selected row(s) has an empty value in the dropdown")
     }
   };
+  // Get role from Keycloak token
+  const role = useKeycloakRole();
+  
   let isShow = {} 
-  const tokenName = String(sessionStorage.getItem('token'))
-  const tokenString = JSON.parse(tokenName)
-
-  if (tokenString === "II"){ // control the permission level of each user
+  if (role === "II"){ // control the permission level of each user
     isShow = {"CT": true, "VF": false, "VP": false, "CI": false }
-  } else if (tokenString === "Senior II") {
+  } else if (role === "Senior II") {
     isShow = {"CT": true, "VF": true, "VP": true, "CI": true }
-  } else if (tokenString === "IA"){
+  } else if (role === "IA"){
     isShow = {"CT": true, "VF": true, "VP": true, "CI": true }
   }
 

@@ -29,25 +29,56 @@ class MainController():
         '''
         Function:   Imports images & their associated areas from DSTA json file, inserts into db (sensor, image, area, image_area) if not already existing
         Input:      json containing images in dsta format
-        Output:     NIL
+        Output:     Dictionary with success message and count of images inserted
         '''
-        for image in json['images']:
-            self.qm.insertSensor(image['sensorName'])
-            self.qm.insertImage(
-                image['imgId'],
-                image['imageFileName'],
-                image['sensorName'],
-                dateutil.parser.isoparse(image['uploadDate']),
-                dateutil.parser.isoparse(image['imageDateTime'])
-            )
-            for area in image['areas']:
-                self.qm.insertArea(
-                    area['areaName']
+        image_count = 0
+        area_count = 0
+        errors = []
+        try:
+            for image in json['images']:
+                try:
+                    self.qm.insertSensor(image['sensorName'])
+                    self.qm.insertImage(
+                        image['imgId'],
+                        image['imageFileName'],
+                        image['sensorName'],
+                        dateutil.parser.isoparse(image['uploadDate']),
+                        dateutil.parser.isoparse(image['imageDateTime'])
                     )
-                self.qm.insertImageAreaDSTA(
-                    image['imgId'],
-                    area['areaName']
-                )
+                    image_count += 1
+                    for area in image['areas']:
+                        try:
+                            self.qm.insertArea(area['areaName'])
+                            self.qm.insertImageAreaDSTA(
+                                image['imgId'],
+                                area['areaName']
+                            )
+                            area_count += 1
+                        except Exception as e:
+                            error_msg = f"Error inserting area {area.get('areaName', 'unknown')} for image {image['imgId']}: {str(e)}"
+                            errors.append(error_msg)
+                except Exception as e:
+                    error_msg = f"Error inserting image {image.get('imgId', 'unknown')}: {str(e)}"
+                    errors.append(error_msg)
+                    print(error_msg)
+            
+            result = {
+                "success": True,
+                "message": f"Successfully inserted {image_count} images and {area_count} areas",
+                "images_inserted": image_count,
+                "areas_inserted": area_count
+            }
+            if errors:
+                result["errors"] = errors
+                result["message"] += f" (with {len(errors)} errors)"
+            return result
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "images_inserted": image_count,
+                "areas_inserted": area_count
+            }
                 
     def insertTTGData(self, json):
         '''
@@ -316,7 +347,12 @@ class MainController():
         for task in json["Tasks"]:
             if task["Assignee"] == None:
                 continue
-            assignee_id = self.qm.getAssigneeID(task["Assignee"])[0][0]
+            assignee_result = self.qm.getAssigneeID(task["Assignee"])
+            if assignee_result is None or len(assignee_result) == 0:
+                # Skip if assignee not found (shouldn't happen with proper mapping, but handle gracefully)
+                print(f"Warning: Assignee '{task['Assignee']}' not found in users table")
+                continue
+            assignee_id = assignee_result[0][0]
             task_status_id = self.qm.getTaskStatusID('Incomplete')
             self.qm.assignTask(task['SCVU Image Area ID'], assignee_id, task_status_id)
         
