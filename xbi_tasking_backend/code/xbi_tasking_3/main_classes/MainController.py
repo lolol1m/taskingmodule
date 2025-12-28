@@ -25,12 +25,14 @@ class MainController():
         print("Password:", (hashed_password))
         return self.qm.accountLogin(hashed_password)
     
-    def insertDSTAData(self, json):
+    def insertDSTAData(self, json, auto_assign = True):
         '''
         Function:   Imports images & their associated areas from DSTA json file, inserts into db (sensor, image, area, image_area) if not already existing
         Input:      json containing images in dsta format
         Output:     Dictionary with success message and count of images inserted
         '''
+
+        #lets try only assigning areas
         image_count = 0
         area_count = 0
         errors = []
@@ -38,6 +40,7 @@ class MainController():
             for image in json['images']:
                 try:
                     self.qm.insertSensor(image['sensorName'])
+                    # insertImage ensures that image_id is unique
                     self.qm.insertImage(
                         image['imgId'],
                         image['imageFileName'],
@@ -54,6 +57,10 @@ class MainController():
                                 area['areaName']
                             )
                             area_count += 1
+
+                            if auto_assign:
+                                self.qm.autoAssign(area['areaName'], image['imgId'])
+                                
                         except Exception as e:
                             error_msg = f"Error inserting area {area.get('areaName', 'unknown')} for image {image['imgId']}: {str(e)}"
                             errors.append(error_msg)
