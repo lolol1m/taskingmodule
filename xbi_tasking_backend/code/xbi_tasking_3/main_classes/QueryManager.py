@@ -2,12 +2,6 @@ from main_classes import Database
 import os
 import requests
 
-KEYCLOAK_URL = "http://localhost:8080"
-REALM = "xbi-tasking"
-CLIENT_ID = "xbi-tasking-admin"
-# EDIT THIS BEFORE RUNNING
-ADMIN_SECRET = "nOJMcD30RVTVkBgI1rJCdaGUref818cg"
-
 class QueryManager():
     '''
     QueryManager handles all the queries to the backend
@@ -35,12 +29,18 @@ class QueryManager():
         Input: NIL
         Output: Admin client token
         '''
-        url = f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token"
+
+        keycloak_url = os.getenv('KEYCLOAK_URL')
+        realm = os.getenv('KEYCLOAK_REALM')
+        admin_client_id = os.getenv('KEYCLOAK_ADMIN_CLIENT_ID')
+        admin_client_secret = os.getenv('KEYCLOAK_ADMIN_CLIENT_SECRET')
+        
+        url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
 
         data = {
             "grant_type": "client_credentials",
-            "client_id": CLIENT_ID,
-            "client_secret": ADMIN_SECRET
+            "client_id": admin_client_id,
+            "client_secret": admin_client_secret
         }
 
         response = requests.post(url, data=data)
@@ -54,7 +54,10 @@ class QueryManager():
         Output: List of II usernames
         '''
         token = self.get_keycloak_admin_token()
-        url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/roles/II/users"
+        keycloak_url = os.getenv('KEYCLOAK_URL')
+        realm = os.getenv('KEYCLOAK_REALM')
+
+        url = f"{keycloak_url}/admin/realms/{realm}/roles/II/users"
 
         headers = {
             "Authorization": f"Bearer {token}"

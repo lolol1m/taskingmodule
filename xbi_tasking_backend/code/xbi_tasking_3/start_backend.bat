@@ -9,6 +9,8 @@ set KEYCLOAK_URL=http://localhost:8080
 set KEYCLOAK_REALM=xbi-tasking
 set KEYCLOAK_CLIENT_ID=xbi-tasking-backend
 set KEYCLOAK_CLIENT_SECRET=CpYBsLztlLtlTPtHfbzB4w1k3lhSAcgK
+set KEYCLOAK_ADMIN_CLIENT_ID=xbi-tasking-admin
+set KEYCLOAK_ADMIN_CLIENT_SECRET=nOJMcD30RVTVkBgI1rJCdaGUref818cg
 
 .\venv\Scripts\python.exe main.py dev_server.config
 pause

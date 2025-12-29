@@ -58,6 +58,7 @@ class MainController():
                             )
                             area_count += 1
 
+                            # auto assigns tasks upon upload
                             if auto_assign:
                                 self.qm.autoAssign(area['areaName'], image['imgId'])
                                 
