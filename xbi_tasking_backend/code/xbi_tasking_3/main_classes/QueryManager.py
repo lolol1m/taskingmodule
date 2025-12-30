@@ -118,7 +118,9 @@ class QueryManager():
         query = f"INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) \
         VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) \
         ON CONFLICT (image_id) DO NOTHING"
-        self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
+        rows = self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
+
+        return rows > 0
     
     def insertArea(self, area_name):
         '''
