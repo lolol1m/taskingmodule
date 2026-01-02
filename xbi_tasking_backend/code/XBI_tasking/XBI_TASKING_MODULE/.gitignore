@@ -1,9 +1,0 @@
-/venv
-/.idea
-*.db
-*.pyc
-/.vscode
-/__pycache__
-*.png
-*jpg
-*jpeg
