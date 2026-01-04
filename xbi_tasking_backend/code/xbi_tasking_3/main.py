@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, File, UploadFile, Depends
+from fastapi import FastAPI, Request, File, UploadFile, Depends, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import argparse
@@ -393,10 +393,23 @@ async def updateUsers(file: UploadFile):
     
     '''
     
+    if file.content_type not in ("text/csv", "application/vnd.ms-excel"):
+        print("invalid file type")
+        raise HTTPException(status_code=400, detail="Invalid file type. CSV required.")
+        
+    # Read file contents
     contents = await file.read()
-    if file.content_type != "text/csv":
-        return {}
-    mc.updateUsers(contents.decode('utf-8'))
+    if not contents:
+        print("empty CSV")
+        raise HTTPException(status_code=400, detail="Empty CSV file")
+        
+
+    csv_text = contents.decode("utf-8")
+    # print(csv_text)
+
+    mc.updateUsers(csv_text)
+
+    return {'status':'updateUser success'}
 
 @app.post("/getTaskingSummaryData")
 async def getTaskingSummaryData(request: Request):

@@ -701,7 +701,7 @@ const TaskingSummary = (dateRange) => {
             disableTouchListener
             title={clipboardValue}
             >
-            <Button variant="contained" onClick={() => {copyClipboard()}}>Copy to Clipboard</Button>
+            <Button variant="contained" onClick={() => {copyClipboard()}}>Start task</Button>
             </Tooltip>
         </ClickAwayListener> {/* button will show according to the value of each key in isShow. remember to write in the DB api address when ecalling the processTask/Image */}
         { isShow.CT ? <Button variant="contained" onClick={() => {processTask('/completeTasks')}}>Complete Task</Button>  : null} 

@@ -325,7 +325,10 @@ class Database():
             self.cursor.execute(query, values)
         else:
             self.cursor.execute(query)
+
+        row_count = self.cursor.rowcount
         self.closeCursor()
+        return row_count
     
     def executeInsertReturningID(self, query, values=None):
         '''
