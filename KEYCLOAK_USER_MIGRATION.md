@@ -192,3 +192,4 @@ The `users` table is still used for:
 - Consider implementing password policies in Keycloak
 - Enable MFA for production environments
 
+
