@@ -75,6 +75,30 @@ The application has been integrated with Keycloak for authentication. Keycloak p
    ```
    **Backend Client Secret**: `your_client_secret`
 
+### 4. Create admin Client
+1. Go to **Clients** → **Create client**
+2. Fill in the form:
+   - **Client type**: OpenID Connect
+   - **Client ID**: `xbi-tasking-admin`
+   - Click **Next**
+3. In **Capability config**:
+   - Enable **Client authentication** (this makes it confidential)
+   - Disable **Standard flow**
+   - Enable **Service accounts roles**
+   - Click **Next**
+4. In **Login settings**:
+   - **Valid redirect URIs**: Leave empty
+   - Click **Save**
+5. Go to the **Credentials** tab
+6. Copy the **Client secret** - you'll need to set this as an environment variable in QueryManager.py
+7. Go to the **Service accounts roles** tab
+8. Click **Assign role**
+9. Leave the filter as **Filter by client roles** (do NOT filter by realm)
+10. Select from the client roles list:
+    - **view-users**
+    - **query-users**
+    - **view-realm**
+
 ### 4. Create Realm Roles
 
 1. Go to **Realm roles**

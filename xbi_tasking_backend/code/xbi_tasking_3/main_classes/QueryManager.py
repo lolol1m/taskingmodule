@@ -1,4 +1,6 @@
 from main_classes import Database
+import os
+import requests
 
 class QueryManager():
     '''
@@ -20,6 +22,70 @@ class QueryManager():
         }
         # Try to map the username, fallback to original if no mapping exists
         return username_mapping.get(keycloak_username.lower(), keycloak_username)
+    
+    def get_keycloak_admin_token(self):
+        '''
+        Obtain Keycloak admin token of xbi-tasking-admin client
+        Input: NIL
+        Output: Admin client token
+        '''
+
+        keycloak_url = os.getenv('KEYCLOAK_URL')
+        realm = os.getenv('KEYCLOAK_REALM')
+        admin_client_id = os.getenv('KEYCLOAK_ADMIN_CLIENT_ID')
+        admin_client_secret = os.getenv('KEYCLOAK_ADMIN_CLIENT_SECRET')
+        
+        url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
+
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": admin_client_id,
+            "client_secret": admin_client_secret
+        }
+
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        return response.json()["access_token"]
+    
+    def getUsersList(self):
+        '''
+        Obtains usernames of all II users from Keycloak
+        Input: NIL
+        Output: List of II usernames
+        '''
+        token = self.get_keycloak_admin_token()
+        keycloak_url = os.getenv('KEYCLOAK_URL')
+        realm = os.getenv('KEYCLOAK_REALM')
+
+        url = f"{keycloak_url}/admin/realms/{realm}/roles/II/users"
+
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        response = requests.get(url, headers = headers)
+        response.raise_for_status()
+        usernames = [user["username"] for user in response.json()]
+
+        return usernames
+    
+    def getUserActiveTasks(self, user_id):
+        '''
+        Counts unfinished tasks of all present II users
+        Input: user_id 
+        Output: integer value of unfinished tasks
+        '''
+        query = """
+                SELECT COUNT(*)
+                FROM task t
+                JOIN task_status ts
+                ON t.task_status_id = ts.id
+                WHERE t.assignee_id = %s
+                AND ts.name != %s;
+                """        
+        
+        result = self.db.executeSelect(query, (user_id, 'Completed'))
+        return result[0][0]
     
     def accountLogin(self, hashed_password):
         '''
@@ -52,7 +118,9 @@ class QueryManager():
         query = f"INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) \
         VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) \
         ON CONFLICT (image_id) DO NOTHING"
-        self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
+        rows = self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
+
+        return rows > 0
     
     def insertArea(self, area_name):
         '''
@@ -238,6 +306,45 @@ class QueryManager():
         ON CONFLICT (scvu_image_area_id) \
         DO UPDATE SET assignee_id = EXCLUDED.assignee_id"
         cursor = self.db.executeInsert(insertTaskQuery, (assignee_id, image_area_id, task_status_id))
+
+    def autoAssign(self, area_name, image_id):
+        '''
+        Function:   Creates and inserts a task into the database as well as initialise that task with the automatically designated assignee 
+        Input:      area_id
+        Output:     NIL
+        '''
+
+        # FIND THE CORRECT IMAGE AREA ID FIRST, currently dpesnt work
+        id_set = self.getUserIds()
+
+        id_dict = {u: 0 for u in id_set}
+        
+        # Obtain scvu_image_area_id
+        query = f"""
+        SELECT ia.scvu_image_area_id 
+        FROM image_area ia 
+        JOIN image i 
+            ON ia.scvu_image_id = i.scvu_image_id
+        JOIN area a
+            ON ia.scvu_area_id = a.scvu_area_id
+        WHERE a.area_name = %s
+        AND i.image_id = %s
+        """
+
+        result = self.db.executeSelect(query, (area_name, image_id))
+        scvu_image_area_id  = result[0][0]
+
+        for user_id in id_dict.keys():
+            active_tasks = self.getUserActiveTasks(user_id)
+            # minor optimisation to terminate iteration  when user no active tasks
+            if active_tasks == 0:
+                self.assignTask(scvu_image_area_id, user_id, 1)
+                return "assigned" 
+            id_dict[user_id] = active_tasks
+
+        assignee_id = min(id_dict, key= id_dict.get)
+        self.assignTask(scvu_image_area_id, assignee_id, 1)
+        return "assigned"
     
     def getPriority(self):
         '''
@@ -277,13 +384,33 @@ class QueryManager():
     
     def getUsers(self):
         '''
-        Function:   Gets users from the db
+        Function:   Gets II users from the db
         Input:      None
-        Output:     nested list of all the users
+        Output:     nested list of all the II users
         '''
+
+        usernames = self.getUsersList()
+        
+        # Obtains all users stored in db 'users' table
         query = "SELECT name FROM users WHERE is_recent = True"
-        return self.db.executeSelect(query)
+        db_users = self.db.executeSelect(query)
+        db_users = [u[0] for u in db_users]
+
+        # Find all II users where is_recent = true
+        intersection = [(u,) for u in usernames if u in db_users]
+
+        return intersection
     
+    def getUserIds(self):
+        names = self.getUsers()
+        names = [u[0] for u in names]
+
+        query = f"SELECT id FROM users WHERE name = ANY(%s)"
+
+        rows = self.db.executeSelect(query, (names,))
+        id_list = {u[0] for u in rows}
+
+        return id_list
 
     def getTaskingSummaryImageData(self, start_date, end_date):
         '''

@@ -25,27 +25,37 @@ class MainController():
         print("Password:", (hashed_password))
         return self.qm.accountLogin(hashed_password)
     
-    def insertDSTAData(self, json):
+    def insertDSTAData(self, json, auto_assign = True):
         '''
         Function:   Imports images & their associated areas from DSTA json file, inserts into db (sensor, image, area, image_area) if not already existing
         Input:      json containing images in dsta format
         Output:     Dictionary with success message and count of images inserted
         '''
+
         image_count = 0
         area_count = 0
         errors = []
+        existing_images = []
         try:
             for image in json['images']:
                 try:
                     self.qm.insertSensor(image['sensorName'])
-                    self.qm.insertImage(
+                    # insertImage ensures that image_id is unique
+                    image_inserted = self.qm.insertImage(
                         image['imgId'],
                         image['imageFileName'],
                         image['sensorName'],
                         dateutil.parser.isoparse(image['uploadDate']),
                         dateutil.parser.isoparse(image['imageDateTime'])
                     )
-                    image_count += 1
+                    if image_inserted:
+                        image_count += 1
+                    else:
+                        existing_images.append({
+                            'image_id': image['imgId'],
+                            'image_file_name': image['imageFileName']
+                            })
+                        continue
                     for area in image['areas']:
                         try:
                             self.qm.insertArea(area['areaName'])
@@ -54,6 +64,11 @@ class MainController():
                                 area['areaName']
                             )
                             area_count += 1
+
+                            # auto assigns tasks upon upload
+                            if auto_assign:
+                                self.qm.autoAssign(area['areaName'], image['imgId'])
+                                
                         except Exception as e:
                             error_msg = f"Error inserting area {area.get('areaName', 'unknown')} for image {image['imgId']}: {str(e)}"
                             errors.append(error_msg)
@@ -64,13 +79,20 @@ class MainController():
             
             result = {
                 "success": True,
-                "message": f"Successfully inserted {image_count} images and {area_count} areas",
                 "images_inserted": image_count,
                 "areas_inserted": area_count
             }
+
+            message_parts = [f"Successfully inserted {image_count} images and {area_count} areas"]
+            if existing_images:
+                existing_str = ", ".join(f"{img['image_file_name']} (ID: {img['image_id']})" for img in existing_images)
+                message_parts.append(f"{len(existing_images)} already existed: {existing_str}")
             if errors:
                 result["errors"] = errors
-                result["message"] += f" (with {len(errors)} errors)"
+                message_parts.append(f"{len(errors)} errors encountered")
+
+            result["message"] = " | ".join(message_parts)
+            print(result)
             return result
         except Exception as e:
             return {
