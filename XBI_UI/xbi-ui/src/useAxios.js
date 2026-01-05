@@ -24,8 +24,8 @@ import axios from "axios";
 // });
 
 
-// backend baseURL
-axios.defaults.baseURL = 'http://192.168.1.2:5000/';
+// backend baseURL - will be overridden by App.js if REACT_APP_DB_API_URL is set
+axios.defaults.baseURL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000/';
 
 export const useAxios = (axiosParams) => {
   const [data, setData] = useState(undefined);

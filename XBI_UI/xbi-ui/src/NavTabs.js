@@ -39,10 +39,11 @@ const NavTabs = ({ tabs, currentTab, handleChange }) => {
   }
 
   const handleLogout = () => {
-    // Clear all stored tokens (for both regular users and admins)
+    // Clear all stored tokens (for both regular users and admins/IA)
     localStorage.removeItem('keycloak_token');
     localStorage.removeItem('admin_token');
     localStorage.removeItem('first_auth_token');
+    localStorage.removeItem('ia_password_validated');
     localStorage.removeItem('username');
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('username');

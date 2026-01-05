@@ -44,7 +44,7 @@ LicenseInfo.setLicenseKey('');
 DatePickerLicenseInfo.setLicenseKey('');
 
 // Get DB API URL from the .env file
-let DB_API_URL = process.env.REACT_APP_DB_API_URL
+let DB_API_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
 axios.defaults.baseURL = DB_API_URL;
 
 // Add Keycloak token to all axios requests

@@ -12,6 +12,7 @@ pandas==2.2.3
 psycopg2==2.9.10
 pydantic==2.9.2
 python-dateutil==2.9.0
+requests
 python-multipart==0.0.12
 python-jose[cryptography]
 python-keycloak
