@@ -1,5 +1,5 @@
 import React from "react";
-import useKeycloakRole from "./useKeycloakRole";
+import useKeycloakRole from "../components/useKeycloakRole";
 
 // Radio buttons.
 import Radio from '@mui/material/Radio';
@@ -9,11 +9,11 @@ import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
 
 // Different tables within admin page.
-import OPSV from "./OPSV";
-import GenBinCount from "./GenBinCount";
-import UpdateSensorCategory from "./UpdateSensorCategory";
-import ParadeState from "./ParadeState";
-import InsertJson from "./InsertJson";
+import OPSV from "../components/OPSV";
+import GenBinCount from "../components/GenBinCount";
+import UpdateSensorCategory from "../components/UpdateSensorCategory";
+import ParadeState from "../components/ParadeState";
+import InsertJson from "../components/InsertJson";
 
 /* Admin page is a single page JS file named AdminPage.js. All the other JS files such as
 OPSV.js, GenBinCount.js etc... are tables embedded into the AdminPage.js file. There is a 

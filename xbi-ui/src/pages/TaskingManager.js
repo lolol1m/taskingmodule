@@ -4,16 +4,15 @@ import {
   useKeepGroupedColumnsHidden,
   GridToolbar
 } from '@mui/x-data-grid-pro';
-import { useAxios } from "./useAxios";
-import useKeycloakRole from "./useKeycloakRole";
+import useKeycloakRole from "../components/useKeycloakRole.js";
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import { memo, useEffect, useState, useMemo } from 'react';
 import { Button, Box, IconButton } from "@mui/material";
 import * as React from 'react';
 
-import CreateTTGModal from './CreateTTG.js';
-import DatePickerModal from './DatePicker.js'
+import CreateTTGModal from '../components/CreateTTG.js';
+import DatePickerModal from '../components/DatePicker.js'
 import axios from 'axios';
 
 import DeleteIcon from "@mui/icons-material/Delete";

@@ -14,26 +14,26 @@ import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 
 // Tab pages.
-import TaskingManager from "./TaskingManager";
-import TaskingSummary from "./TaskingSummary";
-import CompletedImages from "./CompletedImages";
+import TaskingManager from "./pages/TaskingManager.js";
+import TaskingSummary from "./pages/TaskingSummary.js";
+import CompletedImages from "./components/CompletedImages.js";
 import AdminPage from "./AdminPage.js";
-import Login from "./Login.js";
+import Login from "./pages/Login.js";
 import { useState, useEffect } from 'react';
-import useToken from "./useToken.js";
-import keycloak from "./keycloak";
-import AuthGuard from "./AuthGuard.js";
+import useToken from "./components/useToken.js";
+import keycloak from "./components/keycloak.js";
+import AuthGuard from "./components/AuthGuard.js";
 
 // Modal for Date Picker Form
-import DatePickerModal from "./DatePicker.js"
+import DatePickerModal from "./components/DatePicker.js"
 
 // Routing.
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import NavTabs from "./NavTabs";
+import NavTabs from "./components/NavTabs.js";
 import axios from "axios";
 
 // Landing Page.
-import LandingPage from "./LandingPage"
+import LandingPage from "./pages/LandingPage.js"
 
 // MUI X License setup (development only - license check is disabled in node_modules)
 import { LicenseInfo } from '@mui/x-data-grid-pro';

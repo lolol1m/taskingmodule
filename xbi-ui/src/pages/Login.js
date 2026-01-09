@@ -10,7 +10,7 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { useState, useEffect } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import keycloak from './keycloak';
+import keycloak from '../components/keycloak';
 
 
 

@@ -10,7 +10,7 @@
 */
 
 import * as React from 'react';
-import useKeycloakRole from "./useKeycloakRole";
+import useKeycloakRole from "../components/useKeycloakRole";
 
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro';
 import TextField from '@mui/material/TextField';
