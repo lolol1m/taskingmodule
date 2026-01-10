@@ -395,7 +395,7 @@ class QueryManager():
         usernames = self.getUsersList()
         
         # Obtains all users stored in db 'users' table
-        query = "SELECT name FROM users WHERE is_available = True"
+        query = "SELECT name FROM users WHERE is_present = True"
         db_users = self.db.executeSelect(query)
         db_users = [u[0] for u in db_users]
 
@@ -640,7 +640,7 @@ class QueryManager():
         Input: NIL
         Output: NIL
         '''
-        query = f"UPDATE users SET is_available = False"
+        query = f"UPDATE users SET is_present = False"
         self.db.executeUpdate(query)
 
     #TODO: figure out how the new user add system is going to work and change this accordingly
@@ -660,7 +660,7 @@ class QueryManager():
         Input: List of users
         Output: NIL
         '''
-        query = f"UPDATE users SET is_available = True WHERE name = %s"
+        query = f"UPDATE users SET is_present = True WHERE name = %s"
         cursor = self.db.executeUpdateMany(query, user_list)
 
     def updateSensorCategory(self, category_sensor_list):

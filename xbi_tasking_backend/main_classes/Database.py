@@ -157,7 +157,7 @@ class Database():
             CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(255) UNIQUE NOT NULL,
                 name VARCHAR(255) UNIQUE NOT NULL,
-                is_avaliable BOOLEAN DEFAULT FALSE
+                is_present BOOLEAN DEFAULT FALSE
             )
         """) #id refers to keycloak id
         
