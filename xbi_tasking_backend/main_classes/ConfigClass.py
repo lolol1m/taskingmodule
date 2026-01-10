@@ -31,5 +31,21 @@ class ConfigClass(Singleton):
     def getPassword(self):
         return self.config.get('Database', 'password')
     
-
+    def getKeycloakURL(self):
+        return self.config.get('Keycloak', 'keycloak_url')
+    
+    def getKeycloakRealm(self):
+        return self.config.get('Keycloak', 'realm')
+    
+    def getKeycloakClientID(self):
+        return self.config.get('Keycloak', 'client_id')
+    
+    def getKeycloakClientSecret(self):
+        return self.config.get('Keycloak', 'client_secret')
+    
+    def getKeycloakAdminClientID(self):
+        return self.config.get('Keycloak', 'admin_client_id')
+    
+    def getKeycloakAdminClientSecret(self):
+        return self.config.get('Keycloak', 'admin_client_secret')
 

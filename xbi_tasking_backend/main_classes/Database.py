@@ -155,11 +155,11 @@ class Database():
         
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
+                id VARCHAR(255) UNIQUE NOT NULL,
                 name VARCHAR(255) UNIQUE NOT NULL,
-                is_recent BOOLEAN DEFAULT FALSE
+                is_avaliable BOOLEAN DEFAULT FALSE
             )
-        """)
+        """) #id refers to keycloak id
         
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS area (
@@ -215,7 +215,8 @@ class Database():
                 remarks TEXT
             )
         """)
-        
+
+        #TODO: pretty sure this is no longer needed, but leaving until full refactor is complete
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
                 account VARCHAR(255) PRIMARY KEY,
@@ -271,6 +272,7 @@ class Database():
         
         self.cursor.execute("INSERT INTO area(scvu_area_id, area_name, v10) VALUES (0, 'OTHERS', false) ON CONFLICT DO NOTHING")
         
+        #TODO: legacy, please remove once confirmed not needed
         self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('II', '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b') ON CONFLICT DO NOTHING")
         self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('Senior II', 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35') ON CONFLICT DO NOTHING")
         self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('IA', '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce') ON CONFLICT DO NOTHING")
@@ -498,6 +500,7 @@ class Database():
         self.cursor.execute("INSERT INTO area(area_name, v10) VALUES ('30024', true)")
         self.cursor.execute("INSERT INTO area(area_name, v10) VALUES ('30025', true)")
         self.cursor.execute("INSERT INTO area(area_name, v10) VALUES ('30026', true)")
+        #TODO: legacy, please remove once confirmed not needed
         self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('II', '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b')")
         self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('Senior II', 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35')")
         self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('IA', '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce')")

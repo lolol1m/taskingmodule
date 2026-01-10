@@ -7,6 +7,7 @@ from jose import jwt, JWTError
 import os
 from typing import Optional
 import httpx
+from main_classes import ConfigClass
 
 class KeycloakAuth:
     """
@@ -14,10 +15,12 @@ class KeycloakAuth:
     """
     
     def __init__(self):
-        # Get Keycloak configuration from environment variables or use defaults
-        self.keycloak_url = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
-        self.realm = os.getenv('KEYCLOAK_REALM', 'xbi-tasking')
-        self.client_id = os.getenv('KEYCLOAK_CLIENT_ID', 'xbi-tasking-backend')
+        # Get Keycloak configuration from ConfigClass
+        config = ConfigClass._instance
+        self.keycloak_url = config.getKeycloakURL()
+        self.realm = config.getKeycloakRealm()
+        self.client_id = config.getKeycloakClientID()
+        self.client_secret = config.getKeycloakClientSecret()
         
         # Construct the well-known endpoint to get public key
         self.well_known_url = f"{self.keycloak_url}/realms/{self.realm}/.well-known/openid-configuration"
@@ -64,14 +67,11 @@ class KeycloakAuth:
             introspection_url = f"{self.keycloak_url}/realms/{self.realm}/protocol/openid-connect/token/introspect"
             
             async with httpx.AsyncClient() as client:
-                # For introspection, we need client credentials
-                # In production, store these securely (environment variables, secrets manager, etc.)
-                client_secret = os.getenv('KEYCLOAK_CLIENT_SECRET', '')
-                
+                # Use client credentials from config
                 data = {
                     'token': token,
                     'client_id': self.client_id,
-                    'client_secret': client_secret
+                    'client_secret': self.client_secret
                 }
                 
                 response = await client.post(

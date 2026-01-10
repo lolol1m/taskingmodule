@@ -1,4 +1,4 @@
-from main_classes import Database
+from main_classes import Database, ConfigClass
 import os
 import requests
 
@@ -29,11 +29,11 @@ class QueryManager():
         Input: NIL
         Output: Admin client token
         '''
-
-        keycloak_url = os.getenv('KEYCLOAK_URL')
-        realm = os.getenv('KEYCLOAK_REALM')
-        admin_client_id = os.getenv('KEYCLOAK_ADMIN_CLIENT_ID')
-        admin_client_secret = os.getenv('KEYCLOAK_ADMIN_CLIENT_SECRET')
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+        admin_client_id = config.getKeycloakAdminClientID()
+        admin_client_secret = config.getKeycloakAdminClientSecret()
         
         url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
 
@@ -47,6 +47,7 @@ class QueryManager():
         response.raise_for_status()
         return response.json()["access_token"]
     
+    #TODO: can't find a matching call in the rest of the codebase, not sure what this is used for but suspect its not good practice. recommend removal and testing.
     def getUsersList(self):
         '''
         Obtains usernames of all II users from Keycloak
@@ -54,8 +55,9 @@ class QueryManager():
         Output: List of II usernames
         '''
         token = self.get_keycloak_admin_token()
-        keycloak_url = os.getenv('KEYCLOAK_URL')
-        realm = os.getenv('KEYCLOAK_REALM')
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
 
         url = f"{keycloak_url}/admin/realms/{realm}/roles/II/users"
 
@@ -87,6 +89,7 @@ class QueryManager():
         result = self.db.executeSelect(query, (user_id, 'Completed'))
         return result[0][0]
     
+    #TODO: legacy, please remove once confirmed not needed
     def accountLogin(self, hashed_password):
         '''
         Function:   Inserts sensor into db if it doesn't already exist
@@ -314,7 +317,7 @@ class QueryManager():
         Output:     NIL
         '''
 
-        # FIND THE CORRECT IMAGE AREA ID FIRST, currently dpesnt work
+        # FIND THE CORRECT IMAGE AREA ID FIRST, currently doesnt work
         id_set = self.getUserIds()
 
         id_dict = {u: 0 for u in id_set}
@@ -392,7 +395,7 @@ class QueryManager():
         usernames = self.getUsersList()
         
         # Obtains all users stored in db 'users' table
-        query = "SELECT name FROM users WHERE is_recent = True"
+        query = "SELECT name FROM users WHERE is_available = True"
         db_users = self.db.executeSelect(query)
         db_users = [u[0] for u in db_users]
 
@@ -402,6 +405,11 @@ class QueryManager():
         return intersection
     
     def getUserIds(self):
+        '''
+        Function:   Gets database user IDs for Keycloak usernames
+        Input:      None
+        Output:     Set of user IDs from database
+        '''
         names = self.getUsers()
         names = [u[0] for u in names]
 
@@ -438,7 +446,7 @@ class QueryManager():
     def getTaskingSummaryAreaData(self, image_id):
         '''
         Function:   Gets data for tasking summary area
-        Input:      NIL
+        Input:      image_id
         Output:     nested list with id, area_name, task_status, task_remarks, username
         '''
         query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, COALESCE(users.name, 'Unassigned') as username, area.v10, area.opsv \
@@ -632,9 +640,10 @@ class QueryManager():
         Input: NIL
         Output: NIL
         '''
-        query = f"UPDATE users SET is_recent = False"
+        query = f"UPDATE users SET is_available = False"
         self.db.executeUpdate(query)
 
+    #TODO: figure out how the new user add system is going to work and change this accordingly
     def addUsers(self, user_list):
         '''
         Function: Adds unique new users to the database
@@ -644,13 +653,14 @@ class QueryManager():
         query = f"INSERT INTO users (name) VALUES (%s) ON CONFLICT (name) DO NOTHING"
         self.db.executeInsertMany(query, user_list)
     
+    #TODO: figure out how the new user add system is going to work and change this accordingly
     def updateExistingUsers(self, user_list):
         '''
         Function: Updates existing users isRecent flag
         Input: List of users
         Output: NIL
         '''
-        query = f"UPDATE users SET is_recent = True WHERE name = %s"
+        query = f"UPDATE users SET is_available = True WHERE name = %s"
         cursor = self.db.executeUpdateMany(query, user_list)
 
     def updateSensorCategory(self, category_sensor_list):

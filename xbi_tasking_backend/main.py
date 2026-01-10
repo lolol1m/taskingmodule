@@ -152,6 +152,7 @@ async def redoc_html():
 async def index():
     return "it works"
 
+#TODO: legacy, please remove once confirmed not needed
 @app.post("/accountLogin")
 async def accountLogin(request: Request):
     '''

@@ -15,6 +15,7 @@ class MainController():
         self.qm = QueryManager()
         self.eg = ExcelGenerator()
     
+    #TODO: definitely no longer intended to be used, verify zero bugs with removal and then remove
     def accountLogin(self, json):
         '''
         Function:   validates password and returns account type
