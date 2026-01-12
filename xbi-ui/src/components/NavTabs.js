@@ -4,7 +4,7 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Button from '@mui/material/Button';
 import { Link } from "react-router-dom";
-import logo from "./xbi.png"
+import logo from "../assets/xbi.png"
 import keycloak from "./keycloak";
 
 

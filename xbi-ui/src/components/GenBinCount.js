@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useTable } from 'react-table';
-import './table.css';
+import '../styles/table.css';
 import { CSVLink } from "react-csv";
 import Button from '@mui/material/Button';
 import Axios from "axios";

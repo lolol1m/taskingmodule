@@ -17,7 +17,7 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 import TaskingManager from "./pages/TaskingManager.js";
 import TaskingSummary from "./pages/TaskingSummary.js";
 import CompletedImages from "./components/CompletedImages.js";
-import AdminPage from "./AdminPage.js";
+import AdminPage from "./pages/AdminPage.js";
 import Login from "./pages/Login.js";
 import { useState, useEffect } from 'react';
 import useToken from "./components/useToken.js";
