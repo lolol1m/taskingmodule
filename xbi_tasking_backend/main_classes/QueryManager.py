@@ -88,12 +88,14 @@ class QueryManager():
                 response = requests.get(url, headers=headers, timeout=5)
                 response.raise_for_status()
                 users = response.json()
+                print(f"🔵 [getUsersList] Found {len(users)} users with role '{role}': {[u['username'] for u in users]}")
                 for user in users:
                     all_usernames.add(user["username"])
             except requests.exceptions.RequestException as e:
-                print(f"Warning: Could not fetch users with role '{role}' from Keycloak: {e}")
+                print(f"⚠️ Warning: Could not fetch users with role '{role}' from Keycloak: {e}")
                 continue
         
+        print(f"🔵 [getUsersList] Total unique usernames: {list(all_usernames)}")
         return list(all_usernames)
     
     def getUserActiveTasks(self, keycloak_user_id):
@@ -346,7 +348,7 @@ class QueryManager():
         insertTaskQuery = "INSERT INTO task (assignee_keycloak_id, scvu_image_area_id, task_status_id) \
         VALUES (%s, %s, %s) \
         ON CONFLICT (scvu_image_area_id) \
-        DO UPDATE SET assignee_keycloak_id = EXCLUDED.assignee_keycloak_id"
+        DO UPDATE SET assignee_keycloak_id = EXCLUDED.assignee_keycloak_id, task_status_id = EXCLUDED.task_status_id"
         cursor = self.db.executeInsert(insertTaskQuery, (assignee_keycloak_id, image_area_id, task_status_id))
 
     def autoAssign(self, area_name, image_id):
@@ -501,6 +503,12 @@ class QueryManager():
             result = self.db.executeSelect(query, tuple(user_ids))
             present_user_ids = {row[0] for row in result}
             
+            # Log which users are filtered out
+            filtered_out = [(uid, uname) for uid, uname in user_data if uid not in present_user_ids]
+            if filtered_out:
+                print(f"⚠️ [getUsers] Filtered out {len(filtered_out)} users (is_present=False): {[uname for _, uname in filtered_out]}")
+            
+            print(f"🔵 [getUsers] Returning {len(present_user_ids)} users with is_present=True: {[uname for uid, uname in user_data if uid in present_user_ids]}")
             # Return (user_id, username) tuples for users who are present
             return [(user_id, username) for user_id, username in user_data if user_id in present_user_ids]
         
@@ -592,7 +600,8 @@ class QueryManager():
         Input:      image_id
         Output:     nested list with id, area_name, task_status, task_remarks, username
         '''
-        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, COALESCE(task.assignee_keycloak_id, 'Unassigned') as username, area.v10, area.opsv \
+        # First get the raw data with Keycloak user IDs
+        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv \
         FROM task \
         JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
         JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
@@ -600,7 +609,36 @@ class QueryManager():
         JOIN task_status ON task.task_status_id = task_status.id \
         WHERE image.scvu_image_id = %s \
         ORDER BY area.area_name"
-        return self.db.executeSelect(query, (image_id,))
+        results = self.db.executeSelect(query, (image_id,))
+        
+        # Convert Keycloak user IDs to usernames
+        formatted_results = []
+        for row in results:
+            task_id, area_name, task_status, remarks, assignee_keycloak_id, v10, opsv = row
+            username = 'Unassigned'
+            
+            if assignee_keycloak_id:
+                # Try to get username from Keycloak
+                try:
+                    token = self.get_keycloak_admin_token()
+                    config = ConfigClass._instance
+                    keycloak_url = config.getKeycloakURL()
+                    realm = config.getKeycloakRealm()
+                    headers = {"Authorization": f"Bearer {token}"}
+                    
+                    url = f"{keycloak_url}/admin/realms/{realm}/users/{assignee_keycloak_id}"
+                    response = requests.get(url, headers=headers, timeout=5)
+                    if response.status_code == 200:
+                        user_data = response.json()
+                        username = user_data.get('username', assignee_keycloak_id)
+                    else:
+                        username = assignee_keycloak_id  # Fallback to ID if user not found
+                except:
+                    username = assignee_keycloak_id  # Fallback to ID if Keycloak query fails
+            
+            formatted_results.append((task_id, area_name, task_status, remarks, username, v10, opsv))
+        
+        return formatted_results
 
     def startTask(self, task_id):
         '''

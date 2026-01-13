@@ -19,6 +19,7 @@ import Checkbox from '@mui/material/Checkbox';
 import { Button } from "@mui/material";
 
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
@@ -34,12 +35,13 @@ let _ = require('lodash'); // lodash is a library to handle nested arrays
 
 
 const TaskingSummary = (dateRange) => {
+  const location = useLocation();
   const refresh = () => window.location.reload(true)
   const [inputData, setInputData] = useState({})  // to store the table data from DB API
   const [workingData, setWorkingData] = useState({}) // initially populated using inputData and subsequently changed by the different inputs on the table
   const [selectedRow, setSelectedRow] = useState([]) // a list of rowId that are currently selected on the table
   const [toSendData, setToSendData] = useState({}) // the data that is to be sent to the DB API, based on the selectedRow.
-  const [reloadRows, setReloadRows] = useState(false) // a boolean in order to trigger the reloading of the table data
+  const [reloadRows, setReloadRows] = useState(0) // a counter to trigger the reloading of the table data
   const [dropdownValues, setDropdownValues] = useState({"Report": [null], "Cloud Cover": [null], "Image Category": [null]}) 
   // ^ dropdown values, predefined with default values and subsequently populated onload by the DB API
 
@@ -59,6 +61,43 @@ const TaskingSummary = (dateRange) => {
           console.log(error);
         });
   }
+  // Check for refresh trigger from Tasking Manager and when route becomes active
+  useEffect(() => {
+    const checkForRefresh = () => {
+      const refreshTrigger = localStorage.getItem('taskingSummaryRefresh');
+      if (refreshTrigger) {
+        localStorage.removeItem('taskingSummaryRefresh');
+        // Force refresh by incrementing counter AND directly fetching data
+        setReloadRows(prev => prev + 1);
+        // Also directly trigger data fetch
+        if (dateRange && dateRange.dateRange) {
+          axios.post('/getTaskingSummaryData', dateRange.dateRange)
+            .then(function (response) {
+              setInputData(response.data);
+            })
+            .catch(function (error) {
+              console.log(error);
+            });
+        }
+      }
+    };
+    
+    // Check immediately when component mounts or route changes
+    if (location.pathname === '/tasking-summary') {
+      checkForRefresh();
+    }
+    
+    // Check periodically and on window focus
+    const interval = setInterval(checkForRefresh, 500);
+    const handleFocus = () => checkForRefresh();
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [location.pathname, dateRange]);
+
   useEffect(
     () => {
 
@@ -68,15 +107,15 @@ const TaskingSummary = (dateRange) => {
         setInputData(response.data); // place the data from the DB API into inputData
       })
       .catch(function (error) {
-        console.log(error);
+        console.error("❌ Tasking Summary: Error fetching data:", error);
       });
-    }, [reloadRows, dateRange.dateRange]); // reloadRows is a useState to trigger a refresh of data on the DOM, also refresh when dateRange changes
+    }, [reloadRows, dateRange?.dateRange]); // reloadRows is a useState to trigger a refresh of data on the DOM, also refresh when dateRange changes
 
   useEffect(
     () => {
 
       if (inputData && inputData !== undefined) {
-        setReloadRows(false) // reset the reloadRows value back to false since we have reloaded the rows
+        // Don't reset reloadRows - keep the counter incrementing
         setRows(() => {
           let rows = []
           Object.keys(inputData).map((key) => { // iterate through the dictionary and for each item, reformat it and push it into a list

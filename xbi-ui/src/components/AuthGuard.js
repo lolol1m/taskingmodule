@@ -24,6 +24,25 @@ export default function AuthGuard({ children, onAuthSuccess }) {
 
   useEffect(() => {
     const checkAuth = () => {
+      // Check for error in URL query params (from backend redirect on error)
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+      if (error) {
+        console.error('Authentication error:', error);
+        alert(`Authentication failed: ${error}. Please check the backend console for details.`);
+        // Clear any stale tokens
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('id_token');
+        localStorage.removeItem('user');
+        // Clean up URL
+        window.history.replaceState(null, '', window.location.pathname);
+        // Don't redirect again - just show error
+        setIsInitialized(true);
+        setIsAuthenticated(false);
+        return;
+      }
+      
       // Check if we have tokens in URL fragment (after redirect from backend)
       const hash = window.location.hash.substring(1); // Remove '#'
       const params = new URLSearchParams(hash);

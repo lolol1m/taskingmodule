@@ -504,15 +504,36 @@ export default function TaskingManager({ dateRange }) {
   /* Returns task object */
   function assignTasks() {
     let output = { 'Tasks': [] };
-    let tasks = rows.filter(row => {
-      return row.parentId && selectionModel.includes(row.parentId);
-    });
-    for (let task of tasks) {
+    // Get all selected rows (both images and areas)
+    let selectedRows = rows.filter(row => selectionModel.includes(row.id));
+    
+    // For each selected row, if it's an area (has parentId), add it to tasks
+    // Also include all child areas if a parent image is selected
+    let tasksToAssign = [];
+    for (let row of selectedRows) {
+      if (row.parentId) {
+        // This is an area row - add it directly
+        tasksToAssign.push(row);
+      } else {
+        // This is an image row - add all its child areas
+        let childAreas = rows.filter(r => r.parentId === row.id);
+        tasksToAssign.push(...childAreas);
+      }
+    }
+    
+    for (let task of tasksToAssign) {
       console.log(task);
       // Use the actual positive scvu_image_area_id, not the negative display ID
       const areaId = task.scvuImageAreaId || task.id;
-      if (areaId && task.assignee) {
-        output['Tasks'].push({ 'SCVU Image Area ID': areaId, 'Assignee': task.assignee });
+      if (areaId && task.assignee && task.assignee !== "Multiple" && task.assignee !== "") {
+        // Ensure assignee is the Keycloak user ID (string), not an object
+        let assigneeId = task.assignee;
+        if (typeof assigneeId === 'object' && assigneeId.id) {
+          assigneeId = assigneeId.id;
+        }
+        if (assigneeId && assigneeId !== "Multiple" && assigneeId !== "") {
+          output['Tasks'].push({ 'SCVU Image Area ID': areaId, 'Assignee': assigneeId });
+        }
       }
     };
     return output;
@@ -540,9 +561,10 @@ export default function TaskingManager({ dateRange }) {
       return;
     }
 
-    // Track if both requests succeed
+    // Track if requests succeed
     let assignTaskSuccess = false;
     let updateTaskSuccess = false;
+    let hasPriorityUpdates = postTm && Object.keys(postTm).length > 0;
 
     // Assign tasks
     // Check if token exists before making request
@@ -556,10 +578,16 @@ export default function TaskingManager({ dateRange }) {
     axios.post('/assignTask', postTasks)
       .then(
         res => {
-          console.log(res);
+          console.log("Assign task response:", res);
           assignTaskSuccess = true;
-          if (updateTaskSuccess) {
+          // Trigger Tasking Summary refresh via localStorage
+          localStorage.setItem('taskingSummaryRefresh', Date.now().toString());
+          // If no priority updates needed, refresh immediately after task assignment
+          if (!hasPriorityUpdates) {
             alert("Tasks assigned successfully! Refreshing data...");
+            reloadTMTable(); // Refresh the table after successful assignment
+          } else if (updateTaskSuccess) {
+            alert("Tasks assigned and priority updated successfully! Refreshing data...");
             reloadTMTable(); // Refresh the table after successful assignment
           }
         }
@@ -603,25 +631,36 @@ export default function TaskingManager({ dateRange }) {
         }
       );
     
-    // Update tasking manager data (priority, etc.)
-    axios.post('/updateTaskingManagerData', postTm)
-      .then(
-        res => {
-          console.log(res);
-          updateTaskSuccess = true;
-          if (assignTaskSuccess) {
-            alert("Tasks assigned successfully! Refreshing data...");
-            reloadTMTable(); // Refresh the table after successful update
+    // Update tasking manager data (priority, etc.) - only if there are updates
+    if (postTm && Object.keys(postTm).length > 0) {
+      axios.post('/updateTaskingManagerData', postTm)
+        .then(
+          res => {
+            console.log("Update priority response:", res);
+            updateTaskSuccess = true;
+            if (assignTaskSuccess) {
+              // Trigger Tasking Summary refresh via localStorage
+              localStorage.setItem('taskingSummaryRefresh', Date.now().toString());
+              alert("Tasks assigned and priority updated successfully! Refreshing data...");
+              reloadTMTable(); // Refresh the table after successful update
+            }
           }
-        }
-      )
-      .catch(
-        err => {
-          console.error("Error updating tasking manager data:", err);
-          const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Unknown error";
-          alert("Error updating tasking manager data: " + errorMsg);
-        }
-      );
+        )
+        .catch(
+          err => {
+            console.error("Error updating tasking manager data:", err);
+            const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Unknown error";
+            alert("Error updating tasking manager data: " + errorMsg);
+            // Still refresh if task assignment succeeded
+            if (assignTaskSuccess) {
+              reloadTMTable();
+            }
+          }
+        );
+    } else {
+      // No priority updates, so updateTaskSuccess is already true
+      updateTaskSuccess = true;
+    }
   }
 
   // Open Create TTG Modal.
@@ -743,7 +782,11 @@ export default function TaskingManager({ dateRange }) {
             setSelectionModel(newSelectionModel);
           }}
           selectionModel={selectionModel}
-          isRowSelectable={(params) => params.row.groupName && params.row.groupName.length === 1}
+          isRowSelectable={(params) => {
+            // Allow selection of both parent rows (images) and child rows (areas)
+            // Parent rows have groupName.length === 1, child rows have groupName.length === 2
+            return params.row.groupName && (params.row.groupName.length === 1 || params.row.groupName.length === 2);
+          }}
           disableSelectionOnClick
           getCellClassName={(params) => handleClassName(params)}
         />

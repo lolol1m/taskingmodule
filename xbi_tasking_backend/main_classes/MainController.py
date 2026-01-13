@@ -373,17 +373,44 @@ class MainController():
         Input:      json is a dictionary with the required data
         Output:     NIL
         '''
-        for task in json["Tasks"]:
-            if task["Assignee"] == None:
-                continue
-            # Get Keycloak user ID from username
-            assignee_keycloak_id = self.qm.getKeycloakUserID(task["Assignee"])
-            if assignee_keycloak_id is None:
-                # Skip if assignee not found in Keycloak
-                print(f"Warning: Assignee '{task['Assignee']}' not found in Keycloak")
-                continue
-            task_status_id = self.qm.getTaskStatusID('Incomplete')
-            self.qm.assignTask(task['SCVU Image Area ID'], assignee_keycloak_id, task_status_id)
+        for task in json.get("Tasks", []):
+            try:
+                
+                # Validate required fields
+                if "Assignee" not in task or task["Assignee"] == None or task["Assignee"] == "":
+                    continue
+                
+                if "SCVU Image Area ID" not in task or task["SCVU Image Area ID"] == None:
+                    raise ValueError("Missing 'SCVU Image Area ID' in task")
+                
+                # Frontend now sends Keycloak user IDs directly (not usernames)
+                # Check if it's already a Keycloak user ID (UUID format) or if it's a username
+                assignee_keycloak_id = task["Assignee"]
+                
+                # If it's "Multiple", skip it
+                if assignee_keycloak_id == "Multiple":
+                    continue
+                
+                # If it doesn't look like a UUID (Keycloak user ID), try to get the ID from username
+                # UUIDs are typically 36 characters with dashes
+                if len(assignee_keycloak_id) != 36 or assignee_keycloak_id.count('-') != 4:
+                    # It's probably a username, try to get the Keycloak user ID
+                    assignee_keycloak_id = self.qm.getKeycloakUserID(assignee_keycloak_id)
+                    if assignee_keycloak_id is None:
+                        # Skip if assignee not found in Keycloak
+                        continue
+                
+                task_status_id = self.qm.getTaskStatusID('Incomplete')
+                if task_status_id is None:
+                    raise ValueError("Task status 'Incomplete' not found in database. Please ensure task_status table is initialized.")
+                
+                area_id = task['SCVU Image Area ID']
+                self.qm.assignTask(area_id, assignee_keycloak_id, task_status_id)
+                tasks_processed += 1
+            except Exception as e:
+                import traceback
+                error_msg = f"Error processing task {task}: {str(e)}\n{traceback.format_exc()}"
+                raise
         
     def startTasks(self, json):
         '''

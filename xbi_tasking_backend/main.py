@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, File, UploadFile, Depends, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import argparse
 import uvicorn
@@ -275,6 +275,25 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     redirect_uri = f"{backend_url}/auth/callback"
     
     try:
+        print(f"🔵 [auth_callback] Exchanging code for tokens...")
+        print(f"   Token URL: {token_url}")
+        print(f"   Redirect URI: {redirect_uri}")
+        print(f"   Client ID: {client_id}")
+        print(f"   Client secret present: {client_secret is not None and len(client_secret) > 0}")
+        print(f"   Code present: {code is not None}")
+        
+        if not client_secret:
+            error_msg = "Client secret is missing in configuration. Please check dev_server.config"
+            print(f"❌ [auth_callback] {error_msg}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "configuration_error",
+                    "detail": error_msg,
+                    "help": "Go to Keycloak Admin Console → Clients → xbi-tasking-backend → Credentials tab → Copy the Client secret → Update dev_server.config"
+                }
+            )
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 token_url,
@@ -288,13 +307,66 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 timeout=10.0
             )
             
+            print(f"   Response status: {response.status_code}")
+            
             if response.status_code != 200:
-                return RedirectResponse(url=f"{frontend_url}?error=token_exchange_failed")
+                error_detail = response.text
+                print(f"❌ [auth_callback] Token exchange failed: {response.status_code}")
+                print(f"   Error response: {error_detail}")
+                
+                # Parse error to provide helpful message
+                try:
+                    error_json = response.json()
+                    error_type = error_json.get('error', 'unknown')
+                    error_desc = error_json.get('error_description', error_detail)
+                    
+                    if error_type == 'unauthorized_client':
+                        help_msg = (
+                            "The client secret in dev_server.config doesn't match Keycloak.\n"
+                            "To fix:\n"
+                            "1. Go to Keycloak Admin Console: http://localhost:8080/admin\n"
+                            "2. Navigate to: Clients → xbi-tasking-backend → Credentials tab\n"
+                            "3. Copy the 'Client secret' value\n"
+                            "4. Update 'client_secret' in xbi_tasking_backend/dev_server.config\n"
+                            "5. Restart the backend server"
+                        )
+                    else:
+                        help_msg = f"Error: {error_desc}"
+                    
+                    return JSONResponse(
+                        status_code=500,
+                        content={
+                            "error": "token_exchange_failed",
+                            "error_type": error_type,
+                            "detail": error_desc,
+                            "status_code": response.status_code,
+                            "help": help_msg
+                        }
+                    )
+                except:
+                    return JSONResponse(
+                        status_code=500,
+                        content={
+                            "error": "token_exchange_failed",
+                            "detail": error_detail,
+                            "status_code": response.status_code,
+                            "help": "Check that the client_secret in dev_server.config matches the Client secret in Keycloak (Clients → xbi-tasking-backend → Credentials tab)"
+                        }
+                    )
             
             token_data = response.json()
             access_token = token_data.get('access_token')
             refresh_token = token_data.get('refresh_token')
             id_token = token_data.get('id_token')
+            
+            if not access_token:
+                print(f"❌ [auth_callback] No access token in response")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "no_access_token", "detail": "Token exchange succeeded but no access token received"}
+                )
+            
+            print(f"✅ [auth_callback] Token exchange successful")
             
             # Decode token to get user info
             from jose import jwt
@@ -302,6 +374,8 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 # Get public key from Keycloak (simplified - in production cache this)
                 token_info = jwt.get_unverified_claims(id_token)
                 username = token_info.get('preferred_username') or token_info.get('sub', 'user')
+                
+                print(f"   Username: {username}")
                 
                 # Redirect to frontend with tokens in URL fragment (more secure than query params)
                 # Frontend will extract tokens from fragment
@@ -314,15 +388,26 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 
                 # Build redirect URL with fragment
                 redirect_url = f"{frontend_url}#{urllib.parse.urlencode(fragment_params)}"
+                print(f"   Redirecting to frontend...")
                 return RedirectResponse(url=redirect_url)
                 
             except Exception as e:
-                print(f"Error decoding token: {e}")
-                return RedirectResponse(url=f"{frontend_url}?error=token_decode_failed")
+                print(f"❌ [auth_callback] Error decoding token: {e}")
+                import traceback
+                traceback.print_exc()
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "token_decode_failed", "detail": str(e)}
+                )
                 
     except Exception as e:
-        print(f"Error exchanging code for tokens: {e}")
-        return RedirectResponse(url=f"{frontend_url}?error=token_exchange_error")
+        print(f"❌ [auth_callback] Error exchanging code for tokens: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": "token_exchange_error", "detail": str(e)}
+        )
 
 @app.get("/auth/logout")
 async def auth_logout(request: Request):
@@ -796,12 +881,18 @@ async def assignTask(request: Request, user: dict = Depends(get_current_user)):
     '''
     try:
         data = await request.json()
-        return mc.assignTask(data)
+        print(f"🔵 [assignTask endpoint] Received request with {len(data.get('Tasks', []))} tasks")
+        print(f"🔵 [assignTask endpoint] Tasks data: {data.get('Tasks', [])}")
+        result = mc.assignTask(data)
+        return {"status": "success", "message": "Tasks assigned successfully", "tasks_processed": len(data.get('Tasks', []))}
     except Exception as e:
+        import traceback
+        error_msg = f"Error in assignTask: {str(e)}\n{traceback.format_exc()}"
+        print(f"❌ [assignTask endpoint] {error_msg}")
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)}
+            content={"error": str(e), "detail": error_msg}
         )
 
 @app.post("/startTasks")
