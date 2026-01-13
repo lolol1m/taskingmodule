@@ -164,10 +164,16 @@ class MainController():
         '''
         Function:   Gets list of users for drop down
         Input:      None
-        Output:     list of all the users
+        Output:     list of user objects with id and name
         '''
         output = {}
-        output["Users"] = [i[0] for i in self.qm.getUsers()]
+        # Get users as (user_id, username) tuples from QueryManager
+        user_tuples = self.qm.getUsers()
+        
+        # Convert to objects with id and name
+        user_objects = [{"id": user_id, "name": username} for user_id, username in user_tuples]
+        
+        output["Users"] = user_objects
         return output 
 
     def getTaskingSummaryData(self, json):

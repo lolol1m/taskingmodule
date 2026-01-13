@@ -5,7 +5,31 @@ import { Button, Box } from "@mui/material";
 
 const LandingPage = ({dateRange, handleTabChange}) => {
 
-  const username = sessionStorage.getItem('username').replaceAll(`"`, ``) // formats username to be displayed
+  // Get username from localStorage (stored by AuthGuard) or sessionStorage (backward compatibility)
+  let username = 'User'; // Default fallback
+  try {
+    // Try localStorage first (from AuthGuard)
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      username = user.username || 'User';
+    } else {
+      // Fallback to sessionStorage (backward compatibility)
+      const storedUsername = sessionStorage.getItem('username');
+      if (storedUsername) {
+        try {
+          // Try parsing as JSON first
+          username = JSON.parse(storedUsername).replaceAll(`"`, ``);
+        } catch {
+          // If not JSON, use as-is and remove quotes
+          username = storedUsername.replaceAll(`"`, ``);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error getting username:', e);
+    username = 'User'; // Fallback to default
+  }
 
   // const handleTabChange = (event, newValue) => {
   //   setValue(newValue);

@@ -134,6 +134,13 @@ axios.interceptors.request.use(
     const accessToken = localStorage.getItem('access_token');
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+      // Debug: log token for /assignTask requests
+      if (config.url?.includes('assignTask')) {
+        console.log('Sending assignTask request with token:', accessToken.substring(0, 20) + '...');
+        console.log('Authorization header:', config.headers.Authorization?.substring(0, 30) + '...');
+      }
+    } else {
+      console.warn('No access token found in localStorage for request:', config.url);
     }
     return config;
   },

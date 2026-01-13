@@ -63,6 +63,20 @@ class KeycloakAuth:
         Verify a JWT token using Keycloak's token introspection endpoint
         """
         try:
+            # First, try to decode token to check expiration (without verification)
+            try:
+                from jose import jwt
+                decoded = jwt.get_unverified_claims(token)
+                exp = decoded.get('exp')
+                if exp:
+                    import time
+                    now = time.time()
+                    if exp < now:
+                        print(f"❌ Token expired. Exp: {exp}, Now: {now}, Diff: {now - exp} seconds")
+                        return None
+            except Exception as decode_error:
+                print(f"⚠️  Could not decode token for expiration check: {decode_error}")
+            
             # Use token introspection endpoint (more reliable than JWKS for validation)
             introspection_url = f"{self.keycloak_url}/realms/{self.realm}/protocol/openid-connect/token/introspect"
             
@@ -107,9 +121,13 @@ class KeycloakAuth:
                             'roles': realm_roles
                         }
                     else:
+                        print(f"❌ Token introspection returned active=False. Result: {result}")
                         return None
                 else:
-                    print(f"Keycloak introspection failed: {response.status_code} - {response.text}")
+                    print(f"❌ Keycloak introspection failed: {response.status_code}")
+                    print(f"   Response text: {response.text}")
+                    print(f"   Introspection URL: {introspection_url}")
+                    print(f"   Client ID: {self.client_id}")
                     return None
                     
         except Exception as e:

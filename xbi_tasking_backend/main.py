@@ -33,8 +33,10 @@ origins = [
 mc = MainController()
 
 # Keycloak authentication - can be enabled/disabled via environment variable
-KEYCLOAK_ENABLED = os.getenv('KEYCLOAK_ENABLED', 'false').lower() == 'true'
+KEYCLOAK_ENABLED = os.getenv('KEYCLOAK_ENABLED', 'true').lower() == 'true'  # Default to true
+print(f"🔐 Keycloak authentication: {'ENABLED' if KEYCLOAK_ENABLED else 'DISABLED'}")
 
+# IMPORTANT: Auth middleware must be registered BEFORE CORS middleware
 # Middleware to validate tokens for ALL routes (except excluded ones)
 @app.middleware("http")
 async def keycloak_auth_middleware(request: Request, call_next):
@@ -42,36 +44,70 @@ async def keycloak_auth_middleware(request: Request, call_next):
     Middleware that validates Keycloak tokens for all requests
     Excludes: /docs, /redoc, /openapi.json, /static, / (health check)
     """
-    # List of paths that don't require authentication
-    excluded_paths = ["/docs", "/redoc", "/openapi.json", "/", "/static", "/auth/login", "/auth/callback", "/auth/logout"]
+    # CRITICAL: Print at the very start to confirm middleware is running
+    print(f"🚀 [MIDDLEWARE START] {request.method} {request.url.path}")
     
-    # Check if path is excluded
-    if any(request.url.path.startswith(path) for path in excluded_paths):
+    # Handle OPTIONS requests (CORS preflight) - these don't need auth
+    if request.method == "OPTIONS":
+        print(f"   [MIDDLEWARE] OPTIONS request, allowing through")
         response = await call_next(request)
         return response
     
-    # If Keycloak is disabled, allow all requests
+    # List of paths that don't require authentication
+    # Use exact match for most paths, but /static should match any path starting with /static
+    excluded_exact_paths = ["/docs", "/redoc", "/openapi.json", "/", "/auth/login", "/auth/callback", "/auth/logout"]
+    excluded_prefix_paths = ["/static"]
+    
+    # Check if path is excluded (exact match or prefix match)
+    if request.url.path in excluded_exact_paths or any(request.url.path.startswith(prefix) for prefix in excluded_prefix_paths):
+        print(f"   [MIDDLEWARE] Path excluded: {request.url.path}")
+        response = await call_next(request)
+        return response
+    
+    # If Keycloak is disabled, allow all requests but set anonymous user
     if not KEYCLOAK_ENABLED:
+        print(f"   [MIDDLEWARE] Keycloak disabled, setting anonymous user")
+        request.state.user = {"sub": "anonymous", "preferred_username": "anonymous"}
         response = await call_next(request)
         return response
     
     # Validate token for all other routes
+    print(f"🔍 [MIDDLEWARE] Processing {request.method} {request.url.path}, KEYCLOAK_ENABLED={KEYCLOAK_ENABLED}")
+    
+    from main_classes.KeycloakAuth import keycloak_auth
+    
+    auth_header = request.headers.get("Authorization")
+    print(f"   [MIDDLEWARE] Authorization header present: {auth_header is not None}")
+    if auth_header:
+        print(f"   [MIDDLEWARE] Header starts with 'Bearer ': {auth_header.startswith('Bearer ')}")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        print(f"❌ [MIDDLEWARE] Missing or invalid Authorization header for {request.url.path}")
+        print(f"   [MIDDLEWARE] Header value: {auth_header}")
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Not authenticated. Missing or invalid Authorization header."},
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    token = auth_header.split(" ")[1]
+    if not token:
+        print(f"❌ [MIDDLEWARE] Empty token in Authorization header for {request.url.path}")
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Not authenticated. Empty token."},
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    print(f"🔍 [MIDDLEWARE] Validating token for {request.url.path} (token: {token[:20]}...)")
     try:
-        from main_classes.KeycloakAuth import keycloak_auth
-        
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Not authenticated. Missing or invalid Authorization header."},
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        token = auth_header.split(" ")[1]
         token_info = await keycloak_auth.verify_token(token)
+        print(f"   [MIDDLEWARE] Token validation result: {token_info is not None}")
         
         if not token_info:
+            print(f"❌ [MIDDLEWARE] Token validation failed for {request.url.path}")
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=401,
@@ -79,20 +115,27 @@ async def keycloak_auth_middleware(request: Request, call_next):
                 headers={"WWW-Authenticate": "Bearer"}
             )
         
+        print(f"✅ [MIDDLEWARE] Token validated successfully for {request.url.path}, user: {token_info.get('preferred_username', 'unknown')}")
         # Attach user info to request state for use in route handlers
         request.state.user = token_info
+        print(f"   [MIDDLEWARE] Set request.state.user: {request.state.user is not None}")
         
         # Continue with the request
         response = await call_next(request)
+        print(f"   [MIDDLEWARE] Request completed for {request.url.path}")
         return response
         
     except HTTPException as e:
+        print(f"❌ HTTPException in middleware for {request.url.path}: {e.detail}")
         return JSONResponse(
             status_code=e.status_code,
             content={"detail": e.detail},
             headers=e.headers
         )
     except Exception as e:
+        print(f"❌ Exception in middleware for {request.url.path}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
@@ -111,6 +154,9 @@ async def get_current_user(request: Request):
     
     user = getattr(request.state, 'user', None)
     if not user:
+        print(f"❌ get_current_user: No user in request.state for {request.url.path}")
+        print(f"   KEYCLOAK_ENABLED: {KEYCLOAK_ENABLED}")
+        print(f"   This means middleware didn't set request.state.user")
         from fastapi import HTTPException, status
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

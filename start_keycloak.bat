@@ -5,3 +5,4 @@ echo Starting Keycloak with JAVA_HOME=%JAVA_HOME%
 .\kc.bat start-dev --http-port=8080
 pause
 
+

@@ -73,7 +73,10 @@ export default function TaskingManager({ dateRange }) {
         .then(
           res => {
             if (res['data']['Users']) {
-              setAssignee(['Multiple'].concat(res['data']['Users']));
+              // Users are now objects with {id, name}
+              // Add "Multiple" as an object too for consistency
+              const multipleOption = {id: 'Multiple', name: 'Multiple'};
+              setAssignee([multipleOption].concat(res['data']['Users']));
             }
           }
         );
@@ -199,22 +202,55 @@ export default function TaskingManager({ dateRange }) {
   /* Returns assignee row  */
   function Assignee({ params, imgAssignee }) {
     // console.log('RENDER ASSIGNEE');
+    
+    // Helper to convert value (string ID or object) to option object
+    const getValueOption = (value) => {
+      if (!value) return null;
+      if (typeof value === 'object' && value.id) return value;
+      // If value is a string (Keycloak user ID), find matching option
+      const found = assignee?.find(opt => {
+        if (typeof opt === 'string') return opt === value;
+        return opt?.id === value;
+      });
+      return found || null;
+    };
+    
     if (params.rowNode.parent === null) {
       return (
         <Autocomplete
           disablePortal
           id="combo-box-assignee"
           options={assignee || []}
-          getOptionDisabled={(option) =>
-            ['Multiple'].includes(option)
-          }
+          getOptionLabel={(option) => {
+            if (typeof option === 'string') return option; // Backward compatibility
+            return option?.name || option?.id || '';
+          }}
+          isOptionEqualToValue={(option, value) => {
+            if (typeof option === 'string' && typeof value === 'string') {
+              return option === value;
+            }
+            if (typeof option === 'string' || typeof value === 'string') {
+              // One is string, one is object - compare by ID
+              const optId = typeof option === 'string' ? option : option?.id;
+              const valId = typeof value === 'string' ? value : value?.id;
+              return optId === valId;
+            }
+            return option?.id === value?.id;
+          }}
+          getOptionDisabled={(option) => {
+            if (typeof option === 'string') return option === 'Multiple';
+            return option?.id === 'Multiple';
+          }}
           sx={{ width: 300 }}
           renderInput={(params) => <TextField {...params} label="Assignee" />}
-          value={imgAssignee || params.value || null}
+          value={getValueOption(imgAssignee || params.value)}
           onChange={(event, newValue) => {
             // console.log(newValue);
             if (newValue == null) {
               newValue = "";
+            } else if (typeof newValue === 'object' && newValue.id) {
+              // Store the ID (Keycloak user ID) for backend compatibility
+              newValue = newValue.id;
             }
             let newRows = [...rows];
             // newRows[params.id] = { ...params.row, assignee: newValue };
@@ -253,16 +289,36 @@ export default function TaskingManager({ dateRange }) {
           disablePortal
           id="combo-box-assignee"
           options={assignee || null}
-          getOptionDisabled={(option) =>
-            option === 'Multiple'
-          }
+          getOptionLabel={(option) => {
+            if (typeof option === 'string') return option; // Backward compatibility
+            return option?.name || option?.id || '';
+          }}
+          isOptionEqualToValue={(option, value) => {
+            if (typeof option === 'string' && typeof value === 'string') {
+              return option === value;
+            }
+            if (typeof option === 'string' || typeof value === 'string') {
+              // One is string, one is object - compare by ID
+              const optId = typeof option === 'string' ? option : option?.id;
+              const valId = typeof value === 'string' ? value : value?.id;
+              return optId === valId;
+            }
+            return option?.id === value?.id;
+          }}
+          getOptionDisabled={(option) => {
+            if (typeof option === 'string') return option === 'Multiple';
+            return option?.id === 'Multiple';
+          }}
           sx={{ width: 300 }}
           renderInput={(params) => <TextField {...params} label="Assignee" />}
-          value={params.value || null}
+          value={getValueOption(params.value)}
           onChange={(event, newValue) => {
             // console.log(newValue);
             if (newValue == null) {
               newValue = "";
+            } else if (typeof newValue === 'object' && newValue.id) {
+              // Store the ID (Keycloak user ID) for backend compatibility
+              newValue = newValue.id;
             }
             let newRows = [...rows];
             newRows = newRows.map(
@@ -489,6 +545,14 @@ export default function TaskingManager({ dateRange }) {
     let updateTaskSuccess = false;
 
     // Assign tasks
+    // Check if token exists before making request
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      alert("You are not authenticated. Please log in again.");
+      window.location.href = `${process.env.REACT_APP_DB_API_URL || 'http://localhost:5000'}/auth/login`;
+      return;
+    }
+    
     axios.post('/assignTask', postTasks)
       .then(
         res => {
@@ -503,8 +567,39 @@ export default function TaskingManager({ dateRange }) {
       .catch(
         err => {
           console.error("Error assigning tasks:", err);
+          console.error("Full error:", err.response);
+          console.error("Error data:", err.response?.data);
+          console.error("Error status:", err.response?.status);
           const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Unknown error";
           alert("Error assigning tasks: " + errorMsg);
+          
+          // Log token info for debugging
+          const token = localStorage.getItem('access_token');
+          if (token) {
+            try {
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              const exp = payload.exp;
+              const now = Math.floor(Date.now() / 1000);
+              console.log("Token expiry check:", {
+                expires: new Date(exp * 1000).toISOString(),
+                now: new Date(now * 1000).toISOString(),
+                expired: exp < now,
+                minutesUntilExpiry: Math.floor((exp - now) / 60)
+              });
+            } catch (e) {
+              console.error("Could not decode token:", e);
+            }
+          }
+          
+          // If 401, redirect to login
+          if (err.response?.status === 401) {
+            console.log("401 error - redirecting to login");
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('user');
+            window.location.href = `${process.env.REACT_APP_DB_API_URL || 'http://localhost:5000'}/auth/login`;
+          }
         }
       );
     

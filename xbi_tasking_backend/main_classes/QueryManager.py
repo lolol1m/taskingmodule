@@ -457,8 +457,8 @@ class QueryManager():
         try:
             token = self.get_keycloak_admin_token()
         except (ValueError, requests.exceptions.RequestException):
-            # If admin client not configured, return usernames as-is (no is_present filter)
-            return [(username,) for username in keycloak_usernames]
+            # If admin client not configured, return (username, username) tuples (no is_present filter)
+            return [(username, username) for username in keycloak_usernames]
         
         config = ConfigClass._instance
         keycloak_url = config.getKeycloakURL()
@@ -501,11 +501,11 @@ class QueryManager():
             result = self.db.executeSelect(query, tuple(user_ids))
             present_user_ids = {row[0] for row in result}
             
-            # Return usernames for users who are present
-            return [(username,) for user_id, username in user_data if user_id in present_user_ids]
+            # Return (user_id, username) tuples for users who are present
+            return [(user_id, username) for user_id, username in user_data if user_id in present_user_ids]
         
-        # Fallback: return all usernames if we couldn't get IDs
-        return [(username,) for username in keycloak_usernames]
+        # Fallback: return (username, username) tuples if we couldn't get IDs
+        return [(username, username) for username in keycloak_usernames]
     
     def getUserIds(self):
         '''
