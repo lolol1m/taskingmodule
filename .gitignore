@@ -1,3 +1,9 @@
-./xbi_tasking_backend/code/xbi_tasking_3/venv/
 ./xbi_tasking_backend/venv/
 ./xbi_ui/node_modules/
+./xbi_tasking_backend/environment/venv/
+./xbi_tasking_backend/code/xbi_tasking_3/venv/
+node_modules/
+__pycache__/
+venv/
+XBI_UI/
+xbi_tasking_backend/code/
