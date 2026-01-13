@@ -1,7 +1,7 @@
-import "./LandingPage.css";
+import "../styles/LandingPage.css";
 import TaskingSummary from "./TaskingSummary";
 import { Link } from "react-router-dom";
-import logo from "./xbi2.png"
+import logo from "../assets/xbi2.png"
 import { Button, Box } from "@mui/material";
 
 const LandingPage = ({dateRange, handleTabChange}) => {
