@@ -18,9 +18,9 @@
    - **Client ID**: `xbi-tasking-backend`
    - Click **Next**
 3. In **Capability config**:
-   - ✅ **Enable Client authentication** (makes it confidential)
-   - ✅ **Enable Standard flow** (Authorization Code Flow) - **REQUIRED**
-   - ❌ **Disable Direct access grants** (we're using redirect flow, not ROPC)
+   - **Enable Client authentication** (makes it confidential)
+   - **Enable Standard flow** (Authorization Code Flow) - **REQUIRED**
+   - **Disable Direct access grants** (using redirect flow, not ROPC)
    - Click **Next**
 4. In **Login settings**:
    - **Root URL**: Leave empty
@@ -55,12 +55,6 @@
 2. Set username, email (optional)
 3. Go to **Credentials** tab → Set password
 4. Go to **Role mapping** tab → Assign appropriate realm role (II, Senior II, or IA)
-
-### 5. Disable 2FA (if needed)
-
-1. Go to **Realm Settings** → **Authentication**
-2. Go to **Required Actions** tab
-3. Disable **"Configure OTP"** if enabled
 
 ## Backend Configuration
 
@@ -157,4 +151,10 @@ REACT_APP_DB_API_URL=http://localhost:5000
 3. **Token expiration**: Implement refresh token logic for long sessions
 4. **CSRF protection**: State parameter in redirect flow provides CSRF protection
 5. **HttpOnly cookies**: State stored in HttpOnly cookie (can't be accessed by JavaScript)
+
+## Additional Resources
+
+- [Keycloak Documentation](https://www.keycloak.org/documentation)
+- [Keycloak JavaScript Adapter](https://www.keycloak.org/docs/latest/securing_apps/#_javascript_adapter)
+- [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
 

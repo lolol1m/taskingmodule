@@ -39,20 +39,16 @@ const NavTabs = ({ tabs, currentTab, handleChange }) => {
   }
 
   const handleLogout = () => {
-    // Clear all stored tokens (for both regular users and admins/IA)
+    // Clear all stored tokens
     localStorage.removeItem('keycloak_token');
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('first_auth_token');
-    localStorage.removeItem('ia_password_validated');
     localStorage.removeItem('username');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('username');
     
-    // Logout from Keycloak (this also clears Keycloak's internal token storage)
-    // This works for both admin and regular user accounts
-    keycloak.logout({
-      redirectUri: window.location.origin
-    });
+    // Redirect to backend logout endpoint which handles Keycloak logout
+    window.location.href = `${process.env.REACT_APP_DB_API_URL || 'http://localhost:8000'}/auth/logout`;
   };
 
   return (
