@@ -10,7 +10,8 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { useState, useEffect } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import keycloak from '../components/keycloak';
+// Login page - redirects to backend auth endpoint
+const BACKEND_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
 
 
 
@@ -34,34 +35,30 @@ export default function Login({ toSetToken }) { // receives the setToken functio
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Initialize Keycloak - use initOnce to prevent multiple initializations
-    keycloak.initOnce({
-      onLoad: 'check-sso', // Check if user is already authenticated
-      checkLoginIframe: false,
-      pkceMethod: 'S256'
-    })
-    .then((authenticated) => {
+    // Check if user already has a token
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
       setIsInitialized(true);
-      setIsAuthenticated(authenticated);
-      
-      if (authenticated) {
-        // User is already authenticated, save token
-        const token = keycloak.token;
-        const username = keycloak.tokenParsed?.preferred_username || keycloak.tokenParsed?.sub || 'user';
-        toSetToken([token, username]);
+      setIsAuthenticated(true);
+      // User is already authenticated
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          toSetToken([accessToken, user.username]);
+        } catch (e) {
+          console.error('Error parsing user info:', e);
+        }
       }
-    })
-    .catch((error) => {
-      console.error('Keycloak initialization failed:', error);
+    } else {
       setIsInitialized(true);
-    });
+      setIsAuthenticated(false);
+    }
   }, [toSetToken]);
 
   const handleLogin = () => {
-    // Redirect to Keycloak login page
-    keycloak.login({
-      redirectUri: window.location.origin + window.location.pathname
-    });
+    // Redirect to backend login endpoint (which redirects to Keycloak)
+    window.location.href = `${BACKEND_URL}/auth/login`;
   };
 
   if (!isInitialized) {

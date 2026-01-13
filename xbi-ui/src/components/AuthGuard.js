@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
-import keycloak, { keycloakConfigForDebug as keycloakConfig } from './keycloak';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { jwtDecode } from 'jwt-decode';
 
 const theme = createTheme();
 
+// Get backend API URL (should match App.js)
+const BACKEND_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
+
 /**
  * AuthGuard component that ensures user is authenticated before rendering children
- * Redirects to Keycloak login if not authenticated
+ * Redirects to backend login endpoint (which redirects to Keycloak) if not authenticated
  */
 export default function AuthGuard({ children, onAuthSuccess }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -20,73 +23,119 @@ export default function AuthGuard({ children, onAuthSuccess }) {
   const [isIA, setIsIA] = useState(false);
 
   useEffect(() => {
-    // Store first token before checking admin status
-    const checkAuth = async () => {
-      try {
-        // Initialize Keycloak with login-required (forces redirect if not authenticated)
-        // Use initOnce to prevent multiple initializations
-        const authenticated = await keycloak.initOnce({
-          onLoad: 'login-required',
-          checkLoginIframe: false,
-          pkceMethod: 'S256', // Re-enable - Keycloak 26.4.7 may require this
-          enableLogging: true
-        });
+    const checkAuth = () => {
+      // Check if we have tokens in URL fragment (after redirect from backend)
+      const hash = window.location.hash.substring(1); // Remove '#'
+      const params = new URLSearchParams(hash);
+      
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      const idToken = params.get('id_token');
+      const username = params.get('username');
+      
+      if (accessToken) {
+        // We have tokens from redirect - store them
+        localStorage.setItem('access_token', accessToken);
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken);
+        }
+        if (idToken) {
+          localStorage.setItem('id_token', idToken);
+        }
         
-        setIsInitialized(true);
-        
-        if (authenticated) {
-          // Store token
-          const token = keycloak.token;
-          localStorage.setItem('keycloak_token', token);
-          
-          // Check user roles
-          const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
-          const resourceRoles = keycloak.tokenParsed?.resource_access?.[keycloak.clientId]?.roles || [];
+        // Decode token to get user info
+        try {
+          const decoded = jwtDecode(accessToken);
+          const realmRoles = decoded.realm_access?.roles || [];
+          const resourceRoles = decoded.resource_access?.[decoded.aud]?.roles || [];
           const allRoles = [...realmRoles, ...resourceRoles];
-          const username = keycloak.tokenParsed?.preferred_username || keycloak.tokenParsed?.sub || '';
+          const tokenUsername = decoded.preferred_username || decoded.sub || username || 'user';
           
           const hasAdminRole = allRoles.includes('admin') || allRoles.includes('Admin') || allRoles.includes('ADMIN');
-          const hasIARole = allRoles.includes('IA') || allRoles.includes('ia') || username.toLowerCase().includes('iauser');
+          const hasIARole = allRoles.includes('IA') || allRoles.includes('ia') || tokenUsername.toLowerCase().includes('iauser');
           
           setIsAdmin(hasAdminRole);
           setIsIA(hasIARole);
           setIsAuthenticated(true);
+          setIsInitialized(true);
+          
+          // Store user info
+          localStorage.setItem('user', JSON.stringify({
+            username: tokenUsername,
+            roles: allRoles,
+            isAdmin: hasAdminRole,
+            isIA: hasIARole
+          }));
           
           if (onAuthSuccess) {
-            onAuthSuccess([token, username]);
+            onAuthSuccess([accessToken, tokenUsername]);
           }
-        } else {
-          // Not authenticated - Keycloak will redirect to login
-          setIsAuthenticated(false);
+          
+          // Clean up URL fragment
+          window.history.replaceState(null, '', window.location.pathname);
+          return;
+        } catch (error) {
+          console.error('Error decoding token:', error);
         }
-      } catch (error) {
-        console.error('Keycloak initialization failed:', error);
-        console.error('Error details:', {
-          message: error.message,
-          url: keycloakConfig.url,
-          realm: keycloakConfig.realm,
-          clientId: keycloakConfig.clientId,
-          errorType: error.constructor.name
-        });
-        
-        // Try to get more details from the error
-        if (error.xhr) {
-          console.error('HTTP Response:', {
-            status: error.xhr.status,
-            statusText: error.xhr.statusText,
-            responseText: error.xhr.responseText
-          });
-        }
-        
-        
-        // Check if it's a 401 error - this means client configuration is wrong
-        if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
-          console.error('401 Unauthorized Error during token exchange:');
-        }
-        
-        setIsInitialized(true);
-        setIsAuthenticated(false);
       }
+      
+      // Check if we have stored token
+      const storedToken = localStorage.getItem('access_token');
+      if (storedToken) {
+        try {
+          const decoded = jwtDecode(storedToken);
+          const now = Math.floor(Date.now() / 1000);
+          
+          // Check if token is expired
+          if (decoded.exp && decoded.exp < now) {
+            // Token expired - redirect to login
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('user');
+            window.location.href = `${BACKEND_URL}/auth/login`;
+            return;
+          }
+          
+          // Token is valid
+          const realmRoles = decoded.realm_access?.roles || [];
+          const resourceRoles = decoded.resource_access?.[decoded.aud]?.roles || [];
+          const allRoles = [...realmRoles, ...resourceRoles];
+          const tokenUsername = decoded.preferred_username || decoded.sub || 'user';
+          
+          const hasAdminRole = allRoles.includes('admin') || allRoles.includes('Admin') || allRoles.includes('ADMIN');
+          const hasIARole = allRoles.includes('IA') || allRoles.includes('ia') || tokenUsername.toLowerCase().includes('iauser');
+          
+          setIsAdmin(hasAdminRole);
+          setIsIA(hasIARole);
+          setIsAuthenticated(true);
+          setIsInitialized(true);
+          
+          // Store user info
+          localStorage.setItem('user', JSON.stringify({
+            username: tokenUsername,
+            roles: allRoles,
+            isAdmin: hasAdminRole,
+            isIA: hasIARole
+          }));
+          
+          if (onAuthSuccess) {
+            onAuthSuccess([storedToken, tokenUsername]);
+          }
+          return;
+        } catch (error) {
+          console.error('Error validating stored token:', error);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('id_token');
+          localStorage.removeItem('user');
+        }
+      }
+      
+      // No valid token - redirect to backend login
+      setIsInitialized(true);
+      setIsAuthenticated(false);
+      window.location.href = `${BACKEND_URL}/auth/login`;
     };
     
     checkAuth();

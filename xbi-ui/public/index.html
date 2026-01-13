@@ -34,8 +34,67 @@
 </head>
 
 <body>
-  <noscript>You need to enable JavaScript to run this app.</noscript>
-  <div id="root"></div>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script>
+      // Remove MUI X watermark immediately and continuously
+      (function() {
+        function removeWatermark() {
+          // Remove by text content
+          const walker = document.createTreeWalker(
+            document.body || document.documentElement,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+          );
+          
+          let node;
+          while (node = walker.nextNode()) {
+            const text = node.textContent || '';
+            if (text.includes('MUI X') || text.includes('Invalid license') || text.includes('Missing License')) {
+              let parent = node.parentElement;
+              while (parent && parent !== document.body) {
+                if (parent.tagName === 'DIV' || parent.tagName === 'SPAN') {
+                  parent.remove();
+                  break;
+                }
+                parent = parent.parentElement;
+              }
+            }
+          }
+          
+          // Remove fixed position elements that might be watermarks
+          document.querySelectorAll('div').forEach(div => {
+            const text = div.textContent || '';
+            const style = window.getComputedStyle(div);
+            if (
+              (text.includes('MUI X') || text.includes('Invalid license')) ||
+              (style.position === 'fixed' && parseInt(style.zIndex) > 9000 && text.length < 100)
+            ) {
+              div.remove();
+            }
+          });
+        }
+        
+        // Run immediately when DOM is ready
+        if (document.body) {
+          removeWatermark();
+        } else {
+          document.addEventListener('DOMContentLoaded', removeWatermark);
+        }
+        
+        // Set up continuous monitoring
+        const observer = new MutationObserver(removeWatermark);
+        observer.observe(document.documentElement || document.body, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+        
+        // Also use interval as backup
+        setInterval(removeWatermark, 100);
+      })();
+    </script>
   <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.

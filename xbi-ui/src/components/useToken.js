@@ -1,25 +1,12 @@
 import { useState, useEffect } from 'react';
-import keycloak from './keycloak';
 
 export default function useToken() {
     
     const getToken = () => { 
-        // Keycloak JS adapter stores tokens in memory (most secure)
-        // Check if Keycloak has an authenticated token
-        if (keycloak.authenticated && keycloak.token) {
-            return keycloak.token;
-        }
-        
-        // Fallback: Try to get token from localStorage (for persistence across sessions)
-        // This is optional - Keycloak handles token storage internally
-        const storedToken = localStorage.getItem('keycloak_token');
-        if (storedToken) {
-            try {
-                return JSON.parse(storedToken);
-            } catch (e) {
-                // If parsing fails, clear invalid token
-                localStorage.removeItem('keycloak_token');
-            }
+        // Get access token from localStorage
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+            return accessToken;
         }
         
         // Fallback: Try sessionStorage (for backward compatibility)
@@ -48,44 +35,14 @@ export default function useToken() {
             sessionStorage.setItem('username', JSON.stringify(username)); // Also in sessionStorage for backward compatibility
         }
         
-        // Store token in localStorage for persistence across browser sessions
-        // Note: Keycloak JS adapter also stores it in memory automatically
-        localStorage.setItem('keycloak_token', JSON.stringify(token));
+        // Store token in localStorage
+        localStorage.setItem('access_token', token);
         
         // Also store in sessionStorage for backward compatibility
         sessionStorage.setItem('token', JSON.stringify(token));
         
         setToken(token); // set the token to trigger a re-render, allowing App.js to check if there is indeed a token
     } 
-
-    // Set up token refresh interval for Keycloak
-    useEffect(() => {
-        if (keycloak.authenticated) {
-            // Refresh token before it expires (refresh 30 seconds before expiry)
-            const refreshInterval = setInterval(() => {
-                keycloak.updateToken(30)
-                    .then((refreshed) => {
-                        if (refreshed) {
-                            console.log('Token refreshed');
-                            // Update stored token in localStorage
-                            const username = keycloak.tokenParsed?.preferred_username || keycloak.tokenParsed?.sub || 'user';
-                            saveToken([keycloak.token, username]);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('Failed to refresh token:', error);
-                        // Token refresh failed, clear stored tokens and logout
-                        localStorage.removeItem('keycloak_token');
-                        localStorage.removeItem('username');
-                        sessionStorage.removeItem('token');
-                        sessionStorage.removeItem('username');
-                        keycloak.logout();
-                    });
-            }, 60000); // Check every minute
-
-            return () => clearInterval(refreshInterval);
-        }
-    }, [keycloak.authenticated]);
 
     return { 
         setToken: saveToken, // ensure that we return this "saveToken" function back to the App.js and then into Login.js as "setToken"

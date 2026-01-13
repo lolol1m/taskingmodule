@@ -17,11 +17,9 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 import TaskingManager from "./pages/TaskingManager.js";
 import TaskingSummary from "./pages/TaskingSummary.js";
 import CompletedImages from "./components/CompletedImages.js";
-import AdminPage from "./AdminPage.js";
-import Login from "./pages/Login.js";
+import AdminPage from "./pages/AdminPage.js";
 import { useState, useEffect } from 'react';
 import useToken from "./components/useToken.js";
-import keycloak from "./components/keycloak.js";
 import AuthGuard from "./components/AuthGuard.js";
 
 // Modal for Date Picker Form
@@ -39,19 +37,103 @@ import LandingPage from "./pages/LandingPage.js"
 import { LicenseInfo } from '@mui/x-data-grid-pro';
 import { LicenseInfo as DatePickerLicenseInfo } from '@mui/x-date-pickers-pro';
 
-// Set dummy license key to suppress warnings (actual license check is bypassed in verifyLicense.js)
-LicenseInfo.setLicenseKey('');
-DatePickerLicenseInfo.setLicenseKey('');
+// Set development license key to suppress warnings
+// For development: Use a non-empty string to suppress the watermark
+// For production: Replace with your actual MUI X Pro license key
+LicenseInfo.setLicenseKey('development-license-key');
+DatePickerLicenseInfo.setLicenseKey('development-license-key');
+
+// Function to remove MUI X watermark from DOM
+const removeMUIWatermark = () => {
+  // More aggressive removal function
+  const removeWatermark = () => {
+    // Method 1: Remove by text content (most reliable)
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+    
+    let node;
+    const nodesToRemove = [];
+    while (node = walker.nextNode()) {
+      const text = node.textContent || '';
+      if (text.includes('MUI X') || text.includes('Invalid license') || text.includes('Missing License')) {
+        // Remove the parent element containing this text
+        let parent = node.parentElement;
+        while (parent && parent !== document.body) {
+          if (parent.tagName === 'DIV' || parent.tagName === 'SPAN') {
+            nodesToRemove.push(parent);
+            break;
+          }
+          parent = parent.parentElement;
+        }
+      }
+    }
+    nodesToRemove.forEach(el => el.remove());
+    
+    // Method 2: Remove all fixed position divs that might be watermarks
+    const allDivs = document.querySelectorAll('div');
+    allDivs.forEach(div => {
+      const text = div.textContent || div.innerText || '';
+      const style = div.getAttribute('style') || '';
+      const computedStyle = window.getComputedStyle(div);
+      
+      // Check if this is likely the watermark
+      if (
+        text.includes('MUI X') || 
+        text.includes('Invalid license') || 
+        text.includes('Missing License') ||
+        (computedStyle.position === 'fixed' && 
+         (computedStyle.zIndex === '9999' || computedStyle.zIndex === '99999' || parseInt(computedStyle.zIndex) > 9000) &&
+         (text.length < 100)) // Watermark text is usually short
+      ) {
+        div.remove();
+      }
+    });
+  };
+
+  // Run immediately multiple times to catch it
+  removeWatermark();
+  setTimeout(removeWatermark, 50);
+  setTimeout(removeWatermark, 100);
+  setTimeout(removeWatermark, 200);
+  setTimeout(removeWatermark, 500);
+  
+  // Set up interval to catch dynamically added watermarks
+  const interval = setInterval(removeWatermark, 200);
+  
+  // Also use MutationObserver to catch new elements immediately
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach(() => {
+      removeWatermark();
+    });
+  });
+  observer.observe(document.body, { 
+    childList: true, 
+    subtree: true,
+    characterData: true,
+    attributes: true
+  });
+  
+  // Cleanup function
+  return () => {
+    clearInterval(interval);
+    observer.disconnect();
+  };
+};
 
 // Get DB API URL from the .env file
-let DB_API_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
+export const DB_API_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
 axios.defaults.baseURL = DB_API_URL;
 
-// Add Keycloak token to all axios requests
+// Add access token to all axios requests
 axios.interceptors.request.use(
   (config) => {
-    if (keycloak.authenticated && keycloak.token) {
-      config.headers.Authorization = `Bearer ${keycloak.token}`;
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
   },
@@ -65,8 +147,12 @@ axios.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid, logout user
-      keycloak.logout();
+      // Token expired or invalid, clear tokens and redirect to login
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('user');
+      window.location.href = `${DB_API_URL}/auth/login`;
     }
     return Promise.reject(error);
   }
@@ -190,6 +276,10 @@ function MyApp() {
 
 // Main function being exported.
 function App() {
+  // Remove MUI X watermark on component mount and continuously monitor
+  useEffect(() => {
+    return removeMUIWatermark();
+  }, []);
 
 
   return (

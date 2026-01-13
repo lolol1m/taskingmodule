@@ -17,7 +17,9 @@ import { styled } from '@mui/material/styles';
 import { StaticDateRangePicker } from '@mui/x-date-pickers-pro/StaticDateRangePicker';
 import { DateRangePickerDay as MuiDateRangePickerDay } from '@mui/x-date-pickers-pro/DateRangePickerDay';
 
-axios.defaults.baseURL = 'http://localhost:8000';
+// Use the same baseURL as configured in App.js
+const BACKEND_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
+axios.defaults.baseURL = BACKEND_URL;
 
 // Most of these styles are just copy pasted. If you don't understand them...
 // Neither do I so have fun

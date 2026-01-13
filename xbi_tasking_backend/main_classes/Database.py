@@ -78,18 +78,72 @@ class Database():
         '''
         try:
             self.openCursor()
-            # Check if users table exists
+            # Check if user_cache table exists (new schema)
             self.cursor.execute("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_schema = 'public' 
-                    AND table_name = 'users'
+                    AND table_name = 'user_cache'
                 )
             """)
-            tables_exist = self.cursor.fetchone()[0]
+            user_cache_exists = self.cursor.fetchone()[0]
+            
+            # Also check if image table exists (to detect old schema)
+            self.cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'image'
+                )
+            """)
+            image_table_exists = self.cursor.fetchone()[0]
             self.closeCursor()
             
-            if not tables_exist:
+            # If user_cache doesn't exist but image table does, we need to add user_cache and new columns
+            if not user_cache_exists and image_table_exists:
+                print("Updating database schema for Keycloak integration...")
+                self.openCursor()
+                
+                # Create user_cache table
+                self.cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS user_cache (
+                        keycloak_user_id VARCHAR(255) PRIMARY KEY,
+                        display_name VARCHAR(255),
+                        is_present BOOLEAN DEFAULT FALSE,
+                        last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Add new columns to image table if they don't exist
+                self.cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'image' AND column_name = 'vetter_keycloak_id'
+                """)
+                if not self.cursor.fetchone():
+                    self.cursor.execute("""
+                        ALTER TABLE image 
+                        ADD COLUMN vetter_keycloak_id VARCHAR(255)
+                    """)
+                    print("  ✅ Added vetter_keycloak_id to image table")
+                
+                # Add new columns to task table if they don't exist
+                self.cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'task' AND column_name = 'assignee_keycloak_id'
+                """)
+                if not self.cursor.fetchone():
+                    self.cursor.execute("""
+                        ALTER TABLE task 
+                        ADD COLUMN assignee_keycloak_id VARCHAR(255)
+                    """)
+                    print("  ✅ Added assignee_keycloak_id to task table")
+                
+                self.closeCursor()
+                print("✅ Database schema updated for Keycloak")
+            elif not user_cache_exists:
+                # No tables exist at all, create full schema
                 print("Creating database schema...")
                 self._createSchema()
                 self._insertInitialData()
@@ -153,13 +207,26 @@ class Database():
             )
         """)
         
+        # User cache table for application state (is_present) and performance
+        # Keycloak is the source of truth for user identity
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_cache (
+                keycloak_user_id VARCHAR(255) PRIMARY KEY,
+                display_name VARCHAR(255),
+                is_present BOOLEAN DEFAULT FALSE,
+                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Legacy users table - deprecated, kept for migration compatibility
+        # Will be removed after migration is complete
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(255) UNIQUE NOT NULL,
                 name VARCHAR(255) UNIQUE NOT NULL,
                 is_present BOOLEAN DEFAULT FALSE
             )
-        """) #id refers to keycloak id
+        """) # DEPRECATED: Use user_cache and Keycloak instead
         
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS area (
@@ -186,7 +253,7 @@ class Database():
                 cloud_cover_id INTEGER REFERENCES cloud_cover(id),
                 ew_status_id INTEGER REFERENCES ew_status(id),
                 target_tracing BOOLEAN,
-                vetter_id INTEGER REFERENCES users(id)
+                vetter_keycloak_id VARCHAR(255)  -- Keycloak user ID (sub)
             )
         """)
         
@@ -210,7 +277,7 @@ class Database():
             CREATE TABLE IF NOT EXISTS task (
                 scvu_task_id SERIAL PRIMARY KEY,
                 scvu_image_area_id INTEGER UNIQUE REFERENCES image_area(scvu_image_area_id),
-                assignee_id INTEGER REFERENCES users(id),
+                assignee_keycloak_id VARCHAR(255),  -- Keycloak user ID (sub)
                 task_status_id INTEGER REFERENCES task_status(id),
                 remarks TEXT
             )

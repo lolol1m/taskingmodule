@@ -363,21 +363,21 @@ class MainController():
         
     def assignTask(self, json):
         '''
-        Function:   Creates and inserts a task into the database as well as initialise that task with the assignee 
+        Function:   Creates and inserts a task into the database with the assignee
         Input:      json is a dictionary with the required data
         Output:     NIL
         '''
         for task in json["Tasks"]:
             if task["Assignee"] == None:
                 continue
-            assignee_result = self.qm.getAssigneeID(task["Assignee"])
-            if assignee_result is None or len(assignee_result) == 0:
-                # Skip if assignee not found (shouldn't happen with proper mapping, but handle gracefully)
-                print(f"Warning: Assignee '{task['Assignee']}' not found in users table")
+            # Get Keycloak user ID from username
+            assignee_keycloak_id = self.qm.getKeycloakUserID(task["Assignee"])
+            if assignee_keycloak_id is None:
+                # Skip if assignee not found in Keycloak
+                print(f"Warning: Assignee '{task['Assignee']}' not found in Keycloak")
                 continue
-            assignee_id = assignee_result[0][0]
             task_status_id = self.qm.getTaskStatusID('Incomplete')
-            self.qm.assignTask(task['SCVU Image Area ID'], assignee_id, task_status_id)
+            self.qm.assignTask(task['SCVU Image Area ID'], assignee_keycloak_id, task_status_id)
         
     def startTasks(self, json):
         '''
@@ -415,25 +415,25 @@ class MainController():
         for task_id in json["SCVU Task ID"]:
             self.qm.verifyFail(task_id)
 
-    def completeImages(self, json):
+    def completeImages(self, json, vetter_keycloak_id):
         '''
         Function:   Runs completeImage for all the images in the list
-        Input:      json is a dictionary with the required data
+        Input:      json is a dictionary with the required data, vetter_keycloak_id (Keycloak user ID from JWT)
         Output:     Dictionary with results for each image
         '''
         current_datetime = datetime.datetime.today()
         results = {}
         for i in range(len(json["SCVU Image ID"])):
             image_id = json["SCVU Image ID"][i]
-            result = self.completeImage(image_id, json["Vetter"], current_datetime)
+            result = self.completeImage(image_id, vetter_keycloak_id, current_datetime)
             results[image_id] = result
         return results
     
-    def completeImage(self, scvu_image_id, vetter, current_datetime):
+    def completeImage(self, scvu_image_id, vetter_keycloak_id, current_datetime):
         '''
         Function:   Sets the completed date of an image to the current date if all tasks associated with the image are complete
-        Input:      json is a dictionary with the required data
-        Output:     NIL
+        Input:      scvu_image_id, vetter_keycloak_id (Keycloak user ID/sub from JWT), current_datetime
+        Output:     Dictionary with result or error message
         '''
         tasks = self.qm.getAllTaskStatusForImage(scvu_image_id)
         completed_task_id = self.qm.getTaskStatusID("Completed")
@@ -444,7 +444,8 @@ class MainController():
         if incomplete_tasks:
             # Return error message instead of empty dict
             return {"error": f"Cannot complete image {scvu_image_id}: Tasks {incomplete_tasks} are not completed"}
-        self.qm.completeImage(scvu_image_id, vetter, current_datetime)
+        self.qm.completeImage(scvu_image_id, vetter_keycloak_id, current_datetime)
+        return {"success": f"Image {scvu_image_id} completed"}
         return {"success": True}
     
     def uncompleteImages(self, json):

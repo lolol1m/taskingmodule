@@ -4,8 +4,6 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Button from '@mui/material/Button';
 import { Link } from "react-router-dom";
-import logo from "./xbi.png"
-import keycloak from "./keycloak";
 
 
 function LinkTab(props) {
@@ -30,9 +28,17 @@ const NavTabs = ({ tabs, currentTab, handleChange }) => {
     }
     if (storedUsername) {
       username = storedUsername.replaceAll(`"`, ``);
-    } else if (keycloak.authenticated && keycloak.tokenParsed) {
-      // Get from Keycloak token
-      username = keycloak.tokenParsed.preferred_username || keycloak.tokenParsed.sub || 'User';
+    } else {
+      // Try to get from user object in localStorage
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          username = user.username || 'User';
+        } catch (e) {
+          console.error('Error parsing user info:', e);
+        }
+      }
     }
   } catch (e) {
     console.error('Error getting username:', e);
@@ -48,7 +54,7 @@ const NavTabs = ({ tabs, currentTab, handleChange }) => {
     sessionStorage.removeItem('username');
     
     // Redirect to backend logout endpoint which handles Keycloak logout
-    window.location.href = `${process.env.REACT_APP_DB_API_URL || 'http://localhost:8000'}/auth/logout`;
+    window.location.href = `${process.env.REACT_APP_DB_API_URL || 'http://localhost:5000'}/auth/logout`;
   };
 
   return (
@@ -56,7 +62,7 @@ const NavTabs = ({ tabs, currentTab, handleChange }) => {
     <Box className='navTabs' sx={{ width: '100%' }}>
       <nav className="navbar">
         <div>
-        <img src={logo} className='logo'/>
+        <img src="/xbi.png" className='logo' alt="XBI Logo"/>
         <h1 className='navtabTitle'>XBI | {username}</h1>
         </div>
         <Tabs className="tabs" value={currentTab} onChange={(e, newValue) => handleChange(newValue)} aria-label="nav tabs example">

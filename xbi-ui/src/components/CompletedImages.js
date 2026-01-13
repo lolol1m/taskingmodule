@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { DataGridPro, GridToolbar } from "@mui/x-data-grid-pro";
 import { Button, Box } from "@mui/material";
-
-import { baseURL } from "../App";
-
 import axios from "axios";
 let _ = require('lodash');
 

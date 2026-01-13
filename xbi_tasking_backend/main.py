@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, File, UploadFile, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import argparse
 import uvicorn
@@ -11,6 +11,9 @@ from fastapi.openapi.docs import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+import urllib.parse
+import secrets
+import httpx
 
 from main_classes import MainController, ConfigClass
 import os
@@ -40,7 +43,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
     Excludes: /docs, /redoc, /openapi.json, /static, / (health check)
     """
     # List of paths that don't require authentication
-    excluded_paths = ["/docs", "/redoc", "/openapi.json", "/", "/static"]
+    excluded_paths = ["/docs", "/redoc", "/openapi.json", "/", "/static", "/auth/login", "/auth/callback", "/auth/logout"]
     
     # Check if path is excluded
     if any(request.url.path.startswith(path) for path in excluded_paths):
@@ -151,6 +154,155 @@ async def redoc_html():
 @app.get("/")
 async def index():
     return "it works"
+
+# Keycloak authentication endpoints - frontend never talks to Keycloak directly
+@app.get("/auth/login")
+async def auth_login(request: Request):
+    """
+    Initiates Keycloak login flow by redirecting to Keycloak authorization endpoint.
+    Frontend calls this endpoint when user needs to authenticate.
+    """
+    if not KEYCLOAK_ENABLED:
+        return {"detail": "Keycloak authentication is disabled"}
+    
+    config = ConfigClass._instance
+    keycloak_url = config.getKeycloakURL()
+    realm = config.getKeycloakRealm()
+    client_id = config.getKeycloakClientID()
+    
+    # Get frontend URL from environment or use default
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    
+    # Generate state for CSRF protection
+    state = secrets.token_urlsafe(32)
+    
+    # Store state in session/cookie (simplified - in production use secure cookies)
+    # For now, we'll include it in the redirect URI
+    
+    # Build Keycloak authorization URL
+    auth_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/auth"
+    # Use the request URL to get the correct host and port
+    backend_url = str(request.base_url).rstrip('/')
+    redirect_uri = f"{backend_url}/auth/callback"
+    
+    params = {
+        'client_id': client_id,
+        'redirect_uri': str(redirect_uri),
+        'response_type': 'code',
+        'scope': 'openid profile email',
+        'state': state
+    }
+    
+    auth_url_with_params = f"{auth_url}?{urllib.parse.urlencode(params)}"
+    
+    return RedirectResponse(url=auth_url_with_params)
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request, code: str = None, state: str = None, error: str = None):
+    """
+    Handles Keycloak redirect after user authentication.
+    Exchanges authorization code for tokens and redirects to frontend with tokens.
+    """
+    if not KEYCLOAK_ENABLED:
+        return {"detail": "Keycloak authentication is disabled"}
+    
+    if error:
+        # Keycloak returned an error
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        return RedirectResponse(url=f"{frontend_url}?error={error}")
+    
+    if not code:
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        return RedirectResponse(url=f"{frontend_url}?error=no_code")
+    
+    config = ConfigClass._instance
+    keycloak_url = config.getKeycloakURL()
+    realm = config.getKeycloakRealm()
+    client_id = config.getKeycloakClientID()
+    client_secret = config.getKeycloakClientSecret()
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    
+    # Exchange authorization code for tokens
+    token_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
+    # Use the request URL to get the correct host and port
+    backend_url = str(request.base_url).rstrip('/')
+    redirect_uri = f"{backend_url}/auth/callback"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                token_url,
+                data={
+                    'grant_type': 'authorization_code',
+                    'code': code,
+                    'redirect_uri': str(redirect_uri),
+                    'client_id': client_id,
+                    'client_secret': client_secret
+                },
+                timeout=10.0
+            )
+            
+            if response.status_code != 200:
+                return RedirectResponse(url=f"{frontend_url}?error=token_exchange_failed")
+            
+            token_data = response.json()
+            access_token = token_data.get('access_token')
+            refresh_token = token_data.get('refresh_token')
+            id_token = token_data.get('id_token')
+            
+            # Decode token to get user info
+            from jose import jwt
+            try:
+                # Get public key from Keycloak (simplified - in production cache this)
+                token_info = jwt.get_unverified_claims(id_token)
+                username = token_info.get('preferred_username') or token_info.get('sub', 'user')
+                
+                # Redirect to frontend with tokens in URL fragment (more secure than query params)
+                # Frontend will extract tokens from fragment
+                fragment_params = {
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                    'id_token': id_token,
+                    'username': username
+                }
+                
+                # Build redirect URL with fragment
+                redirect_url = f"{frontend_url}#{urllib.parse.urlencode(fragment_params)}"
+                return RedirectResponse(url=redirect_url)
+                
+            except Exception as e:
+                print(f"Error decoding token: {e}")
+                return RedirectResponse(url=f"{frontend_url}?error=token_decode_failed")
+                
+    except Exception as e:
+        print(f"Error exchanging code for tokens: {e}")
+        return RedirectResponse(url=f"{frontend_url}?error=token_exchange_error")
+
+@app.get("/auth/logout")
+async def auth_logout(request: Request):
+    """
+    Logs out user from Keycloak and redirects to frontend.
+    """
+    if not KEYCLOAK_ENABLED:
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        return RedirectResponse(url=frontend_url)
+    
+    config = ConfigClass._instance
+    keycloak_url = config.getKeycloakURL()
+    realm = config.getKeycloakRealm()
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    
+    # Build Keycloak logout URL
+    logout_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/logout"
+    redirect_uri = f"{frontend_url}"
+    
+    params = {
+        'redirect_uri': redirect_uri
+    }
+    
+    logout_url_with_params = f"{logout_url}?{urllib.parse.urlencode(params)}"
+    
+    return RedirectResponse(url=logout_url_with_params)
 
 #TODO: legacy, please remove once confirmed not needed
 @app.post("/accountLogin")
@@ -693,19 +845,20 @@ async def completeImages(request: Request, user: dict = Depends(get_current_user
     
     Input:
         {
-            'SCVU Image ID': <list of int>,
-            'Vetter': <string>
+            'SCVU Image ID': <list of int>
         }
+        Note: Vetter is automatically taken from the authenticated user's JWT token
     
     Sample:
-    
+
         {
-            'SCVU Image ID': [1],
-            'Vetter': 'hi'
+            'SCVU Image ID': [1]
         }
     '''
     data = await request.json()
-    return mc.completeImages(data)
+    # Get Keycloak user ID from JWT token (sub claim)
+    vetter_keycloak_id = user.get('sub')
+    return mc.completeImages(data, vetter_keycloak_id)
 
 @app.post("/uncompleteImages")
 async def uncompleteImages(request: Request):

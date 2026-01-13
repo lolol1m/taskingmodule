@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect } from "react";
-import './table.css';
+import '../styles/table.css';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';

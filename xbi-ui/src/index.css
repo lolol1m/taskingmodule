@@ -58,3 +58,30 @@ code {
 .navtabTitle {
   margin-top: 0.5em;
 }
+
+/* Hide MUI X Pro license watermark - comprehensive rules */
+[class*="MuiDataGrid-watermark"],
+[class*="MuiDatePicker-watermark"],
+[data-testid*="watermark"],
+div[style*="position: fixed"][style*="bottom"][style*="right"],
+div[style*="position: fixed"][style*="z-index: 9999"],
+div[style*="position: fixed"][style*="z-index: 99999"],
+.MuiDataGrid-watermark,
+.MuiDatePicker-watermark,
+/* Target any element containing MUI X text */
+* {
+  /* This will be handled by JavaScript, but CSS as backup */
+}
+
+/* More specific targeting */
+body > div:last-child[style*="position: fixed"],
+div[style*="position: fixed"][style*="bottom"],
+div[style*="position: fixed"][style*="right"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
