@@ -104,13 +104,11 @@ class Database():
                 print("Updating database schema for Keycloak integration...")
                 self.openCursor()
                 
-                # Create user_cache table
+                # Create user_cache table (only for is_present state)
                 self.cursor.execute("""
                     CREATE TABLE IF NOT EXISTS user_cache (
                         keycloak_user_id VARCHAR(255) PRIMARY KEY,
-                        display_name VARCHAR(255),
-                        is_present BOOLEAN DEFAULT FALSE,
-                        last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        is_present BOOLEAN DEFAULT FALSE
                     )
                 """)
                 
@@ -207,14 +205,12 @@ class Database():
             )
         """)
         
-        # User cache table for application state (is_present) and performance
-        # Keycloak is the source of truth for user identity
+        # User cache table for application state (is_present) only
+        # Keycloak is the source of truth for user identity - we don't cache display names
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_cache (
                 keycloak_user_id VARCHAR(255) PRIMARY KEY,
-                display_name VARCHAR(255),
-                is_present BOOLEAN DEFAULT FALSE,
-                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                is_present BOOLEAN DEFAULT FALSE
             )
         """)
         

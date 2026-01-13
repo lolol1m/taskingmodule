@@ -73,6 +73,17 @@ def insert_dummy_data():
         # Get user cache entries for assignments
         db.cursor.execute("SELECT keycloak_user_id FROM user_cache LIMIT 5")
         user_ids = [row[0] for row in db.cursor.fetchall()]
+        
+        # Set all existing users to is_present = True so they appear in assignee dropdown
+        print("\n5. Updating user_cache to set is_present = True...")
+        db.cursor.execute("""
+            UPDATE user_cache 
+            SET is_present = TRUE
+            WHERE is_present = FALSE
+        """)
+        updated_count = db.cursor.rowcount
+        print(f"   ✅ Set {updated_count} users to is_present = True")
+        
         if not user_ids:
             # Create dummy user cache entries
             dummy_users = [
@@ -82,7 +93,7 @@ def insert_dummy_data():
             ]
             for user_id, display_name in dummy_users:
                 db.cursor.execute(
-                    "INSERT INTO user_cache (keycloak_user_id, display_name, is_present) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                    "INSERT INTO user_cache (keycloak_user_id, display_name, is_present) VALUES (%s, %s, %s) ON CONFLICT (keycloak_user_id) DO UPDATE SET is_present = TRUE",
                     (user_id, display_name, True)
                 )
             user_ids = [u[0] for u in dummy_users]

@@ -59,9 +59,9 @@ class QueryManager():
     #TODO: can't find a matching call in the rest of the codebase, not sure what this is used for but suspect its not good practice. recommend removal and testing.
     def getUsersList(self):
         '''
-        Obtains usernames of all II users from Keycloak
+        Obtains usernames of all II, Senior II, and IA users from Keycloak
         Input: NIL
-        Output: List of II usernames (empty list if Keycloak admin client is not configured)
+        Output: List of usernames (empty list if Keycloak admin client is not configured)
         '''
         try:
             token = self.get_keycloak_admin_token()
@@ -74,23 +74,27 @@ class QueryManager():
         keycloak_url = config.getKeycloakURL()
         realm = config.getKeycloakRealm()
 
-        url = f"{keycloak_url}/admin/realms/{realm}/roles/II/users"
-
         headers = {
             "Authorization": f"Bearer {token}"
         }
 
-        try:
-            response = requests.get(url, headers=headers, timeout=5)
-            response.raise_for_status()
-            usernames = [user["username"] for user in response.json()]
-            return usernames
-        except requests.exceptions.RequestException as e:
-            print(f"Warning: Could not fetch users from Keycloak: {e}")
-            return []
-        usernames = [user["username"] for user in response.json()]
-
-        return usernames
+        # Get users with II, Senior II, and IA roles
+        all_usernames = set()
+        roles = ['II', 'Senior II', 'IA']
+        
+        for role in roles:
+            url = f"{keycloak_url}/admin/realms/{realm}/roles/{role}/users"
+            try:
+                response = requests.get(url, headers=headers, timeout=5)
+                response.raise_for_status()
+                users = response.json()
+                for user in users:
+                    all_usernames.add(user["username"])
+            except requests.exceptions.RequestException as e:
+                print(f"Warning: Could not fetch users with role '{role}' from Keycloak: {e}")
+                continue
+        
+        return list(all_usernames)
     
     def getUserActiveTasks(self, keycloak_user_id):
         '''
@@ -315,11 +319,10 @@ class QueryManager():
         Input:      NIL
         Output:     list of tuple, each containing imageareaid, assignee name and remarks
         '''
-        query = f"SELECT image_area.scvu_image_area_id, COALESCE(uc.display_name, 'Unassigned'), task.remarks \
+        query = f"SELECT image_area.scvu_image_area_id, COALESCE(task.assignee_keycloak_id, 'Unassigned'), task.remarks \
         FROM task \
         JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
         JOIN image ON image.scvu_image_id = image_area.scvu_image_id \
-        LEFT JOIN user_cache uc ON task.assignee_keycloak_id = uc.keycloak_user_id \
         WHERE image_area.scvu_image_id = %s"
         cursor = self.db.executeSelect(query, (scvu_image_id,))
         return cursor
@@ -423,59 +426,38 @@ class QueryManager():
     
     def syncUserCache(self, keycloak_user_id, display_name=None):
         '''
-        Function:   Syncs user_cache with Keycloak user data
-        Input:      keycloak_user_id (sub), display_name (optional, will fetch from Keycloak if not provided)
+        Function:   Ensures user exists in cache (for is_present state management)
+        Input:      keycloak_user_id (sub), display_name (ignored - Keycloak is source of truth)
         Output:     NIL
+        Note:       We only store keycloak_user_id and is_present - display names come from Keycloak
         '''
-        if not display_name:
-            # Fetch display name from Keycloak if not provided
-            try:
-                token = self.get_keycloak_admin_token()
-            except (ValueError, requests.exceptions.RequestException):
-                display_name = 'Unknown'
-            else:
-                config = ConfigClass._instance
-                keycloak_url = config.getKeycloakURL()
-                realm = config.getKeycloakRealm()
-                url = f"{keycloak_url}/admin/realms/{realm}/users/{keycloak_user_id}"
-                headers = {"Authorization": f"Bearer {token}"}
-                try:
-                    response = requests.get(url, headers=headers, timeout=5)
-                    if response.status_code == 200:
-                        user = response.json()
-                        display_name = user.get('username') or user.get('preferred_username') or 'Unknown'
-                    else:
-                        display_name = 'Unknown'
-                except requests.exceptions.RequestException:
-                    display_name = 'Unknown'
-        
-        # Upsert into user_cache
+        # Just ensure user exists in cache - we don't store display_name
         query = """
-            INSERT INTO user_cache (keycloak_user_id, display_name, last_synced)
-            VALUES (%s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (keycloak_user_id) 
-            DO UPDATE SET display_name = EXCLUDED.display_name, last_synced = CURRENT_TIMESTAMP
+            INSERT INTO user_cache (keycloak_user_id, is_present)
+            VALUES (%s, FALSE)
+            ON CONFLICT (keycloak_user_id) DO NOTHING
         """
-        self.db.executeInsert(query, (keycloak_user_id, display_name))
+        self.db.executeInsert(query, (keycloak_user_id,))
     
     def getUsers(self):
         '''
-        Function:   Gets II users from Keycloak (with is_present filter from cache)
+        Function:   Gets users from Keycloak (II, Senior II, IA roles) with is_present filter from cache
         Input:      None
-        Output:     nested list of all the II users (as tuples for compatibility)
+        Output:     nested list of usernames (as tuples for compatibility)
+        Note:       Keycloak is the source of truth - we only cache is_present state
         '''
-        # Get users from Keycloak with II role
+        # Get users from Keycloak with II, Senior II, or IA roles
         keycloak_usernames = self.getUsersList()
         
         if not keycloak_usernames:
             # If Keycloak query failed, return empty list
             return []
         
-        # Get Keycloak user IDs for these usernames and sync cache
+        # Get Keycloak user IDs for these usernames and ensure they exist in cache
         try:
             token = self.get_keycloak_admin_token()
         except (ValueError, requests.exceptions.RequestException):
-            # If admin client not configured, return usernames as-is
+            # If admin client not configured, return usernames as-is (no is_present filter)
             return [(username,) for username in keycloak_usernames]
         
         config = ConfigClass._instance
@@ -483,7 +465,8 @@ class QueryManager():
         realm = config.getKeycloakRealm()
         headers = {"Authorization": f"Bearer {token}"}
         
-        user_ids = []
+        # Get user IDs and ensure they're in cache (for is_present filtering)
+        user_data = []  # List of (user_id, username) tuples
         for username in keycloak_usernames:
             url = f"{keycloak_url}/admin/realms/{realm}/users"
             params = {"username": username, "exact": "true"}
@@ -493,26 +476,35 @@ class QueryManager():
                     users = response.json()
                     if users:
                         user_id = users[0].get('id')
-                        display_name = users[0].get('username') or users[0].get('preferred_username') or username
-                        # Sync to cache
-                        self.syncUserCache(user_id, display_name)
-                        user_ids.append(user_id)
+                        # Ensure user exists in cache (for is_present filtering)
+                        # We don't store display_name - Keycloak is source of truth
+                        query = """
+                            INSERT INTO user_cache (keycloak_user_id, is_present)
+                            VALUES (%s, FALSE)
+                            ON CONFLICT (keycloak_user_id) DO NOTHING
+                        """
+                        self.db.executeInsert(query, (user_id,))
+                        user_data.append((user_id, username))
             except requests.exceptions.RequestException:
                 continue
         
-        # Filter by is_present from cache
-        if user_ids:
+        # Filter by is_present from cache - return usernames from Keycloak (source of truth)
+        if user_data:
+            user_ids = [uid for uid, _ in user_data]
             placeholders = ','.join(['%s'] * len(user_ids))
             query = f"""
-                SELECT display_name 
+                SELECT keycloak_user_id 
                 FROM user_cache 
                 WHERE keycloak_user_id IN ({placeholders}) 
                 AND is_present = True
             """
             result = self.db.executeSelect(query, tuple(user_ids))
-            return [(row[0],) for row in result]
+            present_user_ids = {row[0] for row in result}
+            
+            # Return usernames for users who are present
+            return [(username,) for user_id, username in user_data if user_id in present_user_ids]
         
-        # Fallback: return usernames if we couldn't get IDs
+        # Fallback: return all usernames if we couldn't get IDs
         return [(username,) for username in keycloak_usernames]
     
     def getUserIds(self):
@@ -600,13 +592,12 @@ class QueryManager():
         Input:      image_id
         Output:     nested list with id, area_name, task_status, task_remarks, username
         '''
-        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, COALESCE(uc.display_name, 'Unassigned') as username, area.v10, area.opsv \
+        query = "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, COALESCE(task.assignee_keycloak_id, 'Unassigned') as username, area.v10, area.opsv \
         FROM task \
         JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
         JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
         JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
         JOIN task_status ON task.task_status_id = task_status.id \
-        LEFT JOIN user_cache uc ON task.assignee_keycloak_id = uc.keycloak_user_id \
         WHERE image.scvu_image_id = %s \
         ORDER BY area.area_name"
         return self.db.executeSelect(query, (image_id,))
@@ -684,12 +675,11 @@ class QueryManager():
         Input: scvu_image_id
         Output: scvu_task_id, area name, remarks, assignee name
         '''
-        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, COALESCE(uc.display_name, 'Unassigned') as assignee_name \
+        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, COALESCE(task.assignee_keycloak_id, 'Unassigned') as assignee_name \
         FROM task \
         JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
         JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
         JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
-        LEFT JOIN user_cache uc ON task.assignee_keycloak_id = uc.keycloak_user_id \
         WHERE image.scvu_image_id = %s \
         ORDER BY area.area_name"
         cursor = self.db.executeSelect(imageAreaQuery, (scvu_image_id, ))
@@ -704,11 +694,10 @@ class QueryManager():
         imageQuery = f"SELECT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
         COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
         COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, \
-        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, ew_status.name, COALESCE(uc_vetter.display_name, 'Unknown') as vetter_name \
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, ew_status.name, COALESCE(image.vetter_keycloak_id, 'Unknown') as vetter_name \
         FROM image \
         JOIN sensor ON sensor.id = image.sensor_id \
         JOIN ew_status ON ew_status.id = image.ew_status_id \
-        LEFT JOIN user_cache uc_vetter ON image.vetter_keycloak_id = uc_vetter.keycloak_user_id \
         LEFT JOIN report ON report.id = image.report_id \
         LEFT JOIN priority ON priority.id = image.priority_id \
         LEFT JOIN image_category ON image_category.id = image.image_category_id \
@@ -797,14 +786,13 @@ class QueryManager():
     #TODO: figure out how the new user add system is going to work and change this accordingly
     def addUsers(self, user_list):
         '''
-        Function: Adds unique new users to the database
-        Input: List of users
+        Function: Adds unique new users to the database cache (for is_present state)
+        Input: List of (keycloak_user_id,) tuples
         Output: NIL
+        Note: Keycloak is source of truth - we only store is_present state here
         '''
-        # Insert into user_cache - will be synced with Keycloak user data
-        # Note: This assumes keycloak_user_id and display_name are provided
-        # For now, keeping compatibility - this should be updated to sync from Keycloak
-        query = f"INSERT INTO user_cache (keycloak_user_id, display_name) VALUES (%s, %s) ON CONFLICT (keycloak_user_id) DO NOTHING"
+        # Insert into user_cache - only store keycloak_user_id and is_present
+        query = f"INSERT INTO user_cache (keycloak_user_id, is_present) VALUES (%s, FALSE) ON CONFLICT (keycloak_user_id) DO NOTHING"
         self.db.executeInsertMany(query, user_list)
     
     #TODO: figure out how the new user add system is going to work and change this accordingly

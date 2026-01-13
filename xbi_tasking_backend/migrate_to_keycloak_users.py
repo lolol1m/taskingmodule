@@ -37,19 +37,17 @@ def migrate_to_keycloak_users():
         except Exception as e:
             print(f"⚠️  Warning adding columns: {e}")
         
-        # Step 2: Create user_cache table if it doesn't exist
+        # Step 2: Create user_cache table if it doesn't exist (only for is_present state)
         print("Step 2: Creating user_cache table...")
         db.cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_cache (
                 keycloak_user_id VARCHAR(255) PRIMARY KEY,
-                display_name VARCHAR(255),
-                is_present BOOLEAN DEFAULT FALSE,
-                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                is_present BOOLEAN DEFAULT FALSE
             )
         """)
         print("✅ user_cache table created")
         
-        # Step 3: Populate user_cache from existing users table
+        # Step 3: Populate user_cache from existing users table (migrate is_present state)
         print("Step 3: Populating user_cache from users table...")
         # Check if users table has is_present column
         db.cursor.execute("""
@@ -61,23 +59,21 @@ def migrate_to_keycloak_users():
         
         if has_is_present:
             db.cursor.execute("""
-                INSERT INTO user_cache (keycloak_user_id, display_name, is_present)
-                SELECT id, name, is_present
+                INSERT INTO user_cache (keycloak_user_id, is_present)
+                SELECT id, is_present
                 FROM users
                 ON CONFLICT (keycloak_user_id) DO UPDATE
-                SET display_name = EXCLUDED.display_name,
-                    is_present = EXCLUDED.is_present
+                SET is_present = EXCLUDED.is_present
             """)
         else:
             # users table doesn't have is_present, use default FALSE
             db.cursor.execute("""
-                INSERT INTO user_cache (keycloak_user_id, display_name, is_present)
-                SELECT id, name, FALSE
+                INSERT INTO user_cache (keycloak_user_id, is_present)
+                SELECT id, FALSE
                 FROM users
-                ON CONFLICT (keycloak_user_id) DO UPDATE
-                SET display_name = EXCLUDED.display_name
+                ON CONFLICT (keycloak_user_id) DO NOTHING
             """)
-        print("✅ user_cache populated")
+        print("✅ user_cache populated (is_present state migrated)")
         
         # Step 4: Migrate task.assignee_id to assignee_keycloak_id
         print("Step 4: Migrating task assignments...")
