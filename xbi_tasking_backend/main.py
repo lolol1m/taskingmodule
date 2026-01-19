@@ -72,7 +72,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
         return response
     
     # Validate token for all other routes
-    print(f"🔍 [MIDDLEWARE] Processing {request.method} {request.url.path}, KEYCLOAK_ENABLED={KEYCLOAK_ENABLED}")
+    print(f"[MIDDLEWARE] Processing {request.method} {request.url.path}, KEYCLOAK_ENABLED={KEYCLOAK_ENABLED}")
     
     from main_classes.KeycloakAuth import keycloak_auth
     
@@ -82,7 +82,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
         print(f"   [MIDDLEWARE] Header starts with 'Bearer ': {auth_header.startswith('Bearer ')}")
     
     if not auth_header or not auth_header.startswith("Bearer "):
-        print(f"❌ [MIDDLEWARE] Missing or invalid Authorization header for {request.url.path}")
+        print(f"[MIDDLEWARE] Missing or invalid Authorization header for {request.url.path}")
         print(f"   [MIDDLEWARE] Header value: {auth_header}")
         from fastapi.responses import JSONResponse
         return JSONResponse(
@@ -93,7 +93,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
     
     token = auth_header.split(" ")[1]
     if not token:
-        print(f"❌ [MIDDLEWARE] Empty token in Authorization header for {request.url.path}")
+        print(f"[MIDDLEWARE] Empty token in Authorization header for {request.url.path}")
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
@@ -107,7 +107,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
         print(f"   [MIDDLEWARE] Token validation result: {token_info is not None}")
         
         if not token_info:
-            print(f"❌ [MIDDLEWARE] Token validation failed for {request.url.path}")
+            print(f"[MIDDLEWARE] Token validation failed for {request.url.path}")
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=401,
@@ -126,14 +126,14 @@ async def keycloak_auth_middleware(request: Request, call_next):
         return response
         
     except HTTPException as e:
-        print(f"❌ HTTPException in middleware for {request.url.path}: {e.detail}")
+        print(f"HTTPException in middleware for {request.url.path}: {e.detail}")
         return JSONResponse(
             status_code=e.status_code,
             content={"detail": e.detail},
             headers=e.headers
         )
     except Exception as e:
-        print(f"❌ Exception in middleware for {request.url.path}: {str(e)}")
+        print(f"Exception in middleware for {request.url.path}: {str(e)}")
         import traceback
         traceback.print_exc()
         from fastapi.responses import JSONResponse
@@ -154,7 +154,7 @@ async def get_current_user(request: Request):
     
     user = getattr(request.state, 'user', None)
     if not user:
-        print(f"❌ get_current_user: No user in request.state for {request.url.path}")
+        print(f"   get_current_user: No user in request.state for {request.url.path}")
         print(f"   KEYCLOAK_ENABLED: {KEYCLOAK_ENABLED}")
         print(f"   This means middleware didn't set request.state.user")
         from fastapi import HTTPException, status
@@ -275,7 +275,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     redirect_uri = f"{backend_url}/auth/callback"
     
     try:
-        print(f"🔵 [auth_callback] Exchanging code for tokens...")
+        print(f"   [auth_callback] Exchanging code for tokens...")
         print(f"   Token URL: {token_url}")
         print(f"   Redirect URI: {redirect_uri}")
         print(f"   Client ID: {client_id}")
@@ -284,7 +284,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
         
         if not client_secret:
             error_msg = "Client secret is missing in configuration. Please check dev_server.config"
-            print(f"❌ [auth_callback] {error_msg}")
+            print(f"[auth_callback] {error_msg}")
             return JSONResponse(
                 status_code=500,
                 content={
@@ -311,8 +311,8 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
             
             if response.status_code != 200:
                 error_detail = response.text
-                print(f"❌ [auth_callback] Token exchange failed: {response.status_code}")
-                print(f"   Error response: {error_detail}")
+                print(f"[auth_callback] Token exchange failed: {response.status_code}")
+                print(f"Error response: {error_detail}")
                 
                 # Parse error to provide helpful message
                 try:
@@ -360,13 +360,13 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
             id_token = token_data.get('id_token')
             
             if not access_token:
-                print(f"❌ [auth_callback] No access token in response")
+                print(f"[auth_callback] No access token in response")
                 return JSONResponse(
                     status_code=500,
                     content={"error": "no_access_token", "detail": "Token exchange succeeded but no access token received"}
                 )
             
-            print(f"✅ [auth_callback] Token exchange successful")
+            print(f"[auth_callback] Token exchange successful")
             
             # Decode token to get user info
             from jose import jwt
@@ -392,7 +392,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 return RedirectResponse(url=redirect_url)
                 
             except Exception as e:
-                print(f"❌ [auth_callback] Error decoding token: {e}")
+                print(f"[auth_callback] Error decoding token: {e}")
                 import traceback
                 traceback.print_exc()
                 return JSONResponse(
@@ -401,7 +401,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 )
                 
     except Exception as e:
-        print(f"❌ [auth_callback] Error exchanging code for tokens: {e}")
+        print(f"[auth_callback] Error exchanging code for tokens: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse(
@@ -881,14 +881,14 @@ async def assignTask(request: Request, user: dict = Depends(get_current_user)):
     '''
     try:
         data = await request.json()
-        print(f"🔵 [assignTask endpoint] Received request with {len(data.get('Tasks', []))} tasks")
-        print(f"🔵 [assignTask endpoint] Tasks data: {data.get('Tasks', [])}")
+        print(f"[assignTask endpoint] Received request with {len(data.get('Tasks', []))} tasks")
+        print(f"[assignTask endpoint] Tasks data: {data.get('Tasks', [])}")
         result = mc.assignTask(data)
         return {"status": "success", "message": "Tasks assigned successfully", "tasks_processed": len(data.get('Tasks', []))}
     except Exception as e:
         import traceback
         error_msg = f"Error in assignTask: {str(e)}\n{traceback.format_exc()}"
-        print(f"❌ [assignTask endpoint] {error_msg}")
+        print(f"[assignTask endpoint] {error_msg}")
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=500,

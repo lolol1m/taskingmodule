@@ -506,9 +506,9 @@ class QueryManager():
             # Log which users are filtered out
             filtered_out = [(uid, uname) for uid, uname in user_data if uid not in present_user_ids]
             if filtered_out:
-                print(f"⚠️ [getUsers] Filtered out {len(filtered_out)} users (is_present=False): {[uname for _, uname in filtered_out]}")
+                print(f" [getUsers] Filtered out {len(filtered_out)} users (is_present=False): {[uname for _, uname in filtered_out]}")
             
-            print(f"🔵 [getUsers] Returning {len(present_user_ids)} users with is_present=True: {[uname for uid, uname in user_data if uid in present_user_ids]}")
+            print(f" [getUsers] Returning {len(present_user_ids)} users with is_present=True: {[uname for uid, uname in user_data if uid in present_user_ids]}")
             # Return (user_id, username) tuples for users who are present
             return [(user_id, username) for user_id, username in user_data if user_id in present_user_ids]
         
@@ -577,13 +577,13 @@ class QueryManager():
         Input:      NIL
         Output:     nested list with id, sensor_name, image_file_name, image_id, upload_date, image_datetime, report, priority, image_category, quality, cloud_cover, ew_status, target_tracing
         '''
-        query = f"SELECT DISTINCT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        query = f"SELECT DISTINCT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
         COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
         COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, COALESCE(cloud_cover.name, NULL) as cloud_cover_name, \
-        ew_status.name, image.target_tracing \
+        COALESCE(ew_status.name, NULL) as ew_status_name, image.target_tracing \
         FROM image \
-        JOIN sensor ON sensor.id = image.sensor_id \
-        JOIN ew_status ON ew_status.id = image.ew_status_id \
+        LEFT JOIN sensor ON sensor.id = image.sensor_id \
+        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id \
         LEFT JOIN report ON report.id = image.report_id \
         LEFT JOIN priority ON priority.id = image.priority_id \
         LEFT JOIN image_category ON image_category.id = image.image_category_id \
@@ -591,6 +591,8 @@ class QueryManager():
         JOIN image_area ON image_area.scvu_image_id = image.scvu_image_id \
         JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id \
         WHERE image.completed_date IS NULL \
+        AND task.assignee_keycloak_id IS NOT NULL \
+        AND task.assignee_keycloak_id <> '' \
         AND (image.upload_date >= %s AND image.upload_date < %s)"
         return self.db.executeSelect(query, (start_date, end_date))
 
@@ -608,6 +610,8 @@ class QueryManager():
         JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
         JOIN task_status ON task.task_status_id = task_status.id \
         WHERE image.scvu_image_id = %s \
+        AND task.assignee_keycloak_id IS NOT NULL \
+        AND task.assignee_keycloak_id <> '' \
         ORDER BY area.area_name"
         results = self.db.executeSelect(query, (image_id,))
         
