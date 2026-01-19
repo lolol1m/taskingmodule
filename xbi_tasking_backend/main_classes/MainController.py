@@ -772,7 +772,7 @@ class MainController():
         Output:     NIL
         '''
         scvu_image_id = json['SCVU Image ID']
-        self.qm.deleteTasksForImage(scvu_image_id)
+        # self.qm.deleteTasksForImage(scvu_image_id)
         self.qm.deleteImageAreasForImage(scvu_image_id)
         self.qm.deleteImage(scvu_image_id)
         

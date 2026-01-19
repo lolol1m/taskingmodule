@@ -12,3 +12,8 @@ class ParadeStateStatus(ValueEnum):
     PRESENT = "At Work (In Unit)"
     ABSENT = "Duty Off"
     OTHERS = "Others"
+
+class Role(ValueEnum):
+    II = "II"
+    SENIOR_II = "Senior II"
+    IA = "IA"

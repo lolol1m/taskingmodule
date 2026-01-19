@@ -1,4 +1,4 @@
-from main_classes import Database, ConfigClass
+from main_classes import Database, ConfigClass, EnumClasses
 import os
 import requests
 
@@ -23,6 +23,34 @@ class QueryManager():
         # Try to map the username, fallback to original if no mapping exists
         return username_mapping.get(keycloak_username.lower(), keycloak_username)
     
+    def _mapKeycloakUsernameToKeycloakId(self, keycloak_username):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        url = f"{keycloak_url}/admin/realms/{realm}/users"
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        params = {
+            "username": keycloak_username,
+            "exact": "true"
+        }
+
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+
+        users = response.json()
+        if not users:
+            return None
+
+        keycloak_user_id = users[0]["id"]
+        return keycloak_user_id
+
     def get_keycloak_admin_token(self):
         '''
         Obtain Keycloak admin token of xbi-tasking-admin client
@@ -57,7 +85,8 @@ class QueryManager():
             raise
     
     #TODO: can't find a matching call in the rest of the codebase, not sure what this is used for but suspect its not good practice. recommend removal and testing.
-    def getUsersList(self):
+    #NOTE: currently getUsers only used for finding available II users
+    def getUsersList(self, only_II = True):
         '''
         Obtains usernames of all II, Senior II, and IA users from Keycloak
         Input: NIL
@@ -71,6 +100,7 @@ class QueryManager():
             return []
         
         config = ConfigClass._instance
+        role = EnumClasses.Role
         keycloak_url = config.getKeycloakURL()
         realm = config.getKeycloakRealm()
 
@@ -80,7 +110,9 @@ class QueryManager():
 
         # Get users with II, Senior II, and IA roles
         all_usernames = set()
-        roles = ['II', 'Senior II', 'IA']
+        roles = [role.II.value, role.SENIOR_II.value, role.IA.value] if not only_II else [role.II.value]
+
+        # roles = ['II', 'Senior II', 'IA']
         
         for role in roles:
             url = f"{keycloak_url}/admin/realms/{realm}/roles/{role}/users"
@@ -566,10 +598,10 @@ class QueryManager():
         
         return set()
 
-        rows = self.db.executeSelect(query, (names,))
-        id_list = {u[0] for u in rows}
+        # rows = self.db.executeSelect(query, (names,))
+        # id_list = {u[0] for u in rows}
 
-        return id_list
+        # return id_list
 
     def getTaskingSummaryImageData(self, start_date, end_date):
         '''
@@ -829,9 +861,17 @@ class QueryManager():
         Output: NIL
         Note: Keycloak is source of truth - we only store is_present state here
         '''
-        # Insert into user_cache - only store keycloak_user_id and is_present
+
+        user_id_tuples = []
+        for username in user_list:
+            user_id = self._mapKeycloakUsernameToKeycloakId(username)
+            if not user_id:
+                print(f"{username} not in Keycloak. Ensure that {username}'s account is added in Keycloak")
+                continue
+            user_id_tuples.append((user_id,))
+            
         query = f"INSERT INTO user_cache (keycloak_user_id, is_present) VALUES (%s, FALSE) ON CONFLICT (keycloak_user_id) DO NOTHING"
-        self.db.executeInsertMany(query, user_list)
+        self.db.executeInsertMany(query, user_id_tuples)
     
     #TODO: figure out how the new user add system is going to work and change this accordingly
     def updateExistingUsers(self, user_list):
@@ -840,8 +880,16 @@ class QueryManager():
         Input: List of users
         Output: NIL
         '''
+        user_id_tuples = []
+        for username in user_list:
+            user_id = self._mapKeycloakUsernameToKeycloakId(username)
+            if not user_id:
+                print(f"{username} not in Keycloak. Ensure that {username}'s account is added in Keycloak")
+                continue
+            user_id_tuples.append((user_id,))
+
         query = f"UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
-        cursor = self.db.executeUpdateMany(query, user_list)
+        cursor = self.db.executeUpdateMany(query, user_id_tuples)
 
     def updateSensorCategory(self, category_sensor_list):
         '''
