@@ -4,7 +4,7 @@ import dateutil.parser
 import hashlib
 from io import StringIO
 import csv
-from main_classes import QueryManager, ExcelGenerator
+from main_classes import QueryManager, ExcelGenerator,EnumClasses
 from GlobalUtils import datetime_format
 
 class MainController():
@@ -658,12 +658,17 @@ class MainController():
         '''
         # Extract names from parade state csv
         userList = []
+        presentList = []
+        ps_status = EnumClasses.ParadeStateStatus
         file = StringIO(userCSV)
         reader = csv.DictReader(file)
         for row in reader:
             userList.append((row['Name'], ))
+            if ps_status.from_value(row['Status']) == ps_status.PRESENT:
+                presentList.append((row['Name'],))
         
         userList = tuple(userList)
+        presentList = tuple(presentList)
         # userList = (('hello',),  ('hello hello',), ('pair of hello hello',), ('walrus',))
         # Reset isRecent flag
         self.qm.resetRecentUsers()
@@ -672,7 +677,7 @@ class MainController():
         self.qm.addUsers(userList)
 
         # Update existing users
-        self.qm.updateExistingUsers(userList)
+        self.qm.updateExistingUsers(presentList)
 
     def getXBIReport(self, start_date, end_date):
         '''

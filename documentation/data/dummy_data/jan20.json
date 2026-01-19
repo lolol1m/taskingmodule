@@ -1,0 +1,47 @@
+{
+  "images": [
+    {
+      "imgId": 23,
+      "imageFileName": "jinx.tif",
+      "sensorName": "sensor3",
+      "uploadDate": "2026-01-20T09:59:33.333Z",
+      "imageDateTime": "2025-12-26T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 11,
+          "areaName": "area_11"
+        }
+      ]
+    },
+    {
+      "imgId": 24,
+      "imageFileName": "vi.tif",
+      "sensorName": "sensor9",
+      "uploadDate": "2026-01-20T09:59:33.333Z",
+      "imageDateTime": "2025-06-05T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 99,
+          "areaName": "area_99"
+        },
+        {
+          "areaId": 24,
+          "areaName": "area_24"
+        }
+      ]
+    },
+    {
+      "imgId": 25,
+      "imageFileName": "vander.tif",
+      "sensorName": "sensor2",
+      "uploadDate": "2026-01-20T09:59:33.333Z",
+      "imageDateTime": "2025-06-05T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 79,
+          "areaName": "area_79"
+        }
+      ]
+    }
+  ]
+}

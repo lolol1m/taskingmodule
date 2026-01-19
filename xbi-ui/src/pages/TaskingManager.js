@@ -8,7 +8,7 @@ import useKeycloakRole from "../components/useKeycloakRole.js";
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import { memo, useEffect, useState, useMemo } from 'react';
-import { Button, Box, IconButton } from "@mui/material";
+import { Button, Box, IconButton, Tooltip } from "@mui/material";
 import * as React from 'react';
 
 import CreateTTGModal from '../components/CreateTTG.js';
@@ -16,6 +16,7 @@ import DatePickerModal from '../components/DatePicker.js'
 import axios from 'axios';
 
 import DeleteIcon from "@mui/icons-material/Delete";
+import LockIcon from "@mui/icons-material/Lock"
 
 export default function TaskingManager({ dateRange }) {
   /* variables and useState */
@@ -422,52 +423,93 @@ export default function TaskingManager({ dateRange }) {
 
   /* Rendering Delete TTG button if it is created on the UI */
   function renderTTG(params) {
+    // console.log(params)
 
     const deleteTTG = (id) => {
-      axios.post('/deleteImage', {
-        'SCVU Image ID': id
-      })
-        .then(
-          res => {
-            console.log(res);
-          }
-        )
-        .catch(
-          err => {
-            console.log(err);
-          }
-        )
-      setReload(!reload);
-    }
+    axios.post('/deleteImage', { 'SCVU Image ID': id })
+      .then(res => console.log(res))
+      .catch(err => console.log(err));
+    setReload(!reload);
+  };
 
-    if (params.rowNode.parent === null) {
-      // console.log(params);
-      // console.log(actions);
-      if (actions) {
-        if (params.value) {
-          return (
-            <Button variant='outlined' color='error' startIcon={<DeleteIcon />} onClick={() => deleteTTG(params.id)}>
-              Delete TTG
-            </Button>
-          )
-        }
-        else {
-          return (
-            <Button variant='outlined' startIcon={<DeleteIcon />} disabled>
-              Delete TTG
-            </Button>
-          )
-        }
-      }
-      else {
-        return <Button variant='outlined' startIcon={<DeleteIcon />} disabled>
-          Delete TTG
-        </Button>
-      }
-    }
-    else {
-      return null
-    }
+  // Only show buttons for parent rows
+  if (params.rowNode.parent !== null) return null;
+
+  // Determine if button should be enabled
+  // const isEnabled = actions && params.value;
+  const isEnabled = actions;
+ 
+
+  return (
+    <Tooltip title={isEnabled ? "" : "Enable Actions to delete"}>
+      <span
+      style={{
+        display: 'inline-block',
+        cursor: isEnabled ? 'pointer' : 'not-allowed', // <- move cursor here
+      }}
+    >
+      <Button
+        variant={isEnabled ? 'outlined' : 'text'}
+        color={isEnabled ? 'error' : 'inherit'}
+        startIcon={isEnabled ? <DeleteIcon /> : <LockIcon />}
+        disabled={!isEnabled} // still needed for proper disabled behavior
+        onClick={() => { if (isEnabled) deleteTTG(params.id); }}
+        sx={{
+          opacity: isEnabled ? 1 : 0.6,
+          minWidth: 120
+        }}
+      >
+        Delete TTG
+      </Button>
+    </span>
+    </Tooltip>
+  );
+
+    // const deleteTTG = (id) => {
+    //   axios.post('/deleteImage', {
+    //     'SCVU Image ID': id
+    //   })
+    //     .then(
+    //       res => {
+    //         console.log(res);
+    //       }
+    //     )
+    //     .catch(
+    //       err => {
+    //         console.log(err);
+    //       }
+    //     )
+    //   setReload(!reload);
+    // }
+
+    // if (params.rowNode.parent === null) {
+    //   console.log(params);
+    //   console.log(actions);
+    //   if (actions) {
+    //     if (params.value) {
+    //       return (
+    //         <Button variant='outlined' color='error' startIcon={<DeleteIcon />} onClick={() => deleteTTG(params.id)}>
+    //           Delete TTG
+    //         </Button>
+    //       )
+    //     }
+    //     else {
+    //       return (
+    //         <Button variant='outlined' startIcon={<DeleteIcon />} disabled>
+    //           Delete TTG
+    //         </Button>
+    //       )
+    //     }
+    //   }
+    //   else {
+    //     return <Button variant='outlined' startIcon={<DeleteIcon />} disabled>
+    //       Delete TTG
+    //     </Button>
+    //   }
+    // }
+    // else {
+    //   return null
+    // }
   }
 
   /* Handle disabling for TTG button */
@@ -476,6 +518,7 @@ export default function TaskingManager({ dateRange }) {
       return 'disabled'
     }
   }
+
 
   // function renderRemarks(params) {
   //   // console.log(params);
