@@ -34,7 +34,7 @@ mc = MainController()
 
 # Keycloak authentication - can be enabled/disabled via environment variable
 KEYCLOAK_ENABLED = os.getenv('KEYCLOAK_ENABLED', 'true').lower() == 'true'  # Default to true
-print(f"🔐 Keycloak authentication: {'ENABLED' if KEYCLOAK_ENABLED else 'DISABLED'}")
+print(f" Keycloak authentication: {'ENABLED' if KEYCLOAK_ENABLED else 'DISABLED'}")
 
 # IMPORTANT: Auth middleware must be registered BEFORE CORS middleware
 # Middleware to validate tokens for ALL routes (except excluded ones)
@@ -45,7 +45,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
     Excludes: /docs, /redoc, /openapi.json, /static, / (health check)
     """
     # CRITICAL: Print at the very start to confirm middleware is running
-    print(f"🚀 [MIDDLEWARE START] {request.method} {request.url.path}")
+    print(f" [MIDDLEWARE START] {request.method} {request.url.path}")
     
     # Handle OPTIONS requests (CORS preflight) - these don't need auth
     if request.method == "OPTIONS":
@@ -55,7 +55,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
     
     # List of paths that don't require authentication
     # Use exact match for most paths, but /static should match any path starting with /static
-    excluded_exact_paths = ["/docs", "/redoc", "/openapi.json", "/", "/auth/login", "/auth/callback", "/auth/logout"]
+    excluded_exact_paths = ["/docs", "/redoc", "/openapi.json", "/", "/auth/login", "/auth/callback", "/auth/logout", "/auth/refresh"]
     excluded_prefix_paths = ["/static"]
     
     # Check if path is excluded (exact match or prefix match)
@@ -101,7 +101,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    print(f"🔍 [MIDDLEWARE] Validating token for {request.url.path} (token: {token[:20]}...)")
+    print(f" [MIDDLEWARE] Validating token for {request.url.path} (token: {token[:20]}...)")
     try:
         token_info = await keycloak_auth.verify_token(token)
         print(f"   [MIDDLEWARE] Token validation result: {token_info is not None}")
@@ -115,7 +115,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
                 headers={"WWW-Authenticate": "Bearer"}
             )
         
-        print(f"✅ [MIDDLEWARE] Token validated successfully for {request.url.path}, user: {token_info.get('preferred_username', 'unknown')}")
+        print(f"   [MIDDLEWARE] Token validated successfully for {request.url.path}, user: {token_info.get('preferred_username', 'unknown')}")
         # Attach user info to request state for use in route handlers
         request.state.user = token_info
         print(f"   [MIDDLEWARE] Set request.state.user: {request.state.user is not None}")
@@ -241,7 +241,17 @@ async def auth_login(request: Request):
     
     auth_url_with_params = f"{auth_url}?{urllib.parse.urlencode(params)}"
     
-    return RedirectResponse(url=auth_url_with_params)
+    response = RedirectResponse(url=auth_url_with_params)
+    # Store state in an HTTP-only cookie for CSRF protection
+    response.set_cookie(
+        key="kc_state",
+        value=state,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        max_age=300
+    )
+    return response
 
 @app.get("/auth/callback")
 async def auth_callback(request: Request, code: str = None, state: str = None, error: str = None):
@@ -260,6 +270,14 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     if not code:
         frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
         return RedirectResponse(url=f"{frontend_url}?error=no_code")
+
+    # Validate state from cookie to prevent CSRF
+    cookie_state = request.cookies.get("kc_state")
+    if not state or not cookie_state or state != cookie_state:
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        response = RedirectResponse(url=f"{frontend_url}?error=state_mismatch")
+        response.delete_cookie("kc_state")
+        return response
     
     config = ConfigClass._instance
     keycloak_url = config.getKeycloakURL()
@@ -389,7 +407,9 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 # Build redirect URL with fragment
                 redirect_url = f"{frontend_url}#{urllib.parse.urlencode(fragment_params)}"
                 print(f"   Redirecting to frontend...")
-                return RedirectResponse(url=redirect_url)
+                response = RedirectResponse(url=redirect_url)
+                response.delete_cookie("kc_state")
+                return response
                 
             except Exception as e:
                 print(f"[auth_callback] Error decoding token: {e}")
@@ -408,6 +428,45 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
             status_code=500,
             content={"error": "token_exchange_error", "detail": str(e)}
         )
+
+@app.post("/auth/refresh")
+async def auth_refresh(request: Request):
+    """
+    Refresh access token using a refresh token.
+    """
+    if not KEYCLOAK_ENABLED:
+        return {"detail": "Keycloak authentication is disabled"}
+
+    data = await request.json()
+    refresh_token = data.get("refresh_token")
+    if not refresh_token:
+        return JSONResponse(status_code=400, content={"error": "missing_refresh_token"})
+
+    config = ConfigClass._instance
+    keycloak_url = config.getKeycloakURL()
+    realm = config.getKeycloakRealm()
+    client_id = config.getKeycloakClientID()
+    client_secret = config.getKeycloakClientSecret()
+
+    token_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            token_url,
+            data={
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+                'client_id': client_id,
+                'client_secret': client_secret
+            },
+            timeout=10.0
+        )
+        if response.status_code != 200:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "refresh_failed", "detail": response.text}
+            )
+        return response.json()
 
 @app.get("/auth/logout")
 async def auth_logout(request: Request):

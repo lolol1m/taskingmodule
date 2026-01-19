@@ -88,14 +88,14 @@ class QueryManager():
                 response = requests.get(url, headers=headers, timeout=5)
                 response.raise_for_status()
                 users = response.json()
-                print(f"🔵 [getUsersList] Found {len(users)} users with role '{role}': {[u['username'] for u in users]}")
+                print(f" [getUsersList] Found {len(users)} users with role '{role}': {[u['username'] for u in users]}")
                 for user in users:
                     all_usernames.add(user["username"])
             except requests.exceptions.RequestException as e:
                 print(f"⚠️ Warning: Could not fetch users with role '{role}' from Keycloak: {e}")
                 continue
         
-        print(f"🔵 [getUsersList] Total unique usernames: {list(all_usernames)}")
+        print(f" [getUsersList] Total unique usernames: {list(all_usernames)}")
         return list(all_usernames)
     
     def getUserActiveTasks(self, keycloak_user_id):

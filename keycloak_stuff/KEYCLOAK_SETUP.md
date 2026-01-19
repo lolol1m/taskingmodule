@@ -138,7 +138,7 @@ REACT_APP_DB_API_URL=http://localhost:5000
 ### Token Flow
 
 - **Access Token**: Short-lived (typically 5 minutes), used for API calls
-- **Refresh Token**: Long-lived, used to get new access tokens (not yet implemented)
+- **Refresh Token**: Long-lived, used to get new access tokens via `/auth/refresh`
 - **Storage**: Tokens stored in browser localStorage
 - **Security**: Tokens sent in HTTP headers, never in URL query params (except during redirect)
 
@@ -184,7 +184,7 @@ REACT_APP_DB_API_URL=http://localhost:5000
 1. **Tokens in URL fragment**: More secure than query params (fragments aren't sent to server)
 2. **HTTPS in production**: Always use HTTPS in production
 3. **Token expiration**: Implement refresh token logic for long sessions
-4. **CSRF protection**: State parameter in redirect flow provides CSRF protection
+4. **CSRF protection**: State parameter is stored in an HttpOnly cookie and validated on callback
 5. **HttpOnly cookies**: State stored in HttpOnly cookie (can't be accessed by JavaScript)
 
 ## Additional Resources

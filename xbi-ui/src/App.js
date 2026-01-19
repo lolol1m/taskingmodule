@@ -149,17 +149,54 @@ axios.interceptors.request.use(
   }
 );
 
-// Handle 401 responses - token might be expired
+let refreshPromise = null;
+const refreshAccessToken = () => {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) {
+    return Promise.reject(new Error('No refresh token'));
+  }
+  refreshPromise = axios.post('/auth/refresh', { refresh_token: refreshToken })
+    .then((res) => {
+      const accessToken = res.data.access_token;
+      const newRefresh = res.data.refresh_token || refreshToken;
+      const idToken = res.data.id_token;
+      if (!accessToken) {
+        throw new Error('No access token in refresh response');
+      }
+      localStorage.setItem('access_token', accessToken);
+      localStorage.setItem('refresh_token', newRefresh);
+      if (idToken) {
+        localStorage.setItem('id_token', idToken);
+      }
+      return accessToken;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+  return refreshPromise;
+};
+
+// Handle 401 responses - try refresh once, then redirect to login
 axios.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid, clear tokens and redirect to login
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('id_token');
-      localStorage.removeItem('user');
-      window.location.href = `${DB_API_URL}/auth/login`;
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest?._retry && !originalRequest?.url?.includes('/auth/refresh')) {
+      originalRequest._retry = true;
+      try {
+        const newAccessToken = await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return axios(originalRequest);
+      } catch (refreshError) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('id_token');
+        localStorage.removeItem('user');
+        window.location.href = `${DB_API_URL}/auth/login`;
+      }
     }
     return Promise.reject(error);
   }

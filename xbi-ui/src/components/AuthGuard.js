@@ -24,6 +24,74 @@ export default function AuthGuard({ children, onAuthSuccess }) {
 
   useEffect(() => {
     const checkAuth = () => {
+      const applyToken = (token, refreshToken, idToken, fallbackUsername) => {
+        try {
+          const decoded = jwtDecode(token);
+          const realmRoles = decoded.realm_access?.roles || [];
+          const clientId = decoded.azp || decoded.aud;
+          const resourceRoles = decoded.resource_access?.[clientId]?.roles || [];
+          const allRoles = [...realmRoles, ...resourceRoles];
+          const tokenUsername = decoded.preferred_username || decoded.sub || fallbackUsername || 'user';
+
+          const hasAdminRole = allRoles.includes('admin') || allRoles.includes('Admin') || allRoles.includes('ADMIN');
+          const hasIARole = allRoles.includes('IA') || allRoles.includes('ia') || tokenUsername.toLowerCase().includes('iauser');
+
+          setIsAdmin(hasAdminRole);
+          setIsIA(hasIARole);
+          setIsAuthenticated(true);
+          setIsInitialized(true);
+
+          localStorage.setItem('access_token', token);
+          if (refreshToken) {
+            localStorage.setItem('refresh_token', refreshToken);
+          }
+          if (idToken) {
+            localStorage.setItem('id_token', idToken);
+          }
+          localStorage.setItem('user', JSON.stringify({
+            username: tokenUsername,
+            roles: allRoles,
+            isAdmin: hasAdminRole,
+            isIA: hasIARole
+          }));
+
+          if (onAuthSuccess) {
+            onAuthSuccess([token, tokenUsername]);
+          }
+          return true;
+        } catch (error) {
+          console.error('Error decoding token:', error);
+          return false;
+        }
+      };
+
+      const refreshTokens = async () => {
+        const storedRefresh = localStorage.getItem('refresh_token');
+        if (!storedRefresh) {
+          return false;
+        }
+        try {
+          const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: storedRefresh })
+          });
+          if (!response.ok) {
+            return false;
+          }
+          const data = await response.json();
+          return applyToken(
+            data.access_token,
+            data.refresh_token || storedRefresh,
+            data.id_token,
+            null
+          );
+        } catch (error) {
+          console.error('Error refreshing token:', error);
+          return false;
+        }
+      };
+
       // Check for error in URL query params (from backend redirect on error)
       const urlParams = new URLSearchParams(window.location.search);
       const error = urlParams.get('error');
@@ -54,47 +122,10 @@ export default function AuthGuard({ children, onAuthSuccess }) {
       
       if (accessToken) {
         // We have tokens from redirect - store them
-        localStorage.setItem('access_token', accessToken);
-        if (refreshToken) {
-          localStorage.setItem('refresh_token', refreshToken);
-        }
-        if (idToken) {
-          localStorage.setItem('id_token', idToken);
-        }
-        
-        // Decode token to get user info
-        try {
-          const decoded = jwtDecode(accessToken);
-          const realmRoles = decoded.realm_access?.roles || [];
-          const resourceRoles = decoded.resource_access?.[decoded.aud]?.roles || [];
-          const allRoles = [...realmRoles, ...resourceRoles];
-          const tokenUsername = decoded.preferred_username || decoded.sub || username || 'user';
-          
-          const hasAdminRole = allRoles.includes('admin') || allRoles.includes('Admin') || allRoles.includes('ADMIN');
-          const hasIARole = allRoles.includes('IA') || allRoles.includes('ia') || tokenUsername.toLowerCase().includes('iauser');
-          
-          setIsAdmin(hasAdminRole);
-          setIsIA(hasIARole);
-          setIsAuthenticated(true);
-          setIsInitialized(true);
-          
-          // Store user info
-          localStorage.setItem('user', JSON.stringify({
-            username: tokenUsername,
-            roles: allRoles,
-            isAdmin: hasAdminRole,
-            isIA: hasIARole
-          }));
-          
-          if (onAuthSuccess) {
-            onAuthSuccess([accessToken, tokenUsername]);
-          }
-          
+        if (applyToken(accessToken, refreshToken, idToken, username)) {
           // Clean up URL fragment
           window.history.replaceState(null, '', window.location.pathname);
           return;
-        } catch (error) {
-          console.error('Error decoding token:', error);
         }
       }
       
@@ -107,40 +138,19 @@ export default function AuthGuard({ children, onAuthSuccess }) {
           
           // Check if token is expired
           if (decoded.exp && decoded.exp < now) {
-            // Token expired - redirect to login
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('id_token');
-            localStorage.removeItem('user');
-            window.location.href = `${BACKEND_URL}/auth/login`;
+            // Token expired - try refresh
+            refreshTokens().then((refreshed) => {
+              if (!refreshed) {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('id_token');
+                localStorage.removeItem('user');
+                window.location.href = `${BACKEND_URL}/auth/login`;
+              }
+            });
             return;
           }
-          
-          // Token is valid
-          const realmRoles = decoded.realm_access?.roles || [];
-          const resourceRoles = decoded.resource_access?.[decoded.aud]?.roles || [];
-          const allRoles = [...realmRoles, ...resourceRoles];
-          const tokenUsername = decoded.preferred_username || decoded.sub || 'user';
-          
-          const hasAdminRole = allRoles.includes('admin') || allRoles.includes('Admin') || allRoles.includes('ADMIN');
-          const hasIARole = allRoles.includes('IA') || allRoles.includes('ia') || tokenUsername.toLowerCase().includes('iauser');
-          
-          setIsAdmin(hasAdminRole);
-          setIsIA(hasIARole);
-          setIsAuthenticated(true);
-          setIsInitialized(true);
-          
-          // Store user info
-          localStorage.setItem('user', JSON.stringify({
-            username: tokenUsername,
-            roles: allRoles,
-            isAdmin: hasAdminRole,
-            isIA: hasIARole
-          }));
-          
-          if (onAuthSuccess) {
-            onAuthSuccess([storedToken, tokenUsername]);
-          }
+          applyToken(storedToken, localStorage.getItem('refresh_token'), localStorage.getItem('id_token'));
           return;
         } catch (error) {
           console.error('Error validating stored token:', error);
