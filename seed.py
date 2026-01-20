@@ -9,7 +9,7 @@ import random
 # Add backend directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'xbi_tasking_backend'))
 
-from main_classes import ConfigClass, Database
+from main_classes import ConfigClass, Database, QueryManager
 
 
 def reset_seed_data(db):
@@ -76,10 +76,6 @@ def insert_dummy_data():
             db.cursor.execute("SELECT scvu_area_id FROM area WHERE scvu_area_id > 0 ORDER BY scvu_area_id")
             areas = [row[0] for row in db.cursor.fetchall()]
 
-        # Get user cache entries for assignments
-        db.cursor.execute("SELECT keycloak_user_id FROM user_cache LIMIT 5")
-        user_ids = [row[0] for row in db.cursor.fetchall()]
-
         # Set all existing users to is_present = True so they appear in assignee dropdown
         print("\n5. Updating user_cache to set is_present = True...")
         db.cursor.execute("""
@@ -89,6 +85,28 @@ def insert_dummy_data():
         """)
         updated_count = db.cursor.rowcount
         print(f"   Set {updated_count} users to is_present = True")
+
+        # Ensure known dummy users exist in Keycloak and are marked present
+        target_usernames = ["iiuser", "iisenior", "iauser"]
+        try:
+            qm = QueryManager()
+            for username in target_usernames:
+                user_id = qm._mapKeycloakUsernameToKeycloakId(username)
+                if not user_id:
+                    print(f"   ⚠️ {username} not found in Keycloak")
+                    continue
+                db.cursor.execute(
+                    "INSERT INTO user_cache (keycloak_user_id, is_present) VALUES (%s, TRUE) "
+                    "ON CONFLICT (keycloak_user_id) DO UPDATE SET is_present = TRUE",
+                    (user_id,)
+                )
+            print("   Synced dummy Keycloak users into user_cache")
+        except Exception as exc:
+            print(f"   ⚠️ Could not sync Keycloak users: {exc}")
+
+        # Get user cache entries for assignments
+        db.cursor.execute("SELECT keycloak_user_id FROM user_cache LIMIT 5")
+        user_ids = [row[0] for row in db.cursor.fetchall()]
 
         if not user_ids:
             # Create dummy user cache entries (schema only stores keycloak_user_id and is_present)

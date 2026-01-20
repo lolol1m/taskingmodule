@@ -508,7 +508,7 @@ class QueryManager():
         Note:       Keycloak is the source of truth - we only cache is_present state
         '''
         # Get users from Keycloak with II, Senior II, or IA roles
-        keycloak_usernames = self.getUsersList()
+        keycloak_usernames = self.getUsersList(only_II=False)
         
         if not keycloak_usernames:
             # If Keycloak query failed, return empty list

@@ -169,6 +169,11 @@ class MainController():
         output = {}
         # Get users as (user_id, username) tuples from QueryManager
         user_tuples = self.qm.getUsers()
+
+        if not user_tuples:
+            output["Users"] = []
+            output["Warning"] = "No users are marked as present. Update user presence and try again."
+            return output
         
         # Convert to objects with id and name
         user_objects = [{"id": user_id, "name": username} for user_id, username in user_tuples]
