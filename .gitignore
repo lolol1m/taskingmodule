@@ -6,3 +6,4 @@ venv/
 XBI_UI/
 xbi_tasking_backend/code/
 xbi_tasking_backend/dev_server.config
+mockui/

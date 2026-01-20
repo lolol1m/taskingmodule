@@ -129,3 +129,4 @@ def delete_keycloak_data():
 if __name__ == "__main__":
     delete_keycloak_data()
 
+

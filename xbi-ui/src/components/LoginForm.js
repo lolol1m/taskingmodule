@@ -1,3 +1,4 @@
+// Legacy login form (not used in Keycloak flow). Kept for reference only.
 import React, { useState } from 'react';
 import axios from 'axios';
 import Avatar from '@mui/material/Avatar';
@@ -128,5 +129,6 @@ export default function LoginForm({ onLoginSuccess }) {
     </ThemeProvider>
   );
 }
+
 
 
