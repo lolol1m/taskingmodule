@@ -175,19 +175,6 @@ class QueryManager():
         result = self.db.executeSelect(query, (keycloak_user_id, 'Completed'))
         return result[0][0]
     
-    #TODO: legacy, please remove once confirmed not needed
-    def accountLogin(self, hashed_password):
-        '''
-        Function:   Inserts sensor into db if it doesn't already exist
-        Input:      sensor_name
-        Output:     NIL
-        '''
-        query = f"SELECT account FROM accounts WHERE password = %s"
-        cursor = self.db.executeSelect(query, (hashed_password, ))
-        if len(cursor) == 0:
-            return ''
-        return cursor[0][0]
-    
     def insertSensor(self, sensor_name):
         '''
         Function:   Inserts sensor into db if it doesn't already exist

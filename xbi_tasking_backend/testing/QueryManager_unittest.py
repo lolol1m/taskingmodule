@@ -1,6 +1,5 @@
 import unittest
 import datetime
-import hashlib
 from main_classes import QueryManager, ConfigClass
 
 class QueryManager_unittest(unittest.TestCase):
@@ -23,17 +22,6 @@ class QueryManager_unittest(unittest.TestCase):
 
     def tearDown(self):
         self.qm.db.deleteAll()
-    
-    def test_accountLogin_baseCase(self):
-        wp = hashlib.sha256('1'.encode()).hexdigest()
-        res = self.qm.accountLogin(wp)
-        exp = "II"
-        self.assertEqual(res, exp, "accountLogin Failed - II not returned")
-        
-        wp = hashlib.sha256('hello'.encode()).hexdigest()
-        res = self.qm.accountLogin(wp)
-        exp = ""
-        self.assertEqual(res, exp, "accountLogin Failed - empty string not returned")
     
     def test_insertSensor_baseCase(self):
         self.qm.insertSensor('sensor1')

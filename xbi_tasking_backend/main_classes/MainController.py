@@ -1,7 +1,6 @@
 import datetime
 from datetime import timedelta
 import dateutil.parser
-import hashlib
 from io import StringIO
 import csv
 from main_classes import QueryManager, ExcelGenerator,EnumClasses
@@ -14,17 +13,6 @@ class MainController():
     def __init__(self):
         self.qm = QueryManager()
         self.eg = ExcelGenerator()
-    
-    #TODO: definitely no longer intended to be used, verify zero bugs with removal and then remove
-    def accountLogin(self, json):
-        '''
-        Function:   validates password and returns account type
-        Input:      json containing password string
-        Output:     string of account type (II, Senior II, IA) or empty string if password is invalid
-        '''
-        hashed_password = hashlib.sha256(json['Password'].encode()).hexdigest()
-        print("Password:", (hashed_password))
-        return self.qm.accountLogin(hashed_password)
     
     def insertDSTAData(self, json, auto_assign = True):
         '''

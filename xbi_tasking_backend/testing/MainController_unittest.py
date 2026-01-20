@@ -24,19 +24,6 @@ class MainController_unittest(unittest.TestCase):
     def tearDown(self):
         self.mc.qm.db.deleteAll()
     
-    def test_accountLogin_baseCase(self):
-        res = self.mc.accountLogin({
-            'Password': '1'
-        })
-        exp = "II"
-        self.assertEqual(res, exp, "accountLogin failed - II not returned")
-        
-        res = self.mc.accountLogin({
-            'Password': 'hello'
-        })
-        exp = ""
-        self.assertEqual(res, exp, "accountLogin failed - empty string not returned")
-    
     def test_insertDSTAData_baseCase(self):
         data = {
             'images': [{

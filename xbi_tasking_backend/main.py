@@ -494,40 +494,6 @@ async def auth_logout(request: Request):
     
     return RedirectResponse(url=logout_url_with_params)
 
-#TODO: legacy, please remove once confirmed not needed
-@app.post("/accountLogin")
-async def accountLogin(request: Request):
-    '''
-    Function: Login to account
-    
-    Input:
-    
-        {
-            'Password': <str>
-        }
-    
-    Sample:
-    
-        {
-            'Password': 'i_am_not_trolling'
-        }
-    
-    Output:
-    
-        {
-            'Account': <str>
-        }
-    
-    Sample:
-    
-        {
-            'Account': 'II'
-        }
-        
-    '''
-    data = await request.json()
-    return mc.accountLogin(data)
-
 @app.post("/insertDSTAData")
 async def insertDSTAData(file: UploadFile, user: dict = Depends(get_current_user)):
     '''
