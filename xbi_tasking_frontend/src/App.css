@@ -112,6 +112,7 @@
   font-family: inherit;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
   transition: left 700ms ease, top 700ms ease;
+  z-index: 1000000;
 }
 
 .collapse-arrow {
@@ -182,9 +183,19 @@
   color: #9ca3af;
   letter-spacing: 0.08em;
   margin-bottom: 15px;
+  margin-top: 0;
+  display: block;
+  padding: 0;
+  padding-left: 0;
+  padding-right: 0;
+  height: 24px;
 }
 
 .sidebar__title-text {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding-top: 20px;
   transition: opacity 700ms ease;
 }
 
@@ -206,6 +217,7 @@
 .sidebar__text,
 .caret {
   transition: opacity 700ms ease;
+  
 }
 
 .sidebar__item:hover {
