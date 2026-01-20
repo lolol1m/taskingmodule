@@ -808,6 +808,44 @@ class QueryManager():
             formatted.append(tuple(row))
         return formatted
 
+    def getImageDataForUser(self, start_date, end_date, assignee_keycloak_id):
+        '''
+        Function: Gets completed image data filtered by assignee for completed images
+        Input: start_date, end_date, assignee_keycloak_id (Keycloak user ID/sub)
+        Output: same shape as getImageData
+        '''
+        imageQuery = f"""
+        SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime,
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality,
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id
+        FROM image
+        LEFT JOIN sensor ON sensor.id = image.sensor_id
+        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
+        LEFT JOIN report ON report.id = image.report_id
+        LEFT JOIN priority ON priority.id = image.priority_id
+        LEFT JOIN image_category ON image_category.id = image.image_category_id
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id
+        WHERE image.completed_date IS NOT NULL
+        AND ((image.completed_date >= %s AND image.completed_date < %s)
+             OR (image.upload_date >= %s AND image.upload_date < %s))
+        AND EXISTS (
+            SELECT 1
+            FROM task t
+            JOIN image_area ia ON ia.scvu_image_area_id = t.scvu_image_area_id
+            WHERE ia.scvu_image_id = image.scvu_image_id
+            AND t.assignee_keycloak_id = %s
+        )
+        """
+        results = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date, assignee_keycloak_id))
+        formatted = []
+        for row in results:
+            row = list(row)
+            vetter_keycloak_id = row[12]
+            row[12] = self._get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else 'Unassigned'
+            formatted.append(tuple(row))
+        return formatted
+
     def getXBIReportImage(self, start_date, end_date):
         '''
         Function: Gets image data for xbi

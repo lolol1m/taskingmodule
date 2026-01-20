@@ -1042,7 +1042,7 @@ async def uncompleteImages(request: Request):
     return mc.uncompleteImages(data)
 
 @app.post("/getCompleteImageData")
-async def getCompleteImageData(request: Request):
+async def getCompleteImageData(request: Request, user: dict = Depends(get_current_user)):
     '''
     Function: Gets data for completed images including their areas
     Input:
@@ -1091,7 +1091,7 @@ async def getCompleteImageData(request: Request):
     '''
 
     data = await request.json()
-    return mc.getCompleteImageData(data)
+    return mc.getCompleteImageData(data, user)
 
 @app.post("/updateTaskingSummaryData")
 async def updateTaskingSummaryData(request: Request):

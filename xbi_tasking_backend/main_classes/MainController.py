@@ -577,17 +577,26 @@ class MainController():
 
         return output
 
-    def getCompleteImageData(self, json):
+    def getCompleteImageData(self, json, user=None):
         '''
         Function:   Gets the image and associated area data for completed images
         Input:      json (start date, end date)
         Output:     json containing completed image data
         '''
+        start_date = dateutil.parser.isoparse(json['Start Date']).strftime(f"%Y-%m-%d")
+        end_date = (dateutil.parser.isoparse(json['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
 
-        imageData = self.qm.getImageData(
-            dateutil.parser.isoparse(json['Start Date']).strftime(f"%Y-%m-%d"), 
-            (dateutil.parser.isoparse(json['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
-        )
+        account_type = None
+        roles = []
+        if user:
+            account_type = user.get('account_type')
+            roles = user.get('roles', [])
+
+        is_ii_user = account_type == 'II' or ('II' in roles and account_type != 'Senior II' and account_type != 'IA')
+        if is_ii_user and user:
+            imageData = self.qm.getImageDataForUser(start_date, end_date, user.get('sub'))
+        else:
+            imageData = self.qm.getImageData(start_date, end_date)
         output = {}
         
         for image in imageData:
