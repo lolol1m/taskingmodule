@@ -693,6 +693,28 @@ async def getUsers():
     '''
     return mc.getUsers()
 
+@app.post("/createUser")
+async def createUser(request: Request, user: dict = Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    roles = user.get("roles", []) or []
+    account_type = user.get("account_type")
+    is_admin = account_type == "IA" or "IA" in roles
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    data = await request.json()
+    try:
+        result = mc.createUser(data)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/updateUsers")
 async def updateUsers(file: UploadFile):
     '''

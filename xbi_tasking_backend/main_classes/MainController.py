@@ -169,6 +169,22 @@ class MainController():
         output["Users"] = user_objects
         return output 
 
+    def createUser(self, json):
+        '''
+        Function:   Creates a Keycloak user and assigns a role
+        Input:      json with username, password, role
+        Output:     created user info
+        '''
+        username = json.get("username", "").strip()
+        password = json.get("password", "").strip()
+        role = json.get("role", "").strip()
+
+        if not username or not password or not role:
+            return {"error": "username, password, and role are required"}
+
+        result = self.qm.createKeycloakUser(username, password, role)
+        return {"success": True, "user": result}
+
     def getTaskingSummaryData(self, json):
         '''
         Function:   Get Data for Tasking Summary page

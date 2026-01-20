@@ -78,6 +78,98 @@ class QueryManager():
         keycloak_user_id = users[0]["id"]
         return keycloak_user_id
 
+    def _get_keycloak_role(self, role_name):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        url = f"{keycloak_url}/admin/realms/{realm}/roles/{role_name}"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
+    def _assign_realm_role(self, user_id, role_representation):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/realm"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(url, headers=headers, json=[role_representation], timeout=5)
+        response.raise_for_status()
+
+    def createKeycloakUser(self, username, password, role_name):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        # Check for existing user
+        query_url = f"{keycloak_url}/admin/realms/{realm}/users"
+        query_params = {"username": username, "exact": "true"}
+        response = requests.get(query_url, headers=headers, params=query_params, timeout=5)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 403:
+                raise ValueError("Keycloak admin client lacks permission to manage users. Ensure the admin client has realm-management roles: view-users and manage-users.")
+            raise
+        if response.json():
+            raise ValueError("Username already exists")
+
+        # Create user
+        create_url = f"{keycloak_url}/admin/realms/{realm}/users"
+        payload = {
+            "username": username,
+            "enabled": True,
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": password,
+                    "temporary": False
+                }
+            ]
+        }
+        response = requests.post(create_url, headers=headers, json=payload, timeout=5)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 403:
+                raise ValueError("Keycloak admin client lacks permission to create users. Ensure the admin client has realm-management manage-users.")
+            raise
+
+        # Fetch new user ID
+        response = requests.get(query_url, headers=headers, params=query_params, timeout=5)
+        response.raise_for_status()
+        users = response.json()
+        if not users:
+            raise ValueError("User creation failed")
+        user_id = users[0]["id"]
+
+        # Assign role
+        role_rep = self._get_keycloak_role(role_name)
+        self._assign_realm_role(user_id, role_rep)
+
+        # Ensure user exists in cache (default to not present)
+        query = """
+            INSERT INTO user_cache (keycloak_user_id, is_present)
+            VALUES (%s, FALSE)
+            ON CONFLICT (keycloak_user_id) DO NOTHING
+        """
+        self.db.executeInsert(query, (user_id,))
+        return {"id": user_id, "username": username, "role": role_name}
+
     def get_keycloak_admin_token(self):
         '''
         Obtain Keycloak admin token of xbi-tasking-admin client
