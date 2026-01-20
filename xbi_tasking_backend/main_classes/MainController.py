@@ -182,6 +182,19 @@ class MainController():
         if not username or not password or not role:
             return {"error": "username, password, and role are required"}
 
+        if len(password) < 8:
+            return {"error": "Password must be at least 8 characters long"}
+        if not any(ch.islower() for ch in password):
+            return {"error": "Password must include a lowercase letter"}
+        if not any(ch.isupper() for ch in password):
+            return {"error": "Password must include an uppercase letter"}
+        if not any(ch.isdigit() for ch in password):
+            return {"error": "Password must include a number"}
+
+        valid_roles = {r.value for r in EnumClasses.Role}
+        if role not in valid_roles:
+            return {"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}
+
         result = self.qm.createKeycloakUser(username, password, role)
         return {"success": True, "user": result}
 

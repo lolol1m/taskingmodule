@@ -1,6 +1,7 @@
 from main_classes import Database, ConfigClass, EnumClasses
 import os
 import requests
+from urllib.parse import urlparse
 
 class QueryManager():
     '''
@@ -68,7 +69,7 @@ class QueryManager():
             "exact": "true"
         }
 
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=5)
         response.raise_for_status()
 
         users = response.json()
@@ -149,13 +150,19 @@ class QueryManager():
                 raise ValueError("Keycloak admin client lacks permission to create users. Ensure the admin client has realm-management manage-users.")
             raise
 
-        # Fetch new user ID
-        response = requests.get(query_url, headers=headers, params=query_params, timeout=5)
-        response.raise_for_status()
-        users = response.json()
-        if not users:
-            raise ValueError("User creation failed")
-        user_id = users[0]["id"]
+        # Fetch new user ID (prefer Location header)
+        location = response.headers.get("Location")
+        user_id = None
+        if location:
+            path = urlparse(location).path or ""
+            user_id = path.rsplit("/", 1)[-1] if "/" in path else None
+        if not user_id:
+            response = requests.get(query_url, headers=headers, params=query_params, timeout=5)
+            response.raise_for_status()
+            users = response.json()
+            if not users:
+                raise ValueError("User creation failed")
+            user_id = users[0]["id"]
 
         # Assign role
         role_rep = self._get_keycloak_role(role_name)

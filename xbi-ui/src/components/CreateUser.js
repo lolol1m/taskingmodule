@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, MenuItem, Typography, Alert } from "@mui/material";
+import { Box, Button, TextField, MenuItem, Typography, Alert, InputAdornment, IconButton } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import axios from "axios";
 
 const roles = [
@@ -11,6 +12,7 @@ const roles = [
 function CreateUser() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("II");
   const [status, setStatus] = useState(null);
 
@@ -55,10 +57,24 @@ function CreateUser() {
       />
       <TextField
         label="Password"
-        type="password"
+        type={showPassword ? "text" : "password"}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         fullWidth
+        helperText="Min 8 chars, 1 uppercase, 1 lowercase, 1 number"
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                onClick={() => setShowPassword((prev) => !prev)}
+                edge="end"
+                aria-label="toggle password visibility"
+              >
+                {showPassword ? <VisibilityOff /> : <Visibility />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
       />
       <TextField
         label="Role"

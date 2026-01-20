@@ -675,7 +675,7 @@ async def getReport():
     return mc.getReport()
 
 @app.get("/getUsers")
-async def getUsers():
+async def getUsers(user: dict = Depends(get_current_user)):
     '''
     Function: Gets the Users list from the db
     
