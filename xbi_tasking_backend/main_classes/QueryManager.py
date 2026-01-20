@@ -8,6 +8,33 @@ class QueryManager():
     '''
     def __init__(self):
         self.db = Database()
+        self._keycloak_user_cache = {}
+
+    def _get_keycloak_username(self, keycloak_user_id):
+        if not keycloak_user_id:
+            return 'Unassigned'
+        if keycloak_user_id in self._keycloak_user_cache:
+            return self._keycloak_user_cache[keycloak_user_id]
+        try:
+            token = self.get_keycloak_admin_token()
+        except (ValueError, requests.exceptions.RequestException) as e:
+            print(f"Warning: Could not get Keycloak admin token: {e}")
+            return keycloak_user_id
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+        headers = {"Authorization": f"Bearer {token}"}
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{keycloak_user_id}"
+        try:
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                user_data = response.json()
+                username = user_data.get('username', keycloak_user_id)
+                self._keycloak_user_cache[keycloak_user_id] = username
+                return username
+        except requests.exceptions.RequestException:
+            pass
+        return keycloak_user_id
     
     def _mapKeycloakUsernameToDBUsername(self, keycloak_username):
         '''
@@ -717,15 +744,20 @@ class QueryManager():
         Input: scvu_image_id
         Output: scvu_task_id, area name, remarks, assignee name
         '''
-        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, COALESCE(task.assignee_keycloak_id, 'Unassigned') as assignee_name \
+        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id \
         FROM task \
         JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
         JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
         JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
         WHERE image.scvu_image_id = %s \
         ORDER BY area.area_name"
-        cursor = self.db.executeSelect(imageAreaQuery, (scvu_image_id, ))
-        return cursor
+        results = self.db.executeSelect(imageAreaQuery, (scvu_image_id, ))
+        formatted = []
+        for row in results:
+            task_id, area_name, remarks, assignee_keycloak_id = row
+            assignee = self._get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else 'Unassigned'
+            formatted.append((task_id, area_name, remarks, assignee))
+        return formatted
 
     def getImageData(self, start_date, end_date):
         '''
@@ -733,13 +765,13 @@ class QueryManager():
         Input: start_date, end_date
         Output: scvu image id, sensor name, image file name, image id, image upload date, image date time, report name, priority name, image category name, image quality, cloud cover, ew status
         '''
-        imageQuery = f"SELECT image.scvu_image_id, sensor.name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        imageQuery = f"SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
         COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
         COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, \
-        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, ew_status.name, COALESCE(image.vetter_keycloak_id, 'Unknown') as vetter_name \
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id \
         FROM image \
-        JOIN sensor ON sensor.id = image.sensor_id \
-        JOIN ew_status ON ew_status.id = image.ew_status_id \
+        LEFT JOIN sensor ON sensor.id = image.sensor_id \
+        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id \
         LEFT JOIN report ON report.id = image.report_id \
         LEFT JOIN priority ON priority.id = image.priority_id \
         LEFT JOIN image_category ON image_category.id = image.image_category_id \
@@ -748,8 +780,14 @@ class QueryManager():
         AND ((image.completed_date >= %s AND image.completed_date < %s) \
              OR (image.upload_date >= %s AND image.upload_date < %s))"
 
-        cursor = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date))
-        return cursor
+        results = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date))
+        formatted = []
+        for row in results:
+            row = list(row)
+            vetter_keycloak_id = row[12]
+            row[12] = self._get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else 'Unassigned'
+            formatted.append(tuple(row))
+        return formatted
 
     def getXBIReportImage(self, start_date, end_date):
         '''

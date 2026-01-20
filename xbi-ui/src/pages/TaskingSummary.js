@@ -492,28 +492,27 @@ const TaskingSummary = (dateRange) => {
 
 
   const processTask = (apiPath) => { // function to call the DB for all Task related queries, apiPath will determine the exact DB API to call
-    let isTask = true
     console.log("NIMA")
     console.log(apiPath)
     if (selectedRow.length == 0) { // if there are no row selected to be processed
-      isTask = false 
       alert("Please select a row")
-    } 
-    selectedRow.forEach((rowId) => {
-      console.log(rowId)
-      console.log(selectedRow)
-      let childIdDictPath = String(rowId).concat(".", "Child ID")
-      console.log(childIdDictPath)
-      console.log(workingData)
-      if ((_.get(workingData, childIdDictPath) !== undefined)){ // ensure that none of the selected rows have child ID, aka no image row
-        isTask = false
-        alert("Please select a task row")
-      }
-    })
-    if (isTask){
-      // Get the actual task IDs from the selected rows
-      let taskIds = [];
-      selectedRow.forEach((rowId) => {
+      return;
+    }
+
+    // Filter to only task rows (rows with Parent ID)
+    const taskRowIds = selectedRow.filter((rowId) => {
+      const parentIdDictPath = String(rowId).concat(".", "Parent ID");
+      return _.get(workingData, parentIdDictPath) !== undefined;
+    });
+
+    if (taskRowIds.length === 0) {
+      alert("Please select a task row");
+      return;
+    }
+
+    // Get the actual task IDs from the selected rows
+    let taskIds = [];
+    taskRowIds.forEach((rowId) => {
         // Find the row in the rows array to get the scvuTaskId
         const row = rows.find(r => r.id === rowId);
         if (row && row.scvuTaskId) {
@@ -543,30 +542,31 @@ const TaskingSummary = (dateRange) => {
         const errorMsg = error.response?.data?.error || error.response?.data?.detail || error.message || "Unknown error";
         alert("Error completing task: " + errorMsg);
       });
-      setReloadRows(true)
-    }
+      setReloadRows(prev => prev + 1)
   }
 
   const processImage = (apiPath) => { // function to call the DB for all Image related queries, apiPath will determine the exact DB API to call
-    let isImage = true
     if (selectedRow.length == 0) { // if there are no row selected to be processed
-      isImage = false
       alert("Please select an Image Row to be completed")
-    } else {
-      selectedRow.forEach((rowId) => {
-        let parentIdDictPath = String(rowId).concat(".", "Parent ID")
-        if ((_.get(workingData, parentIdDictPath) !== undefined)){  // ensure that none of the selected rows have parent ID, aka no task row
-          isImage = false
-        }
-      })
-      if (isImage == false) alert("Please select only Image Rows")
+      return;
     }
 
-    if (isImage){ // semi hardcoded to be used for complete image, this means that processImage cant rly be used for other button to process image.
+    // Filter to only image rows (rows without Parent ID)
+    const imageRowIds = selectedRow.filter((rowId) => {
+      const parentIdDictPath = String(rowId).concat(".", "Parent ID");
+      return _.get(workingData, parentIdDictPath) === undefined;
+    });
+
+    if (imageRowIds.length === 0) {
+      alert("Please select only Image Rows");
+      return;
+    }
+
+    { // semi hardcoded to be used for complete image, this means that processImage cant rly be used for other button to process image.
       // First, save any pending changes (image category, cloud cover, remarks, etc.) for the selected images
       let dataToSave = {};
       let hasChanges = false;
-      selectedRow.forEach((rowId) => {
+      imageRowIds.forEach((rowId) => {
         let dataRow = _.get(workingData, rowId);
         if (dataRow && dataRow["Child ID"]) {
           // This is an image row - save its data
@@ -597,7 +597,7 @@ const TaskingSummary = (dateRange) => {
         let sessionUsername = sessionStorage.getItem('username');
         let usernameString = JSON.parse(sessionUsername);
         let json = {
-          "SCVU Image ID": selectedRow,
+          "SCVU Image ID": imageRowIds,
           "Vetter": usernameString 
         }
 
@@ -617,7 +617,7 @@ const TaskingSummary = (dateRange) => {
               }
             }
           }
-          setReloadRows(true); // refresh the DOM as the row that was completed would be gone and into CI
+          setReloadRows(prev => prev + 1); // refresh the DOM as the row that was completed would be gone and into CI
         })
         .catch(function (error) {
           console.log(error);
@@ -726,7 +726,7 @@ const TaskingSummary = (dateRange) => {
          * Tooltip: responsible for displaying the ID that was copied to the user, its the grey popup whenever u click the button 
          * Tooltip.title: is the value that is displayed on the tooltip
         */}
-        <Button variant="contained" onClick={() => {setReloadRows(true)}}>Refresh</Button>
+        <Button variant="contained" onClick={() => {setReloadRows(prev => prev + 1)}}>Refresh</Button>
         <Button variant="contained" onClick={refresh}>Change Display Date</Button>
         <ClickAwayListener onClickAway={handleTooltipClose}> 
           <Tooltip 
