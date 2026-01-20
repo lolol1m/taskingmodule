@@ -2,6 +2,7 @@ import "../styles/LandingPage.css";
 import TaskingSummary from "./TaskingSummary";
 import { Link } from "react-router-dom";
 import { Button, Box } from "@mui/material";
+import logo from "../assets/xbi2.png";
 
 const LandingPage = ({dateRange, handleTabChange}) => {
 
@@ -39,7 +40,7 @@ const LandingPage = ({dateRange, handleTabChange}) => {
   return (
     <div className="landing">
       <div>
-        <img className='mainLogo' src="/xbi2.png" alt="XBI Logo"></img>
+        <img className='mainLogo' src={logo} alt="XBI Logo" />
       </div>
       <div className="titleBody">
         <h2 className="title">Welcome to XBI, {username}</h2>

@@ -1,0 +1,55 @@
+{
+  "images": [
+    {
+      "imgId": 21,
+      "imageFileName": "saber.gif",
+      "sensorName": "sensor21",
+      "uploadDate": "2025-12-28T09:59:33.333Z",
+      "imageDateTime": "2025-12-28T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 47,
+          "areaName": "area_47"
+        }
+      ]
+    },
+    {
+      "imgId": 22,
+      "imageFileName": "fredrinn.gif",
+      "sensorName": "sensor22",
+      "uploadDate": "2025-12-28T09:59:33.333Z",
+      "imageDateTime": "2025-12-28T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 54,
+          "areaName": "area_54"
+        },
+        {
+          "areaId": 12,
+          "areaName": "area_12"
+        },
+        {
+          "areaId": 53,
+          "areaName": "area_53"
+        }
+      ]
+    },
+    {
+      "imgId": 23,
+      "imageFileName": "cici.gif",
+      "sensorName": "sensor23",
+      "uploadDate": "2025-12-28T09:59:33.333Z",
+      "imageDateTime": "2025-12-28T09:59:33.333Z",
+      "areas": [
+        {
+          "areaId": 12,
+          "areaName": "area_12"
+        },
+        {
+          "areaId": 24,
+          "areaName": "area_24"
+        }
+      ]
+    }
+  ]
+}

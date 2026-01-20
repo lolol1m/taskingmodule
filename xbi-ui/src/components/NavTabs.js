@@ -4,6 +4,7 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Button from '@mui/material/Button';
 import { Link } from "react-router-dom";
+import logo from "../assets/xbi.png";
 
 
 function LinkTab(props) {
@@ -62,7 +63,7 @@ const NavTabs = ({ tabs, currentTab, handleChange }) => {
     <Box className='navTabs' sx={{ width: '100%' }}>
       <nav className="navbar">
         <div>
-        <img src="/xbi.png" className='logo' alt="XBI Logo"/>
+        <img src={logo} className='logo' alt="XBI Logo" />
         <h1 className='navtabTitle'>XBI | {username}</h1>
         </div>
         <Tabs className="tabs" value={currentTab} onChange={(e, newValue) => handleChange(newValue)} aria-label="nav tabs example">
