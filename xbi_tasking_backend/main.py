@@ -27,6 +27,7 @@ app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 origins = [
+   
     "http://localhost:3000",
     "http://127.0.0.1:3000"
 ]
@@ -217,7 +218,7 @@ async def auth_login(request: Request):
     client_id = config.getKeycloakClientID()
     
     # Get frontend URL from environment or use default
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
@@ -264,17 +265,17 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     
     if error:
         # Keycloak returned an error
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         return RedirectResponse(url=f"{frontend_url}?error={error}")
     
     if not code:
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         return RedirectResponse(url=f"{frontend_url}?error=no_code")
 
     # Validate state from cookie to prevent CSRF
     cookie_state = request.cookies.get("kc_state")
     if not state or not cookie_state or state != cookie_state:
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         response = RedirectResponse(url=f"{frontend_url}?error=state_mismatch")
         response.delete_cookie("kc_state")
         return response
@@ -284,7 +285,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     realm = config.getKeycloakRealm()
     client_id = config.getKeycloakClientID()
     client_secret = config.getKeycloakClientSecret()
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
     # Exchange authorization code for tokens
     token_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
@@ -474,13 +475,13 @@ async def auth_logout(request: Request):
     Logs out user from Keycloak and redirects to frontend.
     """
     if not KEYCLOAK_ENABLED:
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         return RedirectResponse(url=frontend_url)
     
     config = ConfigClass._instance
     keycloak_url = config.getKeycloakURL()
     realm = config.getKeycloakRealm()
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
     # Build Keycloak logout URL
     logout_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/logout"
