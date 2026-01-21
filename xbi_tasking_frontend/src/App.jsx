@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AuthGuard from './components/AuthGuard.jsx'
-import MainPage from './pages/MainPage.jsx'
+import MainPage from './pages/MainPage/MainPage.jsx'
 import './App.css'
 
 function App() {
