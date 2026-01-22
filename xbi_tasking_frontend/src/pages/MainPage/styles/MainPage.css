@@ -1,0 +1,67 @@
+.app-shell {
+  --bg: #0f0f12;
+  --text: #e5e7eb;
+  --header-bg: rgb(0, 0, 90);
+  --header-text: #ffffff;
+  --panel: #15161a;
+  --panel-2: #111318;
+  --border: #2b2d36;
+  --border-strong: #23242a;
+  --hover: #1b1d23;
+  --muted: #9ca3af;
+  --subtext: #cbd5f5;
+  --accent: #3b82f6;
+  --danger: #ef4444;
+  --danger-hover: rgba(239, 68, 68, 0.15);
+  --icon-button-bg: rgba(255, 255, 255, 0.08);
+  --icon-button-border: rgba(255, 255, 255, 0.2);
+  --badge-bg: #ef4444;
+  --badge-border: rgb(0, 0, 90);
+  --table-bg: #111318;
+  --row-bg: #0f1014;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell.is-light {
+  --bg: #f5f6f8;
+  --text: #111827;
+  --header-bg: #0b2f7a;
+  --header-text: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f3f4f6;
+  --border: #d1d5db;
+  --border-strong: #cbd5e1;
+  --hover: #e5e7eb;
+  --muted: #6b7280;
+  --subtext: #475569;
+  --accent: #2563eb;
+  --danger: #dc2626;
+  --danger-hover: rgba(220, 38, 38, 0.12);
+  --icon-button-bg: rgba(255, 255, 255, 0.6);
+  --icon-button-border: rgba(15, 23, 42, 0.1);
+  --badge-bg: #dc2626;
+  --badge-border: #0b2f7a;
+  --table-bg: #f8fafc;
+  --row-bg: #f1f5f9;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  padding: 16px;
+  transition: grid-template-columns 700ms ease;
+  position: relative;
+  overflow: visible;
+}
+
+.layout.is-collapsed {
+  grid-template-columns: auto 1fr;
+}
+
+.is-hidden {
+  display: none;
+}
