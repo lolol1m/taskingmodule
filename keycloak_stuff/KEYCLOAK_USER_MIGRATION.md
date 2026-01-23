@@ -41,7 +41,7 @@ The migration script will:
 - Create corresponding users in Keycloak
 - Assign appropriate roles based on account type
 - Set passwords (from the original account passwords)
-
+-* If there are no rows for users there is no need to migrate because there's nothing to migrate
 ### Run the script:
 
 ```bash
