@@ -1,5 +1,5 @@
 import configparser
-from configparser import SafeConfigParser
+
 
 class Singleton(object):
     _instance = None
