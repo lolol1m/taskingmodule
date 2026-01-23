@@ -6,7 +6,6 @@ import {LicenseInfo} from "@mui/x-license"
 
 function App() {
   LicenseInfo.setLicenseKey(import.meta.env.VITE_MUI_X_LICENSE_KEY)
-  console.log(import.meta.env.VITE_MUI_X_LICENSE_KEY)
   return (
     <Routes>
       <Route
