@@ -879,7 +879,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       </div>
 
       <div className="tasking-summary__actions">
-              {selection.length == 0 ? <div className="tasking-summary__actions-left"><span class="content__subtitle">0 items selected</span></div>:        <div className="tasking-summary__actions-left">
+              {!selection.length ? <div className="tasking-summary__actions-left"><span class="content__subtitle">0 items selected</span></div>:        <div className="tasking-summary__actions-left">
           <ClickAwayListener onClickAway={handleTooltipClose}>
             <Tooltip
               PopperProps={{ disablePortal: true }}
@@ -965,7 +965,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           }}
           checkboxSelection
           disableRowSelectionOnClick
-          onRowSelectionModelChange={(ids) => setSelection(ids)}
+          onRowSelectionModelChange={(ids) =>{
+            //TODO: NEED TO FIX THIS
+            if(ids!=undefined && ids!=null) {
+                setSelection(ids)
+            }
+              }
+            }
           rowHeight={70}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
