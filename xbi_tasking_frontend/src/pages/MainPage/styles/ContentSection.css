@@ -14,8 +14,11 @@
 .content__topbar {
   display: flex;
   justify-content: space-between;
+
   align-items: flex-end;
   gap: 16px;
+
+
 }
 
 .content__heading {
