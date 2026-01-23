@@ -413,10 +413,11 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         renderCell: (params) => {
           if (!params?.row?.childId) return ''
           const rowId = params.row.id
-          const currentValue = Boolean(getWorkingValue(rowId, 'Target Tracing'))
+          const currentValue = Boolean(getWorkingValue(rowId, 'Target Tracing') ?? params?.row?.targetTracing)
           return (
             <Checkbox
               checked={currentValue}
+              onClick={(event) => event.stopPropagation()}
               onChange={(_, newValue) =>
                 setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Target Tracing', newValue, inputData))
               }
@@ -429,14 +430,36 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         headerName: 'V10',
         minWidth: 70,
         flex: 0.4,
-        valueGetter: (params) => formatBoolean(params?.row?.v10),
+        renderCell: (params) => {
+          if (!params?.row?.childId) return ''
+          const rowId = params.row.id
+          const currentValue = Boolean(getWorkingValue(rowId, 'V10') ?? params?.row?.v10)
+          return (
+            <Checkbox
+              checked={currentValue}
+              onChange={(_, newValue) => setWorkingData((prev) => updateWorkingRow(prev, rowId, 'V10', newValue, inputData))}
+            />
+          )
+        },
       },
       {
         field: 'opsV',
         headerName: 'OPS V',
         minWidth: 70,
         flex: 0.4,
-        valueGetter: (params) => formatBoolean(params?.row?.opsV),
+        renderCell: (params) => {
+          if (!params?.row?.childId) return ''
+          const rowId = params.row.id
+          const currentValue = Boolean(getWorkingValue(rowId, 'OPS V') ?? params?.row?.opsV)
+          return (
+            <Checkbox
+              checked={currentValue}
+              onChange={(_, newValue) =>
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'OPS V', newValue, inputData))
+              }
+            />
+          )
+        },
       },
     ],
     [],

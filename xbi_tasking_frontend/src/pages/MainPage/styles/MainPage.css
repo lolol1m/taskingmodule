@@ -25,6 +25,42 @@
   color: var(--text);
 }
 
+.app-shell {
+  --scrollbar-thumb: rgba(255, 255, 255, 0.7);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.9);
+  --scrollbar-track: transparent;
+}
+
+.app-shell.is-light {
+  --scrollbar-thumb: rgba(17, 24, 39, 0.35);
+  --scrollbar-thumb-hover: rgba(17, 24, 39, 0.55);
+  --scrollbar-track: transparent;
+}
+
+.app-shell,
+.app-shell * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.app-shell ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-shell ::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.app-shell ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.app-shell ::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
 .app-shell.is-light {
   --bg: #f5f6f8;
   --text: #111827;
