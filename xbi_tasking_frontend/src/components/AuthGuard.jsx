@@ -33,12 +33,19 @@ const applyToken = (token, refreshToken, idToken, fallbackUsername) => {
     const resourceRoles = decoded.resource_access?.[clientId]?.roles || []
     const allRoles = [...realmRoles, ...resourceRoles]
     const tokenUsername = decoded.preferred_username || decoded.sub || fallbackUsername || 'user'
+    const hasAdminRole =
+      allRoles.includes('admin') || allRoles.includes('Admin') || allRoles.includes('ADMIN')
+    const hasIARole =
+      allRoles.includes('IA') || allRoles.includes('ia') || tokenUsername.toLowerCase().includes('iauser')
 
+    localStorage.setItem('access_token', token)
     localStorage.setItem(
       'user',
       JSON.stringify({
         username: tokenUsername,
         roles: allRoles,
+        isAdmin: hasAdminRole,
+        isIA: hasIARole,
       }),
     )
 
@@ -83,20 +90,83 @@ function AuthGuard({ children }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let expiryTimeoutId
+    let refreshTimeoutId
+
+    const clearAuthTokens = () => {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('id_token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('username')
+    }
+
+    const redirectToLogin = () => {
+      clearAuthTokens()
+      window.location.href = `${BACKEND_URL}/auth/login`
+    }
+
+    const scheduleExpiryRedirect = (token) => {
+      if (!token) return
+      try {
+        const decoded = jwtDecode(token)
+        if (!decoded?.exp) return
+        const msUntilExpiry = decoded.exp * 1000 - Date.now()
+        if (msUntilExpiry <= 0) {
+          redirectToLogin()
+          return
+        }
+        expiryTimeoutId = window.setTimeout(() => {
+          redirectToLogin()
+        }, msUntilExpiry)
+      } catch (err) {
+        console.error('Error decoding token for expiry schedule:', err)
+      }
+    }
+
+    const scheduleTokenRefresh = (token) => {
+      if (!token) return
+      try {
+        const decoded = jwtDecode(token)
+        if (!decoded?.exp) return
+        const bufferMs = 60 * 1000
+        const msUntilRefresh = decoded.exp * 1000 - Date.now() - bufferMs
+        if (refreshTimeoutId) clearTimeout(refreshTimeoutId)
+        refreshTimeoutId = window.setTimeout(async () => {
+          const refreshed = await refreshTokens()
+          if (!refreshed) {
+            redirectToLogin()
+            return
+          }
+          const newToken = localStorage.getItem('access_token')
+          scheduleTokenRefresh(newToken)
+          scheduleExpiryRedirect(newToken)
+        }, Math.max(msUntilRefresh, 0))
+      } catch (err) {
+        console.error('Error decoding token for refresh schedule:', err)
+      }
+    }
+
     const checkAuth = async () => {
       const urlParams = new URLSearchParams(window.location.search)
       const errorParam = urlParams.get('error')
       if (errorParam) {
+        console.error('Authentication error:', errorParam)
+        alert(`Authentication failed: ${errorParam}. Please check the backend console for details.`)
+        clearAuthTokens()
         setError(errorParam)
         setIsInitialized(true)
         setIsAuthenticated(false)
         window.history.replaceState(null, '', window.location.pathname)
+        redirectToLogin()
         return
       }
 
       const tokens = storeTokensFromHash()
       if (tokens?.accessToken) {
         if (applyToken(tokens.accessToken, tokens.refreshToken, tokens.idToken, tokens.username)) {
+          scheduleExpiryRedirect(tokens.accessToken)
+          scheduleTokenRefresh(tokens.accessToken)
           setIsInitialized(true)
           setIsAuthenticated(true)
           return
@@ -111,34 +181,41 @@ function AuthGuard({ children }) {
           if (decoded.exp && decoded.exp < now) {
             const refreshed = await refreshTokens()
             if (!refreshed) {
-              localStorage.removeItem('access_token')
-              localStorage.removeItem('refresh_token')
-              localStorage.removeItem('id_token')
-              localStorage.removeItem('user')
-              window.location.href = `${BACKEND_URL}/auth/login`
+              redirectToLogin()
               return
             }
+            const newToken = localStorage.getItem('access_token')
+            scheduleExpiryRedirect(newToken)
+            scheduleTokenRefresh(newToken)
           } else {
             applyToken(storedToken, localStorage.getItem('refresh_token'), localStorage.getItem('id_token'))
+            scheduleExpiryRedirect(storedToken)
+            scheduleTokenRefresh(storedToken)
           }
           setIsInitialized(true)
           setIsAuthenticated(true)
           return
         } catch (err) {
           console.error('Error validating stored token:', err)
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          localStorage.removeItem('id_token')
-          localStorage.removeItem('user')
+          clearAuthTokens()
         }
       }
 
       setIsInitialized(true)
       setIsAuthenticated(false)
-      window.location.href = `${BACKEND_URL}/auth/login`
+      redirectToLogin()
     }
 
     checkAuth()
+
+    return () => {
+      if (expiryTimeoutId) {
+        clearTimeout(expiryTimeoutId)
+      }
+      if (refreshTimeoutId) {
+        clearTimeout(refreshTimeoutId)
+      }
+    }
   }, [])
 
   if (!isInitialized) {

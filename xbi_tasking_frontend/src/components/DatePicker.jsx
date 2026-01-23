@@ -85,12 +85,12 @@ function DatePickerModal({ open, onClose, onApply }) {
       <Fade in={open}>
         <Box sx={style}>
           <Grid container spacing={2} direction="column" alignItems="center" justifyContent="center">
-            <Grid item>
+            <Grid>
               <Typography id="date-range-modal-title" variant="h6">
                 Select Display Date
               </Typography>
             </Grid>
-            <Grid item>
+            <Grid>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <StaticDateRangePicker
                   displayStaticWrapperAs="desktop"
@@ -102,7 +102,7 @@ function DatePickerModal({ open, onClose, onApply }) {
                 />
               </LocalizationProvider>
             </Grid>
-            <Grid item>
+            <Grid>
               <Button onClick={handleApply}>Submit</Button>
             </Grid>
           </Grid>

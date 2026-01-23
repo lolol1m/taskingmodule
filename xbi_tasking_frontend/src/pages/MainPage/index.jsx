@@ -8,8 +8,15 @@ import useUsername from './hooks/useUsername.js'
 import './styles/index.css'
 
 function MainPage() {
-  const [open, setOpen] = useState(true)
-  const [dateRange, setDateRange] = useState(null)
+  const [dateRange, setDateRange] = useState(() => {
+    try {
+      const stored = localStorage.getItem('tasking_date_range')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+  const [open, setOpen] = useState(() => !localStorage.getItem('tasking_date_range'))
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [adminOpen, setAdminOpen] = useState(true)
   const [activeTab, setActiveTab] = useState('summary')
@@ -24,6 +31,7 @@ function MainPage() {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('id_token')
     localStorage.removeItem('user')
+    localStorage.removeItem('tasking_date_range')
     sessionStorage.removeItem('token')
     sessionStorage.removeItem('username')
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
@@ -31,7 +39,11 @@ function MainPage() {
   }
 
   const handleApply = (range) => {
-    setDateRange(formatDateRange(range))
+    const formatted = formatDateRange(range)
+    setDateRange(formatted)
+    if (formatted) {
+      localStorage.setItem('tasking_date_range', JSON.stringify(formatted))
+    }
     setOpen(false)
   }
 
