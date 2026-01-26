@@ -84,6 +84,16 @@ const normalizeImageName = (value) => {
   return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
 }
 
+const readField = (entry, keys, fallback = '') => {
+  if (!entry) return fallback
+  for (const key of keys) {
+    if (entry[key] !== undefined && entry[key] !== null) {
+      return entry[key]
+    }
+  }
+  return fallback
+}
+
 const buildRows = (inputData) => {
   if (!inputData) return []
   const rows = []
@@ -97,19 +107,19 @@ const buildRows = (inputData) => {
     rows.push({
       id: Number(key),
       imageFileName: normalizeImageName(entry['Image File Name'] || `Image_${key}`),
-      sensorName: entry['Sensor Name'],
-      imageId: entry['Image ID'],
-      uploadDate: entry['Upload Date'],
-      imageDateTime: entry['Image Datetime'],
-      areaName: entry['Area'],
-      assignee: entry['Assignee'],
-      vetter: entry['Vetter'],
-      report: entry['Report'],
-      remarks: entry['Remarks'],
-      imageCategory: entry['Image Category'],
-      imageQuality: entry['Image Quality'],
-      cloudCover: entry['Cloud Cover'],
-      priority: entry['Priority'],
+      sensorName: readField(entry, ['Sensor Name', 'sensorName']),
+      imageId: readField(entry, ['Image ID', 'imageId']),
+      uploadDate: readField(entry, ['Upload Date', 'uploadDate']),
+      imageDateTime: readField(entry, ['Image Datetime', 'imageDateTime']),
+      areaName: readField(entry, ['Area', 'Area Name', 'areaName']),
+      assignee: readField(entry, ['Assignee', 'assignee']),
+      vetter: readField(entry, ['Vetter', 'vetter']),
+      report: readField(entry, ['Report', 'Reports', 'report']),
+      remarks: readField(entry, ['Remarks', 'remarks']),
+      imageCategory: readField(entry, ['Image Category', 'imageCategory']),
+      imageQuality: readField(entry, ['Image Quality', 'imageQuality']),
+      cloudCover: readField(entry, ['Cloud Cover', 'cloudCover']),
+      priority: readField(entry, ['Priority', 'priority']),
       childId: entry['Child ID'],
     })
   })
@@ -162,6 +172,9 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         }
 
         const data = await response.json()
+        const sampleKey = data ? Object.keys(data)[0] : null
+        const sampleEntry = sampleKey != null ? data[sampleKey] : null
+        console.log('Completed images sample entry:', { sampleKey, sampleEntry })
         setInputData(data)
         setRows(buildRows(data))
       } catch (err) {
