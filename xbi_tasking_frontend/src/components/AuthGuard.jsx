@@ -25,9 +25,28 @@ const storeTokensFromHash = () => {
   return { accessToken, refreshToken, idToken, username }
 }
 
+const getTokenExpiryMs = (token) => {
+  try {
+    const decoded = jwtDecode(token)
+    return decoded?.exp ? decoded.exp * 1000 : null
+  } catch (error) {
+    console.error('Error decoding token expiry:', error)
+    return null
+  }
+}
+
+const isTokenExpired = (token, skewSeconds = 30) => {
+  const expiryMs = getTokenExpiryMs(token)
+  if (!expiryMs) return true
+  return expiryMs <= Date.now() + skewSeconds * 1000
+}
+
 const applyToken = (token, refreshToken, idToken, fallbackUsername) => {
   try {
     const decoded = jwtDecode(token)
+    if (decoded?.exp && decoded.exp * 1000 <= Date.now() + 5000) {
+      return false
+    }
     const realmRoles = decoded.realm_access?.roles || []
     const clientId = decoded.azp || decoded.aud
     const resourceRoles = decoded.resource_access?.[clientId]?.roles || []
@@ -77,6 +96,9 @@ const refreshTokens = async () => {
       return false
     }
     const data = await response.json()
+    if (!data?.access_token) {
+      return false
+    }
     return applyToken(data.access_token, data.refresh_token || storedRefresh, data.id_token, null)
   } catch (error) {
     console.error('Error refreshing token:', error)
@@ -108,43 +130,35 @@ function AuthGuard({ children }) {
 
     const scheduleExpiryRedirect = (token) => {
       if (!token) return
-      try {
-        const decoded = jwtDecode(token)
-        if (!decoded?.exp) return
-        const msUntilExpiry = decoded.exp * 1000 - Date.now()
-        if (msUntilExpiry <= 0) {
-          redirectToLogin()
-          return
-        }
-        expiryTimeoutId = window.setTimeout(() => {
-          redirectToLogin()
-        }, msUntilExpiry)
-      } catch (err) {
-        console.error('Error decoding token for expiry schedule:', err)
+      const expiryMs = getTokenExpiryMs(token)
+      if (!expiryMs) return
+      const msUntilExpiry = expiryMs - Date.now()
+      if (msUntilExpiry <= 0) {
+        redirectToLogin()
+        return
       }
+      expiryTimeoutId = window.setTimeout(() => {
+        redirectToLogin()
+      }, msUntilExpiry)
     }
 
     const scheduleTokenRefresh = (token) => {
       if (!token) return
-      try {
-        const decoded = jwtDecode(token)
-        if (!decoded?.exp) return
-        const bufferMs = 60 * 1000
-        const msUntilRefresh = decoded.exp * 1000 - Date.now() - bufferMs
-        if (refreshTimeoutId) clearTimeout(refreshTimeoutId)
-        refreshTimeoutId = window.setTimeout(async () => {
-          const refreshed = await refreshTokens()
-          if (!refreshed) {
-            redirectToLogin()
-            return
-          }
-          const newToken = localStorage.getItem('access_token')
-          scheduleTokenRefresh(newToken)
-          scheduleExpiryRedirect(newToken)
-        }, Math.max(msUntilRefresh, 0))
-      } catch (err) {
-        console.error('Error decoding token for refresh schedule:', err)
-      }
+      const expiryMs = getTokenExpiryMs(token)
+      if (!expiryMs) return
+      const bufferMs = 60 * 1000
+      const msUntilRefresh = expiryMs - Date.now() - bufferMs
+      if (refreshTimeoutId) clearTimeout(refreshTimeoutId)
+      refreshTimeoutId = window.setTimeout(async () => {
+        const refreshed = await refreshTokens()
+        if (!refreshed) {
+          redirectToLogin()
+          return
+        }
+        const newToken = localStorage.getItem('access_token')
+        scheduleTokenRefresh(newToken)
+        scheduleExpiryRedirect(newToken)
+      }, Math.max(msUntilRefresh, 0))
     }
 
     const checkAuth = async () => {
@@ -175,30 +189,39 @@ function AuthGuard({ children }) {
 
       const storedToken = localStorage.getItem('access_token')
       if (storedToken) {
-        try {
-          const decoded = jwtDecode(storedToken)
-          const now = Math.floor(Date.now() / 1000)
-          if (decoded.exp && decoded.exp < now) {
-            const refreshed = await refreshTokens()
-            if (!refreshed) {
-              redirectToLogin()
-              return
-            }
-            const newToken = localStorage.getItem('access_token')
-            scheduleExpiryRedirect(newToken)
-            scheduleTokenRefresh(newToken)
-          } else {
-            applyToken(storedToken, localStorage.getItem('refresh_token'), localStorage.getItem('id_token'))
-            scheduleExpiryRedirect(storedToken)
-            scheduleTokenRefresh(storedToken)
+        if (isTokenExpired(storedToken)) {
+          const refreshed = await refreshTokens()
+          if (!refreshed) {
+            redirectToLogin()
+            return
           }
-          setIsInitialized(true)
-          setIsAuthenticated(true)
-          return
-        } catch (err) {
-          console.error('Error validating stored token:', err)
+        } else if (!applyToken(storedToken, localStorage.getItem('refresh_token'), localStorage.getItem('id_token'))) {
           clearAuthTokens()
+          redirectToLogin()
+          return
         }
+
+        const newToken = localStorage.getItem('access_token')
+        scheduleExpiryRedirect(newToken)
+        scheduleTokenRefresh(newToken)
+        setIsInitialized(true)
+        setIsAuthenticated(true)
+        return
+      }
+
+      const storedRefresh = localStorage.getItem('refresh_token')
+      if (storedRefresh) {
+        const refreshed = await refreshTokens()
+        if (!refreshed) {
+          redirectToLogin()
+          return
+        }
+        const newToken = localStorage.getItem('access_token')
+        scheduleExpiryRedirect(newToken)
+        scheduleTokenRefresh(newToken)
+        setIsInitialized(true)
+        setIsAuthenticated(true)
+        return
       }
 
       setIsInitialized(true)
