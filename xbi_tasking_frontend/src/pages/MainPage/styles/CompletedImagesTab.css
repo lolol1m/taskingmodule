@@ -1,0 +1,107 @@
+.completed-images {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.completed-images__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.completed-images__button {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-transform: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.completed-images__button:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.completed-images__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.completed-images__button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.completed-images__button--primary:hover {
+  background: var(--accent-strong);
+}
+
+.completed-images__error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.completed-images__grid {
+  background: var(--table-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  overflow: auto;
+  max-width: 100%;
+  flex: 1;
+  min-height: 360px;
+  max-height: 660px;
+  transition: max-width 700ms ease;
+  scrollbar-color: var(--border-strong) var(--row-bg);
+  scrollbar-width: thin;
+}
+
+.completed-images__grid::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.completed-images__grid::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.completed-images__grid::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.completed-images__grid::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.completed-images__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.completed-images__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.completed-images__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.completed-images__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.completed-images__grid .MuiDataGrid-scrollbarFiller,
+.completed-images__grid .MuiDataGrid-scrollbarFiller--header {
+  background: var(--row-bg) !important;
+}
+
+.completed-images__grid .MuiDataGrid-root {
+  transition: width 700ms ease;
+}
