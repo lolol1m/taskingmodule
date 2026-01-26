@@ -627,15 +627,20 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           <div className="content__title">Tasking Manager</div>
           <div className="content__subtitle">Manage tasking priorities, assignees, and TTGs.</div>
         </div>
+           <div className="content__controls">
+          <div className="action-bar">
+            <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
+              Refresh
+            </Button>
+            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
+              Change Display Date
+            </Button>
+          </div>
+        </div>
       </div>
       <div className="tasking-manager__actions">
         <div className="tasking-manager__actions-left">
-          <Button className="tasking-manager__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
-            Refresh
-          </Button>
-          <Button className="tasking-manager__button" onClick={onOpenDatePicker}>
-            Change Display Date
-          </Button>
+       
           <Button className="tasking-manager__button" onClick={() => setModalOpen(true)}>
             Create TTG
           </Button>
