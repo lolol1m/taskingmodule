@@ -1116,6 +1116,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
             },
+          
+            '& .MuiDataGrid-row.Mui-selected': {
+      
+              backgroundColor: '#333f4f',
+            },
+
             '& .MuiDataGrid-footerContainer': {
               borderTop: '1px solid var(--border-strong)',
               color: 'var(--muted)',
