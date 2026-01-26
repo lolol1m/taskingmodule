@@ -115,6 +115,11 @@ const updateWorkingRow = (prev, rowId, field, value, baseData = null) => {
   return next
 }
 
+const normalizeImageName = (value) => {
+  if (!value || typeof value !== 'string') return value
+  return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
+}
+
 const buildRows = (inputData) => {
   if (!inputData) return []
 
@@ -124,10 +129,11 @@ const buildRows = (inputData) => {
     if (!entry) return
 
     if (entry['Child ID']) {
-      const imageFileName = entry['Image File Name'] || `Image_${key}`
+      const imageFileName = normalizeImageName(entry['Image File Name'] || `Image_${key}`)
       rows.push({
         id: Number(key),
         groupName: [imageFileName],
+        treePath: [`img_${key}`],
         sensorName: entry['Sensor Name'],
         imageId: entry['Image ID'],
         uploadDate: entry['Upload Date'],
@@ -153,11 +159,12 @@ const buildRows = (inputData) => {
     if (entry['Parent ID'] !== undefined) {
       const parentId = Number(entry['Parent ID'])
       const parent = inputData[parentId] || inputData[entry['Parent ID']]
-      const parentName = parent?.['Image File Name'] || `Image_${parentId}`
+      const parentName = normalizeImageName(parent?.['Image File Name'] || `Image_${parentId}`)
       const areaName = entry['Area Name'] || `Area_${key}`
       rows.push({
         id: Number(key),
         groupName: [parentName, areaName],
+        treePath: [`img_${parentId}`, areaName],
         taskStatus: entry['Task Status'],
         assignee: entry['Assignee'],
         remarks: entry['Remarks'],
@@ -237,10 +244,19 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       borderRadius: 6,
       backgroundColor,
       marginTop: '20px',
+      color: 'var(--text)',
+    },
+    '& .MuiInputBase-input::placeholder': {
+      color: 'var(--muted)',
+      opacity: 1,
     },
     '& .MuiOutlinedInput-input': {
       padding: '0 10px',
       textAlign: 'center',
+      color: 'var(--text)',
+    },
+    '& .MuiAutocomplete-input': {
+      color: 'var(--text)',
     },
     '& .MuiAutocomplete-endAdornment': {
       right: 6,
@@ -496,18 +512,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   }, [columnVisibilityModel])
 
   const getTreeDataPath = (row) => {
+    if (row.treePath && Array.isArray(row.treePath)) {
+      return row.treePath.filter((item) => item != null).map((item) => item?.toString() || '')
+    }
     if (!row.groupName || !Array.isArray(row.groupName)) {
       return [row.id?.toString() || 'unknown']
     }
-
-    const path = row.groupName.filter((item) => item != null).map((item) => item?.toString() || '')
-    if (path.length === 1 && row.id !== undefined && row.id !== null) {
-      path[0] = `${path[0]}_${row.id}`
-    } else if (path.length === 2 && row.parentId !== undefined && row.parentId !== null) {
-      const parentImagePath = `${path[0]}_${row.parentId}`
-      path[0] = parentImagePath
-    }
-    return path
+    return row.groupName.filter((item) => item != null).map((item) => item?.toString() || '')
   }
 
   const fetchSummary = async () => {
@@ -879,50 +890,64 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       </div>
 
       <div className="tasking-summary__actions">
-              {!selection.length ? <div className="tasking-summary__actions-left"><span class="content__subtitle">0 items selected</span></div>:        <div className="tasking-summary__actions-left">
-          <ClickAwayListener onClickAway={handleTooltipClose}>
-            <Tooltip
-              PopperProps={{ disablePortal: true }}
-              onClose={handleTooltipClose}
-              open={openCopy}
-              disableFocusListener
-              disableHoverListener
-              disableTouchListener
-              title={clipboardValue}
-            >
-              <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
-                Start Task
+        <div className="tasking-summary__actions-left">
+          <div className="tasking-summary__action-buttons">
+            <ClickAwayListener onClickAway={handleTooltipClose}>
+              <Tooltip
+                PopperProps={{ disablePortal: true }}
+                onClose={handleTooltipClose}
+                open={openCopy}
+                disableFocusListener
+                disableHoverListener
+                disableTouchListener
+                title={clipboardValue}
+              >
+                <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
+                  Start Task
+                </Button>
+              </Tooltip>
+            </ClickAwayListener>
+            {isShow.CT ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/completeTasks')}
+                disabled={!selection.length}
+              >
+                Complete Task
               </Button>
-            </Tooltip>
-          </ClickAwayListener>
-          {isShow.CT ? (
-            <Button
-              className="tasking-summary__button"
-              onClick={() => processTask('/completeTasks')}
-              disabled={!selection.length}
-            >
-              Complete Task
+            ) : null}
+            {isShow.VF ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/verifyFail')}
+                disabled={!selection.length}
+              >
+                Verify Fail
+              </Button>
+            ) : null}
+            {isShow.VP ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/verifyPass')}
+                disabled={!selection.length}
+              >
+                Verify Pass
+              </Button>
+            ) : null}
+            {isShow.CI ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processImage('/completeImages')}
+                disabled={!selection.length}
+              >
+                Complete Image
+              </Button>
+            ) : null}
+            <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
+              Apply Change
             </Button>
-          ) : null}
-          {isShow.VF ? (
-            <Button className="tasking-summary__button" onClick={() => processTask('/verifyFail')} disabled={!selection.length}>
-              Verify Fail
-            </Button>
-          ) : null}
-          {isShow.VP ? (
-            <Button className="tasking-summary__button" onClick={() => processTask('/verifyPass')} disabled={!selection.length}>
-              Verify Pass
-            </Button>
-          ) : null}
-          {isShow.CI ? (
-            <Button className="tasking-summary__button" onClick={() => processImage('/completeImages')} disabled={!selection.length}>
-              Complete Image
-            </Button>
-          ) : null}
-          <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
-            Apply Change
-          </Button>
-        </div>}
+          </div>
+        </div>
 
 
 
@@ -962,16 +987,29 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             minWidth: 200,
             flex: 1.3,
             hideDescendantCount: true,
+            valueGetter: (_value, row) => {
+              const nameFromGroup =
+                row?.groupName && Array.isArray(row.groupName) ? row.groupName[row.groupName.length - 1] : null
+              return nameFromGroup || row?.areaName || row?.id?.toString() || 'unknown'
+            },
           }}
           checkboxSelection
           disableRowSelectionOnClick
-          onRowSelectionModelChange={(ids) =>{
-            //TODO: NEED TO FIX THIS
-            if(ids!=undefined && ids!=null) {
-                setSelection(ids)
+          onRowSelectionModelChange={(model) => {
+            if (Array.isArray(model)) {
+              setSelection(model)
+              return
             }
-              }
+            if (model?.ids instanceof Set) {
+              setSelection(Array.from(model.ids))
+              return
             }
+            if (model instanceof Set) {
+              setSelection(Array.from(model))
+              return
+            }
+            setSelection([])
+          }}
           rowHeight={70}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
@@ -984,6 +1022,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             height: '100%',
             border: 'none',
             color: 'var(--text)',
+            backgroundColor: 'var(--table-bg)',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
             },
@@ -1012,7 +1051,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               textAlign: 'center',
             },
             '& .MuiDataGrid-cell .MuiOutlinedInput-notchedOutline': {
-              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderColor: 'var(--border-strong)',
             },
             '& .MuiDataGrid-cell .MuiAutocomplete-root, & .MuiDataGrid-cell .MuiTextField-root': {
               marginTop: 0,
@@ -1040,6 +1079,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             },
             '& .MuiDataGrid-virtualScroller': {
               overflowX: 'hidden',
+              backgroundColor: 'var(--table-bg)',
             },
             '& .MuiDataGrid-overlay': {
               backgroundColor: 'transparent',
@@ -1050,16 +1090,50 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               textTransform: 'uppercase',
               fontSize: '11px',
               letterSpacing: '0.04em',
+              borderBottom: '1px solid var(--border-strong)',
+            },
+            '& .MuiDataGrid-columnHeader': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbarFiller': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbarFiller--header': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
+              color: 'var(--muted)',
+            },
+            '& .MuiDataGrid-columnHeaderTitle': {
+              color: 'var(--muted)',
+            },
+            '& .MuiDataGrid-row': {
+              backgroundColor: 'var(--table-bg)',
+            },
+            '& .MuiDataGrid-row:nth-of-type(even)': {
+              backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
             },
             '& .MuiDataGrid-footerContainer': {
               borderTop: '1px solid var(--border-strong)',
+              color: 'var(--muted)',
+              backgroundColor: 'var(--panel)',
             },
             '& .MuiDataGrid-toolbarContainer': {
               padding: '10px 12px',
               borderBottom: '1px solid var(--border-strong)',
+              color: 'var(--text)',
+            },
+            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root.Mui-checked': {
+              color: 'var(--accent)',
             },
           }}
         />

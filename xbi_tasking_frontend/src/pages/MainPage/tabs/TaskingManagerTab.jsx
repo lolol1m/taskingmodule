@@ -1,0 +1,870 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Autocomplete, Button, IconButton, TextField, Tooltip } from '@mui/material'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
+import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import dayjs from 'dayjs'
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+
+const redirectToLogin = () => {
+  window.location.href = `${BACKEND_URL}/auth/login`
+}
+
+const fetchWithAuth = async (url, options = {}) => {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    redirectToLogin()
+    throw new Error('Not authenticated')
+  }
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+    Authorization: `Bearer ${token}`,
+  }
+  const response = await fetch(url, { ...options, headers })
+  if (response.status !== 401) {
+    return response
+  }
+
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) {
+    redirectToLogin()
+    throw new Error('Refresh token missing')
+  }
+
+  const refreshResponse = await fetch(`${BACKEND_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
+  if (!refreshResponse.ok) {
+    redirectToLogin()
+    throw new Error('Refresh failed')
+  }
+  const refreshed = await refreshResponse.json()
+  const refreshedToken = refreshed?.access_token
+  if (!refreshedToken) {
+    redirectToLogin()
+    throw new Error('Refresh failed')
+  }
+  localStorage.setItem('access_token', refreshedToken)
+
+  const retryHeaders = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+    Authorization: `Bearer ${refreshedToken}`,
+  }
+  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
+  if (retryResponse.status === 401) {
+    redirectToLogin()
+  }
+  return retryResponse
+}
+
+const readUserRole = () => {
+  try {
+    const rawUser = localStorage.getItem('user')
+    if (!rawUser) return null
+    const user = JSON.parse(rawUser)
+    const roles = Array.isArray(user?.roles) ? user.roles : []
+    if (roles.includes('IA')) return 'IA'
+    if (roles.includes('Senior II')) return 'Senior II'
+    if (roles.includes('II')) return 'II'
+    return roles[0] || null
+  } catch (error) {
+    console.warn('Unable to read user role', error)
+    return null
+  }
+}
+
+const normalizeImageName = (value) => {
+  if (!value || typeof value !== 'string') return value
+  return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
+}
+
+const toISOLocal = (date) => {
+  if (!date) return null
+  const d = new Date(date)
+  const pad = (value) => String(value).padStart(2, '0')
+  const ms = String(d.getMilliseconds()).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes(),
+  )}:${pad(d.getSeconds())}.${ms}Z`
+}
+
+function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
+  const [rows, setRows] = useState([])
+  const [assignees, setAssignees] = useState([{ id: 'Multiple', name: 'Multiple' }])
+  const [selectionModel, setSelectionModel] = useState(() => ({ type: 'include', ids: new Set() }))
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [actionsEnabled, setActionsEnabled] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [areaOptions, setAreaOptions] = useState([])
+  const [formInput, setFormInput] = useState({
+    imageFileName: '',
+    sensorName: '',
+    uploadDate: null,
+    imageDateTime: null,
+    areas: [],
+  })
+
+  const resetForm = () => {
+    setFormInput({
+      imageFileName: '',
+      sensorName: '',
+      uploadDate: null,
+      imageDateTime: null,
+      areas: [],
+    })
+  }
+
+  const formatData = (inputData) => {
+    if (!inputData) return []
+
+    const entries = Array.isArray(inputData)
+      ? inputData.map((entry, index) => {
+          const key =
+            entry?.id ||
+            entry?.ID ||
+            entry?.['SCVU Image ID'] ||
+            entry?.['SCVU Image Area ID'] ||
+            entry?.['Image ID'] ||
+            index
+          return { key, entry }
+        })
+      : Object.keys(inputData).map((key) => ({ key, entry: inputData[key] }))
+
+    const entryMap = new Map(entries.map(({ key, entry }) => [String(key), entry]))
+
+    const readValue = (entry, keys) => {
+      if (!entry) return null
+      const lowerMap = Object.entries(entry).reduce((acc, [key, value]) => {
+        acc[key.toLowerCase()] = value
+        return acc
+      }, {})
+      for (const key of keys) {
+        if (entry[key] !== undefined && entry[key] !== null) return entry[key]
+        const lowerKey = key.toLowerCase()
+        if (lowerMap[lowerKey] !== undefined && lowerMap[lowerKey] !== null) return lowerMap[lowerKey]
+      }
+      return null
+    }
+
+    const formatted = entries
+      .map(({ key, entry }) => {
+        if (!entry) return null
+
+        const parentIdValue = readValue(entry, ['Parent ID', 'ParentID', 'parent_id'])
+        const areaNameValue = readValue(entry, ['Area Name', 'Area', 'Area_Name'])
+        const imageFileNameValue = normalizeImageName(
+          readValue(entry, [
+          'Image File Name',
+          'Image Filename',
+          'Image Name',
+          'Image ID',
+          'Image',
+          ]),
+        )
+
+        if (parentIdValue !== null && parentIdValue !== undefined && areaNameValue) {
+          const parentId = Number.isNaN(Number(parentIdValue)) ? parentIdValue : Number(parentIdValue)
+          const parent = entryMap.get(String(parentId)) || entryMap.get(String(parentIdValue))
+          const parentName = normalizeImageName(
+            readValue(parent, ['Image File Name', 'Image Filename', 'Image Name', 'Image ID', 'Sensor Name']) ||
+              `Image_${parentId}`,
+          )
+          const areaName = areaNameValue || `Area_${key}`
+          const areaId = Number.isNaN(Number(key)) ? key : Number(key)
+          return {
+            id: areaId,
+            groupName: [parentName, areaName],
+            treePath: [`img_${parentId}`, areaName],
+            assignee: readValue(entry, ['Assignee']) || null,
+            areaName,
+            parentId,
+            scvuImageAreaId: readValue(entry, ['SCVU Image Area ID', 'SCVU Image Area ID']) || null,
+            imageName: null,
+            imageDatetime: null,
+            sensorName: null,
+            uploadDate: null,
+            priority: null,
+            ttg: null,
+          }
+        }
+
+        const imageFileName = imageFileNameValue || `Image_${key}`
+        const imageId = Number.isNaN(Number(key)) ? key : Number(key)
+        return {
+          id: imageId,
+          groupName: [imageFileName],
+          treePath: [`img_${imageId}`],
+          assignee: readValue(entry, ['Assignee']),
+          sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
+          imageName: imageFileName,
+          uploadDate: readValue(entry, ['Upload Date', 'UploadDate']) || null,
+          imageDatetime: readValue(entry, ['Image Datetime', 'Image Date Time', 'Image DateTime']) || null,
+          priority: readValue(entry, ['Priority', 'priority', 'Priority Level']) || null,
+          ttg: readValue(entry, ['TTG']) ?? null,
+        }
+      })
+      .filter(Boolean)
+
+    formatted.sort((a, b) => {
+      if (a.groupName.length === 1 && b.groupName.length === 1) {
+        return a.groupName[0].localeCompare(b.groupName[0])
+      }
+      if (a.groupName.length === 1) return -1
+      if (b.groupName.length === 1) return 1
+      if (a.groupName[0] !== b.groupName[0]) {
+        return a.groupName[0].localeCompare(b.groupName[0])
+      }
+      return a.groupName[1].localeCompare(b.groupName[1])
+    })
+
+    return formatted
+  }
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/getUsers`)
+      const data = await response.json()
+      if (data?.Warning) {
+        alert(data.Warning)
+      }
+      if (Array.isArray(data?.Users) && data.Users.length) {
+        setAssignees([{ id: 'Multiple', name: 'Multiple' }, ...data.Users])
+      } else {
+        setAssignees([{ id: 'Multiple', name: 'Multiple' }])
+      }
+    } catch (err) {
+      console.warn('Failed to load users', err)
+    }
+  }
+
+  const fetchTaskingManager = async () => {
+    if (!dateRange) return
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetchWithAuth(`${BACKEND_URL}/getTaskingManagerData`, {
+        method: 'POST',
+        body: JSON.stringify(dateRange),
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch (${response.status})`)
+      }
+      const data = await response.json()
+      if (!fetchTaskingManager.hasLogged) {
+        console.log('[TaskingManager] Raw response sample:', data)
+        fetchTaskingManager.hasLogged = true
+      }
+      setRows(formatData(data))
+    } catch (err) {
+      console.error('Tasking Manager fetch failed:', err)
+      setError('Unable to load tasking manager data.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchAreas = async () => {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/getAreas`)
+      const data = await response.json()
+      const areas = Array.isArray(data?.Areas) ? data.Areas : []
+      const names = Array.from(new Set(areas.map((area) => area?.['Area Name']).filter(Boolean)))
+      setAreaOptions(names)
+    } catch (err) {
+      console.warn('Unable to load areas', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  useEffect(() => {
+    fetchTaskingManager()
+  }, [refreshKey, dateRange])
+
+  useEffect(() => {
+    if (modalOpen) {
+      fetchAreas()
+    }
+  }, [modalOpen])
+
+  const getValueOption = (value) => {
+    if (!value) return null
+    if (typeof value === 'object' && value.id) return value
+    const found = assignees.find((opt) => opt?.id === value || opt === value)
+    return found || null
+  }
+
+  const updateRows = (rowId, updater) => {
+    setRows((prev) => prev.map((row) => (row.id === rowId ? updater(row) : row)))
+  }
+
+  const normalizeSelection = (model) => {
+    if (model?.ids instanceof Set) return model
+    if (Array.isArray(model)) return { type: 'include', ids: new Set(model) }
+    return { type: 'include', ids: new Set() }
+  }
+
+  const hasEmptyAssignee = useMemo(() => {
+    if (!selectionModel.ids.size) return false
+    return rows.some((row) => {
+      if (!selectionModel.ids.has(row.id)) return false
+      const value = row.assignee
+      return value === null || value === undefined || value === ''
+    })
+  }, [rows, selectionModel])
+
+  const renderAssignee = (params) => {
+    let imgAssignee = ''
+    const rowNode = params.rowNode || { parent: null, children: [] }
+    if (rowNode.parent === null && rowNode.children?.length) {
+      const firstChildId = rowNode.children[0]
+      const firstChild = rows.find((row) => row.id === firstChildId)
+      const allMatch = rowNode.children.every((childId) => {
+        const child = rows.find((row) => row.id === childId)
+        return child?.assignee === firstChild?.assignee
+      })
+      imgAssignee = allMatch ? firstChild?.assignee : 'Multiple'
+    }
+
+    const sharedProps = {
+      disablePortal: true,
+      options: assignees || [],
+      getOptionLabel: (option) => {
+        if (typeof option === 'string') return option
+        return option?.name || option?.id || ''
+      },
+      isOptionEqualToValue: (option, value) => {
+        const optionId = typeof option === 'string' ? option : option?.id
+        const valueId = typeof value === 'string' ? value : value?.id
+        return optionId === valueId
+      },
+      getOptionDisabled: (option) => {
+        const optionId = typeof option === 'string' ? option : option?.id
+        return optionId === 'Multiple'
+      },
+      renderInput: (inputParams) => <TextField {...inputParams} placeholder="Assignee" size="small" />,
+      size: 'small',
+      fullWidth: true,
+    }
+
+    const handleChange = (newValue) => {
+      let assigneeValue = newValue
+      if (assigneeValue == null) {
+        assigneeValue = ''
+      } else if (typeof assigneeValue === 'object' && assigneeValue.id) {
+        assigneeValue = assigneeValue.id
+      }
+      updateRows(params.id, (row) => ({ ...row, assignee: assigneeValue }))
+    }
+
+    const isImageRow = params?.row?.groupName?.length === 1
+    if (isImageRow) {
+      return (
+        <Autocomplete
+          {...sharedProps}
+          value={getValueOption(imgAssignee || params.value)}
+          onChange={(_, newValue) => {
+            let assigneeValue = newValue
+            if (assigneeValue == null) {
+              assigneeValue = ''
+            } else if (typeof assigneeValue === 'object' && assigneeValue.id) {
+              assigneeValue = assigneeValue.id
+            }
+            setRows((prev) =>
+              prev.map((row) => {
+                if (row.id === params.id || row.parentId === params.id) {
+                  return { ...row, assignee: assigneeValue }
+                }
+                return row
+              }),
+            )
+          }}
+        />
+      )
+    }
+
+    return (
+      <Autocomplete
+        {...sharedProps}
+        value={getValueOption(params.value)}
+        onChange={(_, newValue) => {
+          handleChange(newValue)
+          const parentId = params?.row?.parentId
+          if (parentId === undefined || parentId === null) return
+          setRows((prev) => {
+            const next = prev.map((row) => {
+              if (row.id === params.id) {
+                return { ...row, assignee: newValue && newValue.id ? newValue.id : newValue || '' }
+              }
+              return row
+            })
+            const children = next.filter((row) => row.parentId === parentId)
+            if (!children.length) return next
+            const first = children[0]?.assignee
+            const allSame = children.every((row) => row.assignee === first)
+            return next.map((row) => {
+              if (row.id === parentId) {
+                return { ...row, assignee: allSame ? first : 'Multiple' }
+              }
+              return row
+            })
+          })
+        }}
+      />
+    )
+  }
+
+  const renderPriority = (params) => {
+    const options = ['Low', 'Medium', 'High']
+    const isImageRow = params?.row?.groupName?.length === 1
+    if (!isImageRow) return ''
+    return (
+      <Autocomplete
+        disablePortal
+        options={options}
+        value={params.row.priority || null}
+        onChange={(_, newValue) => updateRows(params.row.id, (row) => ({ ...row, priority: newValue }))}
+        renderInput={(inputParams) => <TextField {...inputParams} placeholder="Priority" size="small" />}
+        size="small"
+        fullWidth
+      />
+    )
+  }
+
+  const renderTTG = (params) => {
+    const isImageRow = params?.row?.groupName?.length === 1
+    if (!isImageRow) return null
+    const isEnabled = actionsEnabled
+    return (
+      <Tooltip title={isEnabled ? '' : 'Enable actions to delete'}>
+        <span className="tasking-manager__ttg">
+          <Button
+            className="tasking-manager__button tasking-manager__button--danger"
+            size="small"
+            variant={isEnabled ? 'outlined' : 'text'}
+            disabled={!isEnabled}
+            startIcon={isEnabled ? <DeleteOutlineIcon fontSize="small" /> : <LockOutlinedIcon fontSize="small" />}
+            onClick={() => {
+              if (!isEnabled) return
+              fetchWithAuth(`${BACKEND_URL}/deleteImage`, {
+                method: 'POST',
+                body: JSON.stringify({ 'SCVU Image ID': params.id }),
+              }).then(() => setRefreshKey((prev) => prev + 1))
+            }}
+          >
+            Delete TTG
+          </Button>
+        </span>
+      </Tooltip>
+    )
+  }
+
+  const assignTasks = () => {
+    const output = { Tasks: [] }
+    const selectedRows = rows.filter((row) => selectionModel.ids.has(row.id))
+    const tasksToAssign = []
+    selectedRows.forEach((row) => {
+      if (row.parentId) {
+        tasksToAssign.push(row)
+      } else {
+        const childAreas = rows.filter((child) => child.parentId === row.id)
+        tasksToAssign.push(...childAreas)
+      }
+    })
+    tasksToAssign.forEach((task) => {
+      const areaId = task.scvuImageAreaId || task.id
+      let assigneeId = task.assignee
+      if (typeof assigneeId === 'object' && assigneeId?.id) {
+        assigneeId = assigneeId.id
+      }
+      if (areaId && assigneeId && assigneeId !== 'Multiple') {
+        output.Tasks.push({ 'SCVU Image Area ID': areaId, Assignee: assigneeId })
+      }
+    })
+    return output
+  }
+
+  const updateTaskingManager = () => {
+    const output = {}
+    rows
+      .filter((row) => selectionModel.ids.has(row.id))
+      .filter((row) => row.groupName?.length === 1)
+      .forEach((row) => {
+        output[row.id] = { Priority: row.priority }
+      })
+    return output
+  }
+
+  const postData = async () => {
+    const tasksPayload = assignTasks()
+    const prioritiesPayload = updateTaskingManager()
+    const hasTasks = tasksPayload.Tasks.length > 0
+    const hasPriority = Object.keys(prioritiesPayload).length > 0
+
+    if (!hasTasks && !hasPriority) {
+      alert('No tasks to assign or priorities to update.')
+      return
+    }
+
+    try {
+      if (hasTasks) {
+        await fetchWithAuth(`${BACKEND_URL}/assignTask`, {
+          method: 'POST',
+          body: JSON.stringify(tasksPayload),
+        })
+        localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
+      }
+
+      if (hasPriority) {
+        await fetchWithAuth(`${BACKEND_URL}/updateTaskingManagerData`, {
+          method: 'POST',
+          body: JSON.stringify(prioritiesPayload),
+        })
+      }
+
+      alert('Tasking Manager updated successfully.')
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('Tasking Manager update failed', err)
+      alert('Unable to apply changes. Please try again.')
+    }
+  }
+
+  const handleCreateTTG = async () => {
+    const payload = {
+      imageFileName: formInput.imageFileName,
+      sensorName: formInput.sensorName,
+      uploadDate: toISOLocal(formInput.uploadDate),
+      imageDateTime: toISOLocal(formInput.imageDateTime),
+      areas: formInput.areas || [],
+    }
+    await fetchWithAuth(`${BACKEND_URL}/insertTTGData`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    resetForm()
+    setModalOpen(false)
+    setRefreshKey((prev) => prev + 1)
+  }
+
+  const role = readUserRole()
+  if (role === 'II') {
+    return <div className="tasking-manager__notice">You do not have permission to view this tab.</div>
+  }
+
+  const columns = useMemo(
+    () => [
+      { field: 'sensorName', headerName: 'Sensor Name', minWidth: 140, flex: 0.7 },
+      { field: 'imageDatetime', headerName: 'Image Datetime', minWidth: 170, flex: 0.9 },
+      {
+        field: 'priority',
+        headerName: 'Priority',
+        minWidth: 130,
+        flex: 0.7,
+        renderCell: renderPriority,
+      },
+      {
+        field: 'assignee',
+        headerName: 'Assignee',
+        minWidth: 170,
+        flex: 0.9,
+        renderCell: renderAssignee,
+      },
+      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 170, flex: 0.9 },
+      {
+        field: 'ttg',
+        headerName: 'Action',
+        minWidth: 140,
+        flex: 0.7,
+        renderCell: renderTTG,
+      },
+    ],
+    [rows, assignees, actionsEnabled],
+  )
+
+  const getTreeDataPath = (row) => {
+    if (row.treePath && Array.isArray(row.treePath)) {
+      return row.treePath.filter((item) => item != null).map((item) => item?.toString() || '')
+    }
+    if (row.groupName && Array.isArray(row.groupName)) {
+      const path = row.groupName.filter((item) => item != null).map((item) => item?.toString() || '')
+      if (path.length === 1 && row.id !== undefined && row.id !== null) {
+        return [`img_${row.id}`]
+      }
+      return path
+    }
+    return [row.id?.toString() || 'unknown']
+  }
+
+  const groupingColDef = {
+    headerName: 'Image/Area Name',
+    minWidth: 200,
+    flex: 1.3,
+    hideDescendantCount: true,
+    valueGetter: (_value, row) => {
+      const nameFromGroup =
+        row?.groupName && Array.isArray(row.groupName) ? row.groupName[row.groupName.length - 1] : null
+      return nameFromGroup || row?.areaName || row?.imageName || row?.id?.toString() || 'unknown'
+    },
+  }
+
+  return (
+    <div className="tasking-manager">
+      <div className="content__topbar">
+        <div className="content__heading">
+          <div className="content__title">Tasking Manager</div>
+          <div className="content__subtitle">Manage tasking priorities, assignees, and TTGs.</div>
+        </div>
+      </div>
+      <div className="tasking-manager__actions">
+        <div className="tasking-manager__actions-left">
+          <Button className="tasking-manager__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
+            Refresh
+          </Button>
+          <Button className="tasking-manager__button" onClick={onOpenDatePicker}>
+            Change Display Date
+          </Button>
+          <Button className="tasking-manager__button" onClick={() => setModalOpen(true)}>
+            Create TTG
+          </Button>
+          <Button
+            className="tasking-manager__button"
+            onClick={postData}
+            disabled={!selectionModel.ids.size || hasEmptyAssignee}
+          >
+            Apply Change
+          </Button>
+        </div>
+        <div className="tasking-manager__actions-right">
+          <Button className="tasking-manager__button" onClick={() => setActionsEnabled((prev) => !prev)}>
+            {actionsEnabled ? 'Disable Actions' : 'Enable Actions'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="tasking-manager__grid">
+        <DataGridPro
+          treeData
+          rows={rows}
+          columns={columns}
+          getTreeDataPath={getTreeDataPath}
+          groupingColDef={groupingColDef}
+          checkboxSelection
+          disableRowSelectionOnClick
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(model) => setSelectionModel(normalizeSelection(model))}
+          checkboxSelectionVisibleOnly={false}
+          rowHeight={64}
+          loading={loading}
+          slots={{ toolbar: GridToolbar }}
+          sx={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            color: 'var(--text)',
+            backgroundColor: 'var(--table-bg)',
+            '& .MuiDataGrid-columnHeaderTitle': {
+              paddingLeft: 0,
+            },
+            '& .MuiDataGrid-cell': {
+              display: 'flex',
+              alignItems: 'center',
+              borderColor: 'var(--border-strong)',
+              paddingTop: 4,
+              paddingBottom: 4,
+            },
+            '& .MuiDataGrid-cellContent': {
+              width: '100%',
+            },
+            '& .MuiDataGrid-cell .MuiAutocomplete-root': {
+              width: '100%',
+              alignSelf: 'center',
+            },
+            '& .MuiDataGrid-cell .MuiInputBase-root': {
+              height: 30,
+              minHeight: 30,
+              fontSize: 12,
+              color: 'var(--text)',
+            },
+            '& .MuiDataGrid-cell .MuiInputBase-input': {
+              paddingTop: 0,
+              paddingBottom: 0,
+              textAlign: 'center',
+              color: 'var(--text)',
+            },
+            '& .MuiDataGrid-cell .MuiOutlinedInput-notchedOutline': {
+              borderColor: 'var(--border-strong)',
+            },
+            '& .MuiDataGrid-cell .MuiAutocomplete-root, & .MuiDataGrid-cell .MuiTextField-root': {
+              marginTop: 0,
+              marginBottom: 0,
+            },
+            '& .MuiDataGrid-columnHeader[data-field="__tree_data_group__"] .MuiDataGrid-columnHeaderTitle': {
+              paddingLeft: 0,
+            },
+            '& .MuiDataGrid-cell[data-field="__tree_data_group__"]': {
+              paddingLeft: 0,
+            },
+            '& .MuiDataGrid-cellCheckbox': {
+              justifyContent: 'center',
+              paddingLeft: 0,
+            },
+            '& .MuiDataGrid-virtualScroller': {
+              overflowX: 'hidden',
+              backgroundColor: 'var(--table-bg)',
+            },
+            '& .MuiDataGrid-columnHeaders': {
+              backgroundColor: 'var(--row-bg)',
+              color: 'var(--muted)',
+              textTransform: 'uppercase',
+              fontSize: '11px',
+              letterSpacing: '0.04em',
+              borderBottom: '1px solid var(--border-strong)',
+            },
+            '& .MuiDataGrid-columnHeader': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbarFiller': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbarFiller--header': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-filler': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-filler--header': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar--vertical': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar--horizontal': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar .MuiDataGrid-scrollbarContent': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-row': {
+              backgroundColor: 'var(--table-bg)',
+            },
+            '& .MuiDataGrid-row:nth-of-type(even)': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: 'var(--hover)',
+            },
+            '& .MuiDataGrid-footerContainer': {
+              borderTop: '1px solid var(--border-strong)',
+              color: 'var(--muted)',
+              backgroundColor: 'var(--panel)',
+            },
+            '& .MuiDataGrid-toolbarContainer': {
+              padding: '10px 12px',
+              borderBottom: '1px solid var(--border-strong)',
+              color: 'var(--text)',
+            },
+            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root.Mui-checked': {
+              color: 'var(--accent)',
+            },
+          }}
+        />
+        {error && <div className="tasking-manager__error">{error}</div>}
+      </div>
+
+      <div className={`tasking-manager__modal ${modalOpen ? 'is-open' : ''}`}>
+        <div className="tasking-manager__modal-backdrop" onClick={() => setModalOpen(false)} />
+        <div className="tasking-manager__modal-content">
+          <div className="tasking-manager__modal-header">
+            <div className="tasking-manager__modal-title">Create TTG</div>
+            <IconButton onClick={() => setModalOpen(false)} size="small">
+              X
+            </IconButton>
+          </div>
+          <div className="tasking-manager__modal-body">
+            <TextField
+              label="Sensor Name"
+              value={formInput.sensorName}
+              onChange={(event) => setFormInput((prev) => ({ ...prev, sensorName: event.target.value }))}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="Image File Name"
+              value={formInput.imageFileName}
+              onChange={(event) => setFormInput((prev) => ({ ...prev, imageFileName: event.target.value }))}
+              fullWidth
+              size="small"
+            />
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DateTimePicker
+                label="Upload Date"
+                value={formInput.uploadDate ? dayjs(formInput.uploadDate) : null}
+                onChange={(value) =>
+                  setFormInput((prev) => ({ ...prev, uploadDate: value ? value.toDate() : null }))
+                }
+                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              />
+              <DateTimePicker
+                label="Image Datetime"
+                value={formInput.imageDateTime ? dayjs(formInput.imageDateTime) : null}
+                onChange={(value) =>
+                  setFormInput((prev) => ({ ...prev, imageDateTime: value ? value.toDate() : null }))
+                }
+                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              />
+            </LocalizationProvider>
+            <Autocomplete
+              multiple
+              freeSolo
+              options={areaOptions}
+              value={formInput.areas}
+              onChange={(_, newValue) => setFormInput((prev) => ({ ...prev, areas: newValue }))}
+              renderInput={(inputParams) => <TextField {...inputParams} label="Areas" size="small" fullWidth />}
+            />
+          </div>
+          <div className="tasking-manager__modal-actions">
+            <Button className="tasking-manager__button" onClick={() => setModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="tasking-manager__button tasking-manager__button--primary"
+              disabled={
+                !formInput.sensorName ||
+                !formInput.imageFileName ||
+                !formInput.uploadDate ||
+                !formInput.imageDateTime
+              }
+              onClick={handleCreateTTG}
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default TaskingManagerTab

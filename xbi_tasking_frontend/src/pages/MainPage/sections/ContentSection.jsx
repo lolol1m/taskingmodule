@@ -1,8 +1,10 @@
 import TaskingSummaryTab from '../tabs/TaskingSummaryTab.jsx'
+import TaskingManagerTab from '../tabs/TaskingManagerTab.jsx'
 import TabPlaceholder from '../tabs/TabPlaceholder.jsx'
 
 const tabMap = {
   summary: TaskingSummaryTab,
+  manager: TaskingManagerTab,
 }
 
 function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed }) {

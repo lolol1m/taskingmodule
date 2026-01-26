@@ -21,6 +21,18 @@
   align-items: center;
 }
 
+.tasking-summary__actions-left {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.tasking-summary__action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .tasking-summary__segmented {
   display: inline-flex;
   background: var(--panel);
@@ -93,6 +105,49 @@
   min-height: 360px;
   max-height: 660px;
   transition: max-width 700ms ease;
+  scrollbar-color: var(--border-strong) var(--row-bg);
+  scrollbar-width: thin;
+}
+
+.tasking-summary__grid::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.tasking-summary__grid::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.tasking-summary__grid::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.tasking-summary__grid::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.tasking-summary__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.tasking-summary__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.tasking-summary__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.tasking-summary__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.tasking-summary__grid .MuiDataGrid-scrollbarFiller,
+.tasking-summary__grid .MuiDataGrid-scrollbarFiller--header {
+  background: var(--row-bg) !important;
 }
 
 .tasking-summary__grid .MuiDataGrid-root {
