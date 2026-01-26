@@ -888,7 +888,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       </div>
 
       <div className="tasking-summary__actions">
-        <div className="tasking-summary__actions-left">
+              {!selection.length ? <div className="tasking-summary__actions-left"><span class="content__subtitle">0 items selected</span></div>:        <div className="tasking-summary__actions-left">
           <ClickAwayListener onClickAway={handleTooltipClose}>
             <Tooltip
               PopperProps={{ disablePortal: true }}
@@ -931,7 +931,15 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
             Apply Change
           </Button>
-        </div>
+        </div>}
+
+
+
+
+
+
+
+
         <div className="tasking-summary__actions-right">
           <div className="tasking-summary__segmented" role="group" aria-label="Column view toggle">
             <button
@@ -966,7 +974,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           }}
           checkboxSelection
           disableRowSelectionOnClick
-          onRowSelectionModelChange={(ids) => setSelection(ids)}
+          onRowSelectionModelChange={(ids) =>{
+            //TODO: NEED TO FIX THIS
+            if(ids!=undefined && ids!=null) {
+                setSelection(ids)
+            }
+              }
+            }
           rowHeight={70}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
