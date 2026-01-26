@@ -237,10 +237,19 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       borderRadius: 6,
       backgroundColor,
       marginTop: '20px',
+      color: 'var(--text)',
+    },
+    '& .MuiInputBase-input::placeholder': {
+      color: 'var(--muted)',
+      opacity: 1,
     },
     '& .MuiOutlinedInput-input': {
       padding: '0 10px',
       textAlign: 'center',
+      color: 'var(--text)',
+    },
+    '& .MuiAutocomplete-input': {
+      color: 'var(--text)',
     },
     '& .MuiAutocomplete-endAdornment': {
       right: 6,
@@ -970,6 +979,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             height: '100%',
             border: 'none',
             color: 'var(--text)',
+            backgroundColor: 'var(--table-bg)',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
             },
@@ -998,7 +1008,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               textAlign: 'center',
             },
             '& .MuiDataGrid-cell .MuiOutlinedInput-notchedOutline': {
-              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderColor: 'var(--border-strong)',
             },
             '& .MuiDataGrid-cell .MuiAutocomplete-root, & .MuiDataGrid-cell .MuiTextField-root': {
               marginTop: 0,
@@ -1026,6 +1036,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             },
             '& .MuiDataGrid-virtualScroller': {
               overflowX: 'hidden',
+              backgroundColor: 'var(--table-bg)',
             },
             '& .MuiDataGrid-overlay': {
               backgroundColor: 'transparent',
@@ -1036,16 +1047,50 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               textTransform: 'uppercase',
               fontSize: '11px',
               letterSpacing: '0.04em',
+              borderBottom: '1px solid var(--border-strong)',
+            },
+            '& .MuiDataGrid-columnHeader': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbarFiller': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbarFiller--header': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
+              color: 'var(--muted)',
+            },
+            '& .MuiDataGrid-columnHeaderTitle': {
+              color: 'var(--muted)',
+            },
+            '& .MuiDataGrid-row': {
+              backgroundColor: 'var(--table-bg)',
+            },
+            '& .MuiDataGrid-row:nth-of-type(even)': {
+              backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
             },
             '& .MuiDataGrid-footerContainer': {
               borderTop: '1px solid var(--border-strong)',
+              color: 'var(--muted)',
+              backgroundColor: 'var(--panel)',
             },
             '& .MuiDataGrid-toolbarContainer': {
               padding: '10px 12px',
               borderBottom: '1px solid var(--border-strong)',
+              color: 'var(--text)',
+            },
+            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root.Mui-checked': {
+              color: 'var(--accent)',
             },
           }}
         />
