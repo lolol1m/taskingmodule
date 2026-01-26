@@ -888,50 +888,64 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       </div>
 
       <div className="tasking-summary__actions">
-              {!selection.length ? <div className="tasking-summary__actions-left"><span class="content__subtitle">0 items selected</span></div>:        <div className="tasking-summary__actions-left">
-          <ClickAwayListener onClickAway={handleTooltipClose}>
-            <Tooltip
-              PopperProps={{ disablePortal: true }}
-              onClose={handleTooltipClose}
-              open={openCopy}
-              disableFocusListener
-              disableHoverListener
-              disableTouchListener
-              title={clipboardValue}
-            >
-              <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
-                Start Task
+        <div className="tasking-summary__actions-left">
+          <div className="tasking-summary__action-buttons">
+            <ClickAwayListener onClickAway={handleTooltipClose}>
+              <Tooltip
+                PopperProps={{ disablePortal: true }}
+                onClose={handleTooltipClose}
+                open={openCopy}
+                disableFocusListener
+                disableHoverListener
+                disableTouchListener
+                title={clipboardValue}
+              >
+                <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
+                  Start Task
+                </Button>
+              </Tooltip>
+            </ClickAwayListener>
+            {isShow.CT ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/completeTasks')}
+                disabled={!selection.length}
+              >
+                Complete Task
               </Button>
-            </Tooltip>
-          </ClickAwayListener>
-          {isShow.CT ? (
-            <Button
-              className="tasking-summary__button"
-              onClick={() => processTask('/completeTasks')}
-              disabled={!selection.length}
-            >
-              Complete Task
+            ) : null}
+            {isShow.VF ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/verifyFail')}
+                disabled={!selection.length}
+              >
+                Verify Fail
+              </Button>
+            ) : null}
+            {isShow.VP ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/verifyPass')}
+                disabled={!selection.length}
+              >
+                Verify Pass
+              </Button>
+            ) : null}
+            {isShow.CI ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processImage('/completeImages')}
+                disabled={!selection.length}
+              >
+                Complete Image
+              </Button>
+            ) : null}
+            <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
+              Apply Change
             </Button>
-          ) : null}
-          {isShow.VF ? (
-            <Button className="tasking-summary__button" onClick={() => processTask('/verifyFail')} disabled={!selection.length}>
-              Verify Fail
-            </Button>
-          ) : null}
-          {isShow.VP ? (
-            <Button className="tasking-summary__button" onClick={() => processTask('/verifyPass')} disabled={!selection.length}>
-              Verify Pass
-            </Button>
-          ) : null}
-          {isShow.CI ? (
-            <Button className="tasking-summary__button" onClick={() => processImage('/completeImages')} disabled={!selection.length}>
-              Complete Image
-            </Button>
-          ) : null}
-          <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
-            Apply Change
-          </Button>
-        </div>}
+          </div>
+        </div>
 
 
 
@@ -974,13 +988,21 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           }}
           checkboxSelection
           disableRowSelectionOnClick
-          onRowSelectionModelChange={(ids) =>{
-            //TODO: NEED TO FIX THIS
-            if(ids!=undefined && ids!=null) {
-                setSelection(ids)
+          onRowSelectionModelChange={(model) => {
+            if (Array.isArray(model)) {
+              setSelection(model)
+              return
             }
-              }
+            if (model?.ids instanceof Set) {
+              setSelection(Array.from(model.ids))
+              return
             }
+            if (model instanceof Set) {
+              setSelection(Array.from(model))
+              return
+            }
+            setSelection([])
+          }}
           rowHeight={70}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
