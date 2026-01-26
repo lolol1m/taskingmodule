@@ -115,6 +115,11 @@ const updateWorkingRow = (prev, rowId, field, value, baseData = null) => {
   return next
 }
 
+const normalizeImageName = (value) => {
+  if (!value || typeof value !== 'string') return value
+  return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
+}
+
 const buildRows = (inputData) => {
   if (!inputData) return []
 
@@ -124,10 +129,11 @@ const buildRows = (inputData) => {
     if (!entry) return
 
     if (entry['Child ID']) {
-      const imageFileName = entry['Image File Name'] || `Image_${key}`
+      const imageFileName = normalizeImageName(entry['Image File Name'] || `Image_${key}`)
       rows.push({
         id: Number(key),
         groupName: [imageFileName],
+        treePath: [`img_${key}`],
         sensorName: entry['Sensor Name'],
         imageId: entry['Image ID'],
         uploadDate: entry['Upload Date'],
@@ -153,11 +159,12 @@ const buildRows = (inputData) => {
     if (entry['Parent ID'] !== undefined) {
       const parentId = Number(entry['Parent ID'])
       const parent = inputData[parentId] || inputData[entry['Parent ID']]
-      const parentName = parent?.['Image File Name'] || `Image_${parentId}`
+      const parentName = normalizeImageName(parent?.['Image File Name'] || `Image_${parentId}`)
       const areaName = entry['Area Name'] || `Area_${key}`
       rows.push({
         id: Number(key),
         groupName: [parentName, areaName],
+        treePath: [`img_${parentId}`, areaName],
         taskStatus: entry['Task Status'],
         assignee: entry['Assignee'],
         remarks: entry['Remarks'],
@@ -505,18 +512,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   }, [columnVisibilityModel])
 
   const getTreeDataPath = (row) => {
+    if (row.treePath && Array.isArray(row.treePath)) {
+      return row.treePath.filter((item) => item != null).map((item) => item?.toString() || '')
+    }
     if (!row.groupName || !Array.isArray(row.groupName)) {
       return [row.id?.toString() || 'unknown']
     }
-
-    const path = row.groupName.filter((item) => item != null).map((item) => item?.toString() || '')
-    if (path.length === 1 && row.id !== undefined && row.id !== null) {
-      path[0] = `${path[0]}_${row.id}`
-    } else if (path.length === 2 && row.parentId !== undefined && row.parentId !== null) {
-      const parentImagePath = `${path[0]}_${row.parentId}`
-      path[0] = parentImagePath
-    }
-    return path
+    return row.groupName.filter((item) => item != null).map((item) => item?.toString() || '')
   }
 
   const fetchSummary = async () => {
@@ -985,6 +987,11 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             minWidth: 200,
             flex: 1.3,
             hideDescendantCount: true,
+            valueGetter: (_value, row) => {
+              const nameFromGroup =
+                row?.groupName && Array.isArray(row.groupName) ? row.groupName[row.groupName.length - 1] : null
+              return nameFromGroup || row?.areaName || row?.id?.toString() || 'unknown'
+            },
           }}
           checkboxSelection
           disableRowSelectionOnClick

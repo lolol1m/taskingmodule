@@ -95,6 +95,29 @@
   background: var(--row-bg);
 }
 
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-scrollbarFiller,
+.tasking-manager__grid .MuiDataGrid-scrollbarFiller--header {
+  background: var(--row-bg) !important;
+}
+
 .tasking-manager__error {
   padding: 12px 16px;
   color: var(--danger);

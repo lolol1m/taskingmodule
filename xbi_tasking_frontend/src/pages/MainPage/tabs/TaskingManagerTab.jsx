@@ -81,6 +81,11 @@ const readUserRole = () => {
   }
 }
 
+const normalizeImageName = (value) => {
+  if (!value || typeof value !== 'string') return value
+  return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
+}
+
 const toISOLocal = (date) => {
   if (!date) return null
   const d = new Date(date)
@@ -157,20 +162,23 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
         const parentIdValue = readValue(entry, ['Parent ID', 'ParentID', 'parent_id'])
         const areaNameValue = readValue(entry, ['Area Name', 'Area', 'Area_Name'])
-        const imageFileNameValue = readValue(entry, [
+        const imageFileNameValue = normalizeImageName(
+          readValue(entry, [
           'Image File Name',
           'Image Filename',
           'Image Name',
           'Image ID',
           'Image',
-        ])
+          ]),
+        )
 
         if (parentIdValue !== null && parentIdValue !== undefined && areaNameValue) {
           const parentId = Number.isNaN(Number(parentIdValue)) ? parentIdValue : Number(parentIdValue)
           const parent = entryMap.get(String(parentId)) || entryMap.get(String(parentIdValue))
-          const parentName =
+          const parentName = normalizeImageName(
             readValue(parent, ['Image File Name', 'Image Filename', 'Image Name', 'Image ID', 'Sensor Name']) ||
-            `Image_${parentId}`
+              `Image_${parentId}`,
+          )
           const areaName = areaNameValue || `Area_${key}`
           const areaId = Number.isNaN(Number(key)) ? key : Number(key)
           return {
@@ -614,6 +622,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
   return (
     <div className="tasking-manager">
+      <div className="content__topbar">
+        <div className="content__heading">
+          <div className="content__title">Tasking Manager</div>
+          <div className="content__subtitle">Manage tasking priorities, assignees, and TTGs.</div>
+        </div>
+      </div>
       <div className="tasking-manager__actions">
         <div className="tasking-manager__actions-left">
           <Button className="tasking-manager__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
@@ -726,6 +740,24 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
               backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-scrollbarFiller--header': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-filler': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-filler--header': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar--vertical': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar--horizontal': {
+              backgroundColor: 'var(--row-bg)',
+            },
+            '& .MuiDataGrid-scrollbar .MuiDataGrid-scrollbarContent': {
               backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-row': {
