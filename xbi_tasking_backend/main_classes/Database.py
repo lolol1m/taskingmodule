@@ -1,5 +1,6 @@
 import psycopg2
 from psycopg2 import sql
+import time
 
 from main_classes import ConfigClass
 
@@ -336,13 +337,13 @@ class Database():
         self.cursor.execute("INSERT INTO area(scvu_area_id, area_name, v10) VALUES (0, 'OTHERS', false) ON CONFLICT DO NOTHING")
         
         #TODO: legacy, please remove once confirmed not needed
-        self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('II', '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b') ON CONFLICT DO NOTHING")
-        self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('Senior II', 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35') ON CONFLICT DO NOTHING")
-        self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('IA', '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce') ON CONFLICT DO NOTHING")
+        # self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('II', '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b') ON CONFLICT DO NOTHING")
+        # self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('Senior II', 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35') ON CONFLICT DO NOTHING")
+        # self.cursor.execute("INSERT INTO accounts(account, password) VALUES ('IA', '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce') ON CONFLICT DO NOTHING")
         
-        self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('II User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
-        self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('Senior II User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
-        self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('IA User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
+        # self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('II User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
+        # self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('Senior II User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
+        # self.cursor.execute("INSERT INTO users(name, is_recent) VALUES ('IA User', True) ON CONFLICT (name) DO UPDATE SET is_recent = True")
         
         self.closeCursor()
     

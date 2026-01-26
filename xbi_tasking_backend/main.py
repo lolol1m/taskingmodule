@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, File, UploadFile, Depends, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import argparse
+# import argparse
 import uvicorn
 import json
 from fastapi.openapi.docs import (
@@ -18,11 +18,11 @@ import httpx
 from main_classes import MainController, ConfigClass
 import os
 
-parser = argparse.ArgumentParser(description="runs xbi tasking backend server")
-parser.add_argument("config_path", help="file path of the config file to be used")
-args = parser.parse_args()
+# parser = argparse.ArgumentParser(description="runs xbi tasking backend server")
+# parser.add_argument("config_path", help="file path of the config file to be used")
+# args = parser.parse_args()
 
-ConfigClass(args.config_path)
+ConfigClass()
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -212,7 +212,7 @@ async def auth_login(request: Request):
         return {"detail": "Keycloak authentication is disabled"}
     
     config = ConfigClass._instance
-    keycloak_url = config.getKeycloakURL()
+    keycloak_url = config.getKeycloakPublicURL()
     realm = config.getKeycloakRealm()
     client_id = config.getKeycloakClientID()
     
@@ -280,7 +280,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
         return response
     
     config = ConfigClass._instance
-    keycloak_url = config.getKeycloakURL()
+    keycloak_url = config.getKeycloakInternalURL()
     realm = config.getKeycloakRealm()
     client_id = config.getKeycloakClientID()
     client_secret = config.getKeycloakClientSecret()
@@ -443,7 +443,7 @@ async def auth_refresh(request: Request):
         return JSONResponse(status_code=400, content={"error": "missing_refresh_token"})
 
     config = ConfigClass._instance
-    keycloak_url = config.getKeycloakURL()
+    keycloak_url = config.getKeycloakInternalURL()
     realm = config.getKeycloakRealm()
     client_id = config.getKeycloakClientID()
     client_secret = config.getKeycloakClientSecret()
@@ -478,7 +478,7 @@ async def auth_logout(request: Request):
         return RedirectResponse(url=frontend_url)
     
     config = ConfigClass._instance
-    keycloak_url = config.getKeycloakURL()
+    keycloak_url = config.getKeycloakPublicURL()
     realm = config.getKeycloakRealm()
     frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
     

@@ -21,7 +21,7 @@ class QueryManager():
             print(f"Warning: Could not get Keycloak admin token: {e}")
             return keycloak_user_id
         config = ConfigClass._instance
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
         headers = {"Authorization": f"Bearer {token}"}
         url = f"{keycloak_url}/admin/realms/{realm}/users/{keycloak_user_id}"
@@ -53,7 +53,7 @@ class QueryManager():
     def _mapKeycloakUsernameToKeycloakId(self, keycloak_username):
         token = self.get_keycloak_admin_token()
         config = ConfigClass._instance
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
 
         url = f"{keycloak_url}/admin/realms/{realm}/users"
@@ -85,7 +85,7 @@ class QueryManager():
         Output: Admin client token
         '''
         config = ConfigClass._instance
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
         admin_client_id = config.getKeycloakAdminClientID()
         admin_client_secret = config.getKeycloakAdminClientSecret()
@@ -128,7 +128,7 @@ class QueryManager():
         
         config = ConfigClass._instance
         role = EnumClasses.Role
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
 
         headers = {
@@ -312,7 +312,7 @@ class QueryManager():
             return None
         
         config = ConfigClass._instance
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
         
         # Query Keycloak Admin API for user by username
@@ -509,7 +509,7 @@ class QueryManager():
             return [(username, username) for username in keycloak_usernames]
         
         config = ConfigClass._instance
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
         headers = {"Authorization": f"Bearer {token}"}
         
@@ -580,7 +580,7 @@ class QueryManager():
             return set()
         
         config = ConfigClass._instance
-        keycloak_url = config.getKeycloakURL()
+        keycloak_url = config.getKeycloakInternalURL()
         realm = config.getKeycloakRealm()
         
         headers = {"Authorization": f"Bearer {token}"}
@@ -672,7 +672,7 @@ class QueryManager():
                 try:
                     token = self.get_keycloak_admin_token()
                     config = ConfigClass._instance
-                    keycloak_url = config.getKeycloakURL()
+                    keycloak_url = config.getKeycloakInternalURL()
                     realm = config.getKeycloakRealm()
                     headers = {"Authorization": f"Bearer {token}"}
                     

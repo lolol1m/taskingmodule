@@ -18,7 +18,7 @@ class KeycloakAuth:
     def __init__(self):
         # Get Keycloak configuration from ConfigClass
         config = ConfigClass._instance
-        self.keycloak_url = config.getKeycloakURL()
+        self.keycloak_url = config.getKeycloakInternalURL()
         self.realm = config.getKeycloakRealm()
         self.client_id = config.getKeycloakClientID()
         self.client_secret = config.getKeycloakClientSecret()

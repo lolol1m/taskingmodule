@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+
+  frontend:
+    build: ./xbi-ui
+    # Use image instead of build once you have image loaded
+    # image: taskingmodule-frontend
+    container_name: xbi-frontend
+    depends_on:
+      - backend
+    environment:
+      REACT_APP_DB_API_URL: http://localhost:5000
+      # REACT_APP_DB_API_URL: http://backend:5000
+    ports:
+      - "3000:3000"
+
+  backend:
+    build: ./xbi_tasking_backend
+    # Use image instead of build once you have image loaded
+    # image: taskingmodule-backend
+    container_name: xbi-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_NAME: XBI_TASKING_3
+      DB_USER: postgres
+      DB_PASSWORD: password
+
+      # Keycloak 
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_REALM: xbi-tasking
+      KEYCLOAK_CLIENT_ID: xbi-tasking-backend
+      KEYCLOAK_CLIENT_SECRET: Zj7CYgoGf7pOuW18fEcmNFwI7HIK1k0K
+      KEYCLOAK_ADMIN_CLIENT_ID: xbi-tasking-admin
+      KEYCLOAK_ADMIN_CLIENT_SECRET: 9YMbyTXVTpjPErz8jGwmWtjwfsNDnont
+      KEYCLOAK_ENABLED: "true"
+
+    ports:
+      - "5000:5000"
+
+
+  postgres:
+    image: postgres:15.6
+    container_name: xbi-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: XBI_TASKING_3
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres "]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+
+
+  keycloak:
+    image: xbi-keycloak:custom
+    container_name: xbi-keycloak
+    command: 
+    - start-dev
+    - --import-realm
+    - --hostname=localhost
+    - --hostname-strict=false
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+
+volumes:
+  pgdata:
+  keycloak_data:

@@ -1,0 +1,11 @@
+venv/
+code/
+*.bat
+dev_server.config
+
+.gitignore
+
+# Testing stuff
+testing/
+testing.config
+unittesting.py
