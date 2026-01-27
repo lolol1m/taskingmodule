@@ -11,9 +11,10 @@ import {
   Typography,
 } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import API from '../../../api/api'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-
+const api = new API()
 const refreshAccessToken = async () => {
   const storedRefresh = localStorage.getItem('refresh_token')
   if (!storedRefresh) {
@@ -602,16 +603,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetchWithAuth(`${BACKEND_URL}/getTaskingSummaryData`, {
-        method: 'POST',
-        body: JSON.stringify(dateRange),
-      })
+ 
+      const data = await api.postTaskingSummaryData(dateRange)
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch (${response.status})`)
-      }
+  
 
-      const data = await response.json()
+
       setInputData(data)
     } catch (err) {
       console.error('Tasking Summary fetch failed:', err)
@@ -685,9 +682,9 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const fetchDropdownValues = async (path, key) => {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}${path}`)
-      if (!response.ok) return
-      const data = await response.json()
+      const response = await api.client({url: `${path}`, method: "get"})
+     
+      const data =  response.data
       const normalized = normalizeOptions(data, key)
       if (normalized.length) {
         writeCachedOptions(key, normalized)
@@ -724,10 +721,8 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       const row = rows.find((item) => item.id === rowId)
       return row?.scvuTaskId || rowId
     })
-    await fetchWithAuth(`${BACKEND_URL}${apiPath}`, {
-      method: 'POST',
-      body: JSON.stringify({ 'SCVU Task ID': taskIds }),
-    })
+    await api.client({url: `${path}`, method: "post", data: { 'SCVU Task ID': taskIds }})
+  
 
     setRefreshKey((prev) => prev + 1)
   }

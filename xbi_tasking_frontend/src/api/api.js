@@ -120,6 +120,11 @@ class API {
         return response.data
     }
 
+        async postTaskingSummaryData(body) {
+        const response =await  this.client.post("/getTaskingSummaryData",  body)
+        return response.data
+    }
+
     async postDeleteImage(body){
         const response = await this.client.post("/deleteImage", body)
         return response.data
