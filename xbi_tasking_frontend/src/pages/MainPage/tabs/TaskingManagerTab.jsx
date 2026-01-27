@@ -9,62 +9,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import dayjs from 'dayjs'
 import API from '../../../api/api'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-const api= new API()
-const redirectToLogin = () => {
-  window.location.href = `${BACKEND_URL}/auth/login`
-}
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('access_token')
-  if (!token) {
-    redirectToLogin()
-    throw new Error('Not authenticated')
-  }
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${token}`,
-  }
-  const response = await fetch(url, { ...options, headers })
-  if (response.status !== 401) {
-    return response
-  }
-
-  const refreshToken = localStorage.getItem('refresh_token')
-  if (!refreshToken) {
-    redirectToLogin()
-    throw new Error('Refresh token missing')
-  }
-
-  const refreshResponse = await fetch(`${BACKEND_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
-  if (!refreshResponse.ok) {
-    redirectToLogin()
-    throw new Error('Refresh failed')
-  }
-  const refreshed = await refreshResponse.json()
-  const refreshedToken = refreshed?.access_token
-  if (!refreshedToken) {
-    redirectToLogin()
-    throw new Error('Refresh failed')
-  }
-  localStorage.setItem('access_token', refreshedToken)
-
-  const retryHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${refreshedToken}`,
-  }
-  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
-  if (retryResponse.status === 401) {
-    redirectToLogin()
-  }
-  return retryResponse
-}
+const api = new API()
 
 const readUserRole = () => {
   try {

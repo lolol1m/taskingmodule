@@ -588,33 +588,48 @@ class QueryManager():
     
     def getUsers(self):
         '''
-        Function:   Gets users from Keycloak (II, Senior II, IA roles) with is_present filter from cache
+        Function:   Gets users from Keycloak (II, Senior II, IA roles) with presence from cache
         Input:      None
-        Output:     nested list of usernames (as tuples for compatibility)
-        Note:       Keycloak is the source of truth - we only cache is_present state
+        Output:     list of dicts with id, name, role, is_present
+        Note:       Keycloak is the source of truth for users/roles; cache stores is_present
         '''
-        # Get users from Keycloak with II, Senior II, or IA roles
-        keycloak_usernames = self.getUsersList(only_II=False)
-        
-        if not keycloak_usernames:
-            # If Keycloak query failed, return empty list
-            return []
-        
-        # Get Keycloak user IDs for these usernames and ensure they exist in cache
         try:
             token = self.get_keycloak_admin_token()
         except (ValueError, requests.exceptions.RequestException):
-            # If admin client not configured, return (username, username) tuples (no is_present filter)
-            return [(username, username) for username in keycloak_usernames]
+            # If admin client not configured, we cannot resolve roles or presence
+            usernames = self.getUsersList(only_II=False)
+            return [{"id": username, "name": username, "role": None, "is_present": None} for username in usernames]
         
         config = ConfigClass._instance
+        role_enum = EnumClasses.Role
         keycloak_url = config.getKeycloakURL()
         realm = config.getKeycloakRealm()
         headers = {"Authorization": f"Bearer {token}"}
-        
-        # Get user IDs and ensure they're in cache (for is_present filtering)
+
+        # Build username -> roles map
+        roles = [role_enum.II.value, role_enum.SENIOR_II.value, role_enum.IA.value]
+        username_to_roles = {}
+        for role_name in roles:
+            url = f"{keycloak_url}/admin/realms/{realm}/roles/{role_name}/users"
+            try:
+                response = requests.get(url, headers=headers, timeout=5)
+                response.raise_for_status()
+                users = response.json()
+                for user in users:
+                    username = user.get("username")
+                    if not username:
+                        continue
+                    username_to_roles.setdefault(username, []).append(role_name)
+            except requests.exceptions.RequestException as e:
+                print(f"⚠️ Warning: Could not fetch users with role '{role_name}' from Keycloak: {e}")
+                continue
+
+        if not username_to_roles:
+            return []
+
+        # Resolve user IDs and ensure cache entries exist
         user_data = []  # List of (user_id, username) tuples
-        for username in keycloak_usernames:
+        for username in username_to_roles.keys():
             url = f"{keycloak_url}/admin/realms/{realm}/users"
             params = {"username": username, "exact": "true"}
             try:
@@ -623,8 +638,6 @@ class QueryManager():
                     users = response.json()
                     if users:
                         user_id = users[0].get('id')
-                        # Ensure user exists in cache (for is_present filtering)
-                        # We don't store display_name - Keycloak is source of truth
                         query = """
                             INSERT INTO user_cache (keycloak_user_id, is_present)
                             VALUES (%s, FALSE)
@@ -634,31 +647,32 @@ class QueryManager():
                         user_data.append((user_id, username))
             except requests.exceptions.RequestException:
                 continue
-        
-        # Filter by is_present from cache - return usernames from Keycloak (source of truth)
-        if user_data:
-            user_ids = [uid for uid, _ in user_data]
-            placeholders = ','.join(['%s'] * len(user_ids))
-            query = f"""
-                SELECT keycloak_user_id 
-                FROM user_cache 
-                WHERE keycloak_user_id IN ({placeholders}) 
-                AND is_present = True
-            """
-            result = self.db.executeSelect(query, tuple(user_ids))
-            present_user_ids = {row[0] for row in result}
-            
-            # Log which users are filtered out
-            filtered_out = [(uid, uname) for uid, uname in user_data if uid not in present_user_ids]
-            if filtered_out:
-                print(f" [getUsers] Filtered out {len(filtered_out)} users (is_present=False): {[uname for _, uname in filtered_out]}")
-            
-            print(f" [getUsers] Returning {len(present_user_ids)} users with is_present=True: {[uname for uid, uname in user_data if uid in present_user_ids]}")
-            # Return (user_id, username) tuples for users who are present
-            return [(user_id, username) for user_id, username in user_data if user_id in present_user_ids]
-        
-        # Fallback: return (username, username) tuples if we couldn't get IDs
-        return [(username, username) for username in keycloak_usernames]
+
+        if not user_data:
+            return []
+
+        # Fetch presence for all users
+        user_ids = [uid for uid, _ in user_data]
+        placeholders = ','.join(['%s'] * len(user_ids))
+        query = f"""
+            SELECT keycloak_user_id, is_present
+            FROM user_cache
+            WHERE keycloak_user_id IN ({placeholders})
+        """
+        result = self.db.executeSelect(query, tuple(user_ids))
+        presence_map = {row[0]: row[1] for row in result}
+
+        output = []
+        for user_id, username in user_data:
+            roles_for_user = username_to_roles.get(username, [])
+            output.append({
+                "id": user_id,
+                "name": username,
+                "role": ", ".join(roles_for_user) if roles_for_user else None,
+                "is_present": bool(presence_map.get(user_id, False)),
+            })
+
+        return output
     
     def getUserIds(self):
         '''
