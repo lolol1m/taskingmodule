@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import API from '../../../api/api'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-
+const api = new API()
 const refreshAccessToken = async () => {
   const storedRefresh = localStorage.getItem('refresh_token')
   if (!storedRefresh) {
@@ -162,16 +163,11 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
       try {
         setLoading(true)
         setError(null)
-        const response = await fetchWithAuth(`${BACKEND_URL}/getCompleteImageData`, {
-          method: 'POST',
-          body: JSON.stringify(dateRange),
-        })
+        
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch (${response.status})`)
-        }
 
-        const data = await response.json()
+
+        const data = api.postGetCompleteImageData(dateRange)
         const sampleKey = data ? Object.keys(data)[0] : null
         const sampleEntry = sampleKey != null ? data[sampleKey] : null
         console.log('Completed images sample entry:', { sampleKey, sampleEntry })
@@ -192,13 +188,8 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
     if (!selection.length) return
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`${BACKEND_URL}/uncompleteImages`, {
-        method: 'POST',
-        body: JSON.stringify({ 'SCVU Image ID': selection }),
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to uncomplete (${response.status})`)
-      }
+      const response = await api.postUncompleteImages({ 'SCVU Image ID': selection })
+
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Uncomplete images failed:', err)

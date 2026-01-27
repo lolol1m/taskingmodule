@@ -147,6 +147,16 @@ class API {
     }
 
 
+    async postGetCompleteImageData(body){
+        const response =  await this.client.post("/getCompleteImageData", body)
+        return response.data
+    }
+
+    async postUncompleteImages(body) {
+        const response =  await this.client.post("/uncompleteImages", body)
+        return response.data
+    }
+
 
 
 
