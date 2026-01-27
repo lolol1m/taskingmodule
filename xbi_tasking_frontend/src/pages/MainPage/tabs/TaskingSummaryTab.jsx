@@ -263,6 +263,29 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     },
   })
 
+  const inlineTextFieldSx = () => ({
+    width: '100%',
+    minWidth: 0,
+    '& .MuiOutlinedInput-root': {
+      height: 28,
+      minHeight: 28,
+      paddingRight: 8,
+      alignItems: 'center',
+      borderRadius: 6,
+      backgroundColor: 'transparent',
+      color: 'var(--text)',
+    },
+    '& .MuiOutlinedInput-input': {
+      padding: '0 10px',
+      textAlign: 'left',
+      color: 'var(--text)',
+    },
+    '& .MuiInputBase-input::placeholder': {
+      color: 'var(--muted)',
+      opacity: 1,
+    },
+  })
+
   const getWorkingValue = (rowId, field) => {
     const source = workingData || inputData
     if (!source) return null
@@ -326,7 +349,30 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           )
         },
       },
-      { field: 'remarks', headerName: 'Remarks', minWidth: 140, flex: 0.9, editable: true },
+      {
+        field: 'remarks',
+        headerName: 'Remarks',
+        minWidth: 140,
+        flex: 0.9,
+        renderCell: (params) => {
+          if (!params?.row) return ''
+          const rowId = params.row.id
+          const currentValue = getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? ''
+          return (
+            <TextField
+              value={currentValue ?? ''}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) =>
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Remarks', event.target.value, inputData))
+              }
+              placeholder="Add remarks"
+              size="small"
+              fullWidth
+              sx={inlineTextFieldSx()}
+            />
+          )
+        },
+      },
       {
         field: 'imageStatus',
         headerName: 'Image Status',
@@ -392,7 +438,30 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           )
         },
       },
-      { field: 'imageQuality', headerName: 'Image Quality', minWidth: 120, flex: 0.6, editable: true },
+      {
+        field: 'imageQuality',
+        headerName: 'Image Quality',
+        minWidth: 140,
+        flex: 0.7,
+        renderCell: (params) => {
+          if (!params?.row?.childId) return ''
+          const rowId = params.row.id
+          const currentValue = getWorkingValue(rowId, 'Image Quality') ?? params?.row?.imageQuality ?? ''
+          return (
+            <TextField
+              value={currentValue ?? ''}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) =>
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
+              }
+              placeholder="Image quality"
+              size="small"
+              fullWidth
+              sx={inlineTextFieldSx()}
+            />
+          )
+        },
+      },
       {
         field: 'cloudCover',
         headerName: 'Cloud Cover',
@@ -420,7 +489,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           )
         },
       },
-      { field: 'ewStatus', headerName: 'EW Status', minWidth: 100, flex: 0.5 },
+      {
+        field: 'ewStatus',
+        headerName: 'EW Status',
+        minWidth: 100,
+        flex: 0.5,
+        renderCell: (params) => params?.row?.ewStatus || '—',
+      },
       {
         field: 'targetTracing',
         headerName: 'Target Tracing',
@@ -984,8 +1059,8 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           getTreeDataPath={getTreeDataPath}
           groupingColDef={{
             headerName: 'Image/Area Name',
-            minWidth: 200,
-            flex: 1.3,
+            minWidth: showDetails ? 170 : 200,
+            flex: showDetails ? 1.05 : 1.3,
             hideDescendantCount: true,
             valueGetter: (_value, row) => {
               const nameFromGroup =
