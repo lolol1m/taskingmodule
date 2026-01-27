@@ -152,19 +152,16 @@ class MainController():
         '''
         Function:   Gets list of users for drop down
         Input:      None
-        Output:     list of user objects with id and name
+        Output:     list of user objects with id, name, role, is_present
         '''
         output = {}
-        # Get users as (user_id, username) tuples from QueryManager
-        user_tuples = self.qm.getUsers()
+        # Get users as objects from QueryManager
+        user_objects = self.qm.getUsers()
 
-        if not user_tuples:
+        if not user_objects:
             output["Users"] = []
-            output["Warning"] = "No users are marked as present. Update user presence and try again."
+            output["Warning"] = "No users available from Keycloak."
             return output
-        
-        # Convert to objects with id and name
-        user_objects = [{"id": user_id, "name": username} for user_id, username in user_tuples]
         
         output["Users"] = user_objects
         return output 
