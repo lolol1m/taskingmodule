@@ -1,0 +1,65 @@
+.admin-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.admin-tab__grid {
+  background: var(--table-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  overflow: auto;
+  max-width: 100%;
+  flex: 1;
+  min-height: 360px;
+  max-height: 660px;
+  scrollbar-color: var(--border-strong) var(--row-bg);
+  scrollbar-width: thin;
+}
+
+.admin-tab__grid::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.admin-tab__grid::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.admin-tab__grid::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-scrollbarFiller,
+.admin-tab__grid .MuiDataGrid-scrollbarFiller--header {
+  background: var(--row-bg) !important;
+}
+
+.admin-tab__error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
