@@ -3,82 +3,7 @@ import { Box, Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
 const api = new API()
-const refreshAccessToken = async () => {
-  const storedRefresh = localStorage.getItem('refresh_token')
-  if (!storedRefresh) {
-    return null
-  }
-
-  const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: storedRefresh }),
-  })
-
-  if (!response.ok) {
-    return null
-  }
-
-  const data = await response.json()
-  if (data.access_token) {
-    localStorage.setItem('access_token', data.access_token)
-  }
-  if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token)
-  }
-  if (data.id_token) {
-    localStorage.setItem('id_token', data.id_token)
-  }
-
-  return data.access_token || null
-}
-
-const clearAuthTokens = () => {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('id_token')
-  localStorage.removeItem('user')
-  localStorage.removeItem('username')
-}
-
-const redirectToLogin = () => {
-  clearAuthTokens()
-  window.location.href = `${BACKEND_URL}/auth/login`
-}
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('access_token')
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-
-  const response = await fetch(url, { ...options, headers })
-  if (response.status !== 401) {
-    return response
-  }
-
-  const refreshedToken = await refreshAccessToken()
-  if (!refreshedToken) {
-    redirectToLogin()
-    return response
-  }
-
-  const retryHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${refreshedToken}`,
-  }
-
-  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
-  if (retryResponse.status === 401) {
-    redirectToLogin()
-  }
-  return retryResponse
-}
 
 const normalizeImageName = (value) => {
   if (!value || typeof value !== 'string') return value
@@ -163,11 +88,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
       try {
         setLoading(true)
         setError(null)
-        
-
-
-
-        const data = api.postGetCompleteImageData(dateRange)
+        const data = await api.getCompleteImageData(dateRange)
         const sampleKey = data ? Object.keys(data)[0] : null
         const sampleEntry = sampleKey != null ? data[sampleKey] : null
         console.log('Completed images sample entry:', { sampleKey, sampleEntry })
@@ -188,8 +109,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
     if (!selection.length) return
     try {
       setLoading(true)
-      const response = await api.postUncompleteImages({ 'SCVU Image ID': selection })
-
+      await api.uncompleteImages({ 'SCVU Image ID': selection })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Uncomplete images failed:', err)
