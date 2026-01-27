@@ -7,9 +7,10 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import dayjs from 'dayjs'
+import API from '../../../api/api'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-
+const api= API()
 const redirectToLogin = () => {
   window.location.href = `${BACKEND_URL}/auth/login`
 }
@@ -231,9 +232,11 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   }
 
   const fetchUsers = async () => {
+  
+
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/getUsers`)
-      const data = await response.json()
+
+      const data = await api.getUsers()
       if (data?.Warning) {
         alert(data.Warning)
       }
