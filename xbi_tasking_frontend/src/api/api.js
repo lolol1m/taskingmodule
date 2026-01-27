@@ -115,6 +115,21 @@ class API {
         return response.data
     }
 
+    async getCompleteImageData(body) {
+        const response = await this.client.post("/getCompleteImageData", body)
+        return response.data
+    }
+
+    async uncompleteImages(body) {
+        const response = await this.client.post("/uncompleteImages", body)
+        return response.data
+    }
+
+    async setOpsvAreas(body) {
+        const response = await this.client.post("/setOpsvAreas", body)
+        return response.data
+    }
+
     async postTaskingManagerData(body) {
         const response =await  this.client.post("/getTaskingManagerData",  body)
         return response.data
@@ -122,6 +137,11 @@ class API {
 
         async postTaskingSummaryData(body) {
         const response =await  this.client.post("/getTaskingSummaryData",  body)
+        return response.data
+    }
+
+    async postUpdateTaskingSummaryData(body) {
+        const response = await this.client.post("/updateTaskingSummaryData", body)
         return response.data
     }
 

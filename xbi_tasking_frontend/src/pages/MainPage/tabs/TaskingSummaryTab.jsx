@@ -13,82 +13,7 @@ import {
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
 const api = new API()
-const refreshAccessToken = async () => {
-  const storedRefresh = localStorage.getItem('refresh_token')
-  if (!storedRefresh) {
-    return null
-  }
-
-  const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: storedRefresh }),
-  })
-
-  if (!response.ok) {
-    return null
-  }
-
-  const data = await response.json()
-  if (data.access_token) {
-    localStorage.setItem('access_token', data.access_token)
-  }
-  if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token)
-  }
-  if (data.id_token) {
-    localStorage.setItem('id_token', data.id_token)
-  }
-
-  return data.access_token || null
-}
-
-const clearAuthTokens = () => {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('id_token')
-  localStorage.removeItem('user')
-  localStorage.removeItem('username')
-}
-
-const redirectToLogin = () => {
-  clearAuthTokens()
-  window.location.href = `${BACKEND_URL}/auth/login`
-}
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('access_token')
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-
-  const response = await fetch(url, { ...options, headers })
-  if (response.status !== 401) {
-    return response
-  }
-
-  const refreshedToken = await refreshAccessToken()
-  if (!refreshedToken) {
-    redirectToLogin()
-    return response
-  }
-
-  const retryHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${refreshedToken}`,
-  }
-
-  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
-  if (retryResponse.status === 401) {
-    redirectToLogin()
-  }
-  return retryResponse
-}
 
 const readUserRole = () => {
   try {
@@ -721,10 +646,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       const row = rows.find((item) => item.id === rowId)
       return row?.scvuTaskId || rowId
     })
-    await api.client({url: `${path}`, method: "post", data: { 'SCVU Task ID': taskIds }})
-  
-
-    setRefreshKey((prev) => prev + 1)
+    try {
+      await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('Tasking Summary task update failed:', err)
+      alert('Unable to update tasks. Please try again.')
+    }
   }
 
   const processImage = async (apiPath) => {
@@ -766,27 +694,31 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
     const saveAndComplete = async () => {
       const username = localStorage.getItem('username')
-      await fetchWithAuth(`${BACKEND_URL}${apiPath}`, {
-        method: 'POST',
-        body: JSON.stringify({
+      await api.client({
+        url: `${apiPath}`,
+        method: 'post',
+        data: {
           'SCVU Image ID': imageIds,
           Vetter: username || '',
-        }),
+        },
       })
     }
 
     if (hasChanges && Object.keys(dataToSave).length > 0) {
-      const saveResponse = await fetchWithAuth(`${BACKEND_URL}/updateTaskingSummaryData`, {
-        method: 'POST',
-        body: JSON.stringify(dataToSave),
-      })
-      if (!saveResponse.ok) {
+      try {
+        await api.postUpdateTaskingSummaryData(dataToSave)
+      } catch (err) {
+        console.error('Tasking Summary save failed:', err)
         alert('Error saving changes. Image will not be completed.')
         return
       }
+    }
+    try {
       await saveAndComplete()
-    } else {
-      await saveAndComplete()
+    } catch (err) {
+      console.error('Tasking Summary complete failed:', err)
+      alert('Unable to complete images. Please try again.')
+      return
     }
 
     setRefreshKey((prev) => prev + 1)
@@ -816,12 +748,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       return
     }
 
-    await fetchWithAuth(`${BACKEND_URL}/updateTaskingSummaryData`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-
-    setRefreshKey((prev) => prev + 1)
+    try {
+      await api.postUpdateTaskingSummaryData(payload)
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('Tasking Summary update failed:', err)
+      alert('Unable to save changes. Please try again.')
+    }
   }
 
   const isCellEditable = (params) => {
