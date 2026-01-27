@@ -29,7 +29,7 @@ class API {
         );
         this.client.interceptors.response.use(
             (response) => {
-                console.log("Response successful!")
+                console.log(`Response successful! ${response.status}`)
                 return response
             },
         async (error) => {
@@ -95,27 +95,28 @@ class API {
     }
 
     async postTaskingManagerData(body) {
-        const response =await  this.client.post("/getTaskingManagerData", data = body)
+        const response =await  this.client.post("/getTaskingManagerData",  body)
         return response.data
     }
 
     async postDeleteImage(body){
-        const response = await this.client.post("/deleteImage", data = body)
+        const response = await this.client.post("/deleteImage", body)
         return response.data
 
     }
 
     async postAssignTask(body){ 
-              const response = await this.client.post("/assignTask", data = body)
+              const response = await this.client.post("/assignTask",  body)
         return response.data
     }
 
     async postUpdateTaskingManagerData(body){ 
-        const response = await this.client.post("/updateTaskingManagerData", data = body)
+        const response = await this.client.post("/updateTaskingManagerData",  body)
+    
         return response.data
     }
         async postInsertTTGData(body){ 
-        const response = await this.client.post("/insertTTGData", data = body)
+        const response = await this.client.post("/insertTTGData", body)
         return response.data
     }
 

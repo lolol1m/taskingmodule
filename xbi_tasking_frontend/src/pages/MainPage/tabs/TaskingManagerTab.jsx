@@ -255,14 +255,10 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetchWithAuth(`${BACKEND_URL}/getTaskingManagerData`, {
-        method: 'POST',
-        body: JSON.stringify(dateRange),
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to fetch (${response.status})`)
-      }
-      const data = await response.json()
+     
+      var response = await api.postTaskingManagerData(dateRange)
+      
+      const data = response
       if (!fetchTaskingManager.hasLogged) {
         console.log('[TaskingManager] Raw response sample:', data)
         fetchTaskingManager.hasLogged = true
@@ -278,8 +274,8 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
   const fetchAreas = async () => {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/getAreas`)
-      const data = await response.json()
+     
+      const data = await api.getAreas()
       const areas = Array.isArray(data?.Areas) ? data.Areas : []
       const names = Array.from(new Set(areas.map((area) => area?.['Area Name']).filter(Boolean)))
       setAreaOptions(names)
@@ -459,12 +455,10 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             variant={isEnabled ? 'outlined' : 'text'}
             disabled={!isEnabled}
             startIcon={isEnabled ? <DeleteOutlineIcon fontSize="small" /> : <LockOutlinedIcon fontSize="small" />}
-            onClick={() => {
+            onClick={async () => {
               if (!isEnabled) return
-              fetchWithAuth(`${BACKEND_URL}/deleteImage`, {
-                method: 'POST',
-                body: JSON.stringify({ 'SCVU Image ID': params.id }),
-              }).then(() => setRefreshKey((prev) => prev + 1))
+              await api.postDeleteImage({ 'SCVU Image ID': params.id })
+              setRefreshKey((prev) => prev + 1)
             }}
           >
             Delete TTG
@@ -523,18 +517,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
     try {
       if (hasTasks) {
-        await fetchWithAuth(`${BACKEND_URL}/assignTask`, {
-          method: 'POST',
-          body: JSON.stringify(tasksPayload),
-        })
+        await api.postAssignTask(tasksPayload)
         localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
       }
 
       if (hasPriority) {
-        await fetchWithAuth(`${BACKEND_URL}/updateTaskingManagerData`, {
-          method: 'POST',
-          body: JSON.stringify(prioritiesPayload),
-        })
+        await api.postUpdateTaskingManagerData(prioritiesPayload)
+    
       }
 
       alert('Tasking Manager updated successfully.')
@@ -553,10 +542,8 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       imageDateTime: toISOLocal(formInput.imageDateTime),
       areas: formInput.areas || [],
     }
-    await fetchWithAuth(`${BACKEND_URL}/insertTTGData`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
+    await api.postInsertTTGData(payload)
+
     resetForm()
     setModalOpen(false)
     setRefreshKey((prev) => prev + 1)
