@@ -16,6 +16,7 @@ class API {
                 if (!token) {
                     window.location.href = `${api_link}/auth/login` //redirect to login
                     this.#__redirectToLogin()
+                    this.#__clearAuthTokens();
                     throw new Error('Not authenticated')
                 }
                 config.headers.Authorization = `Bearer ${token}`
@@ -42,6 +43,7 @@ class API {
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) {
         this.#__redirectToLogin();
+        this.#__clearAuthTokens();
         return Promise.reject(new Error("Refresh token missing"));
       }
 
@@ -56,16 +58,29 @@ class API {
         const refreshedToken = refreshResponse.data?.access_token;
         if (!refreshedToken) {
           this.#__redirectToLogin();
+        this.#__clearAuthTokens();
           return Promise.reject(new Error("Refresh failed"));
         }
 
+
+         if (refreshResponse.data?.access_token) {
+    localStorage.setItem('access_token', refreshResponse.data?.access_token)
+  }
+  if (refreshResponse.data?.refresh_token) {
+    localStorage.setItem('refresh_token', refreshResponse.data?.refresh_token)
+  }
+  if (refreshResponse.data?.id_token) {
+    localStorage.setItem('id_token', refreshResponse.data?.id_token)
+  }
+
     
-        localStorage.setItem("access_token", refreshedToken);
+        
 
         
         originalRequest.headers.Authorization = `Bearer ${refreshedToken}`;
         return this.client(originalRequest);
       } catch (refreshError) {
+        this.#__clearAuthTokens();
         this.#__redirectToLogin();
         return Promise.reject(refreshError);
       }
@@ -82,7 +97,13 @@ class API {
         window.location.href = `${api_link}/auth/login`
 
     }
-
+    #__clearAuthTokens() {
+          localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('id_token')
+  localStorage.removeItem('user')
+  localStorage.removeItem('username')
+    }
 
     async getUsers() {
         const response = await this.client.get("/getUsers")
