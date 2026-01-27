@@ -10,7 +10,7 @@ import dayjs from 'dayjs'
 import API from '../../../api/api'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-const api= API()
+const api= new API()
 const redirectToLogin = () => {
   window.location.href = `${BACKEND_URL}/auth/login`
 }
