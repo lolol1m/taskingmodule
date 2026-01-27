@@ -15,7 +15,7 @@ class API {
                 const token = localStorage.getItem("access_token"); 
                 if (!token) {
                     window.location.href = `${api_link}/auth/login` //redirect to login
-                    this.__redirectToLogin()
+                    this.#__redirectToLogin()
                     throw new Error('Not authenticated')
                 }
                 config.headers.Authorization = `Bearer ${token}`
@@ -41,7 +41,7 @@ class API {
 
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) {
-        this.__redirectToLogin();
+        this.#__redirectToLogin();
         return Promise.reject(new Error("Refresh token missing"));
       }
 
@@ -55,7 +55,7 @@ class API {
 
         const refreshedToken = refreshResponse.data?.access_token;
         if (!refreshedToken) {
-          this.__redirectToLogin();
+          this.#__redirectToLogin();
           return Promise.reject(new Error("Refresh failed"));
         }
 
@@ -66,7 +66,7 @@ class API {
         originalRequest.headers.Authorization = `Bearer ${refreshedToken}`;
         return this.client(originalRequest);
       } catch (refreshError) {
-        this.__redirectToLogin();
+        this.#__redirectToLogin();
         return Promise.reject(refreshError);
       }
     }
@@ -78,7 +78,7 @@ class API {
 
     }
 
-    __redirectToLogin() { //Private method to redirect to login
+    #__redirectToLogin() { //Private method to redirect to login
         window.location.href = `${api_link}/auth/login`
 
     }
