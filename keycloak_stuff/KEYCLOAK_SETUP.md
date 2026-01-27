@@ -83,7 +83,8 @@ If you don't need Keycloak user listing, you can skip this section and leave `ad
    - `view-users` (to view users)
    - `query-users` (to query users by role)
    - `view-realm` (to access realm info)
-
+   - `manage-users` (to manage users info)
+   
 ## Backend Configuration
 
 ### Environment Variables

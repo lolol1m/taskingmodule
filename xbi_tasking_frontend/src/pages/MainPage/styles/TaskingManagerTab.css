@@ -1,0 +1,193 @@
+.tasking-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.tasking-manager__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tasking-manager__actions-left,
+.tasking-manager__actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tasking-manager__button {
+  text-transform: none !important;
+  font-family: inherit !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  padding: 6px 14px !important;
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong) !important;
+  box-shadow: none !important;
+}
+
+.tasking-manager__button:hover {
+  background: var(--hover) !important;
+}
+
+.tasking-manager__button--primary {
+  background: var(--accent) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+.tasking-manager__button--danger {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+}
+
+.tasking-manager__button.Mui-disabled {
+  opacity: 0.5;
+  color: var(--muted) !important;
+}
+
+.tasking-manager__grid {
+  background: var(--table-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  overflow: auto;
+  max-width: 100%;
+  flex: 1;
+  min-height: 360px;
+  max-height: 660px;
+  transition: max-width 700ms ease;
+  scrollbar-color: var(--border-strong) var(--row-bg);
+  scrollbar-width: thin;
+}
+
+.tasking-manager__grid .MuiDataGrid-cell .MuiAutocomplete-root {
+  margin-top: 0;
+  align-self: flex-start;
+}
+
+.tasking-manager__grid .MuiDataGrid-cell .MuiInputBase-root {
+  position: relative;
+  top: 15px;
+}
+
+.tasking-manager__grid::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.tasking-manager__grid::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.tasking-manager__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.tasking-manager__grid .MuiDataGrid-scrollbarFiller,
+.tasking-manager__grid .MuiDataGrid-scrollbarFiller--header {
+  background: var(--row-bg) !important;
+}
+
+.tasking-manager__error {
+  padding: 12px 16px;
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+  border-top: 1px solid var(--border-strong);
+}
+
+.tasking-manager__notice {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+
+.tasking-manager__ttg {
+  display: inline-flex;
+}
+
+.tasking-manager__modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.tasking-manager__modal.is-open {
+  display: flex;
+}
+
+.tasking-manager__modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 15, 0.6);
+}
+
+.tasking-manager__modal-content {
+  position: relative;
+  width: min(700px, 90vw);
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 1;
+}
+
+.tasking-manager__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tasking-manager__modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tasking-manager__modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.tasking-manager__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

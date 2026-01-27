@@ -27,8 +27,10 @@ app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000",
 ]
 mc = MainController()
 
@@ -217,7 +219,7 @@ async def auth_login(request: Request):
     client_id = config.getKeycloakClientID()
     
     # Get frontend URL from environment or use default
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
@@ -264,17 +266,17 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     
     if error:
         # Keycloak returned an error
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         return RedirectResponse(url=f"{frontend_url}?error={error}")
     
     if not code:
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         return RedirectResponse(url=f"{frontend_url}?error=no_code")
 
     # Validate state from cookie to prevent CSRF
     cookie_state = request.cookies.get("kc_state")
     if not state or not cookie_state or state != cookie_state:
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         response = RedirectResponse(url=f"{frontend_url}?error=state_mismatch")
         response.delete_cookie("kc_state")
         return response
@@ -284,7 +286,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     realm = config.getKeycloakRealm()
     client_id = config.getKeycloakClientID()
     client_secret = config.getKeycloakClientSecret()
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
     # Exchange authorization code for tokens
     token_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
@@ -474,13 +476,13 @@ async def auth_logout(request: Request):
     Logs out user from Keycloak and redirects to frontend.
     """
     if not KEYCLOAK_ENABLED:
-        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
         return RedirectResponse(url=frontend_url)
     
     config = ConfigClass._instance
     keycloak_url = config.getKeycloakURL()
     realm = config.getKeycloakRealm()
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
     # Build Keycloak logout URL
     logout_url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/logout"
@@ -675,7 +677,7 @@ async def getReport():
     return mc.getReport()
 
 @app.get("/getUsers")
-async def getUsers():
+async def getUsers(user: dict = Depends(get_current_user)):
     '''
     Function: Gets the Users list from the db
     
@@ -692,6 +694,28 @@ async def getUsers():
         }
     '''
     return mc.getUsers()
+
+@app.post("/createUser")
+async def createUser(request: Request, user: dict = Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    roles = user.get("roles", []) or []
+    account_type = user.get("account_type")
+    is_admin = account_type == "IA" or "IA" in roles
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    data = await request.json()
+    try:
+        result = mc.createUser(data)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/updateUsers")
 async def updateUsers(file: UploadFile):
@@ -1042,7 +1066,7 @@ async def uncompleteImages(request: Request):
     return mc.uncompleteImages(data)
 
 @app.post("/getCompleteImageData")
-async def getCompleteImageData(request: Request):
+async def getCompleteImageData(request: Request, user: dict = Depends(get_current_user)):
     '''
     Function: Gets data for completed images including their areas
     Input:
@@ -1091,7 +1115,7 @@ async def getCompleteImageData(request: Request):
     '''
 
     data = await request.json()
-    return mc.getCompleteImageData(data)
+    return mc.getCompleteImageData(data, user)
 
 @app.post("/updateTaskingSummaryData")
 async def updateTaskingSummaryData(request: Request):

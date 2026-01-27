@@ -169,6 +169,35 @@ class MainController():
         output["Users"] = user_objects
         return output 
 
+    def createUser(self, json):
+        '''
+        Function:   Creates a Keycloak user and assigns a role
+        Input:      json with username, password, role
+        Output:     created user info
+        '''
+        username = json.get("username", "").strip()
+        password = json.get("password", "").strip()
+        role = json.get("role", "").strip()
+
+        if not username or not password or not role:
+            return {"error": "username, password, and role are required"}
+
+        if len(password) < 8:
+            return {"error": "Password must be at least 8 characters long"}
+        if not any(ch.islower() for ch in password):
+            return {"error": "Password must include a lowercase letter"}
+        if not any(ch.isupper() for ch in password):
+            return {"error": "Password must include an uppercase letter"}
+        if not any(ch.isdigit() for ch in password):
+            return {"error": "Password must include a number"}
+
+        valid_roles = {r.value for r in EnumClasses.Role}
+        if role not in valid_roles:
+            return {"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}
+
+        result = self.qm.createKeycloakUser(username, password, role)
+        return {"success": True, "user": result}
+
     def getTaskingSummaryData(self, json):
         '''
         Function:   Get Data for Tasking Summary page
@@ -577,17 +606,26 @@ class MainController():
 
         return output
 
-    def getCompleteImageData(self, json):
+    def getCompleteImageData(self, json, user=None):
         '''
         Function:   Gets the image and associated area data for completed images
         Input:      json (start date, end date)
         Output:     json containing completed image data
         '''
+        start_date = dateutil.parser.isoparse(json['Start Date']).strftime(f"%Y-%m-%d")
+        end_date = (dateutil.parser.isoparse(json['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
 
-        imageData = self.qm.getImageData(
-            dateutil.parser.isoparse(json['Start Date']).strftime(f"%Y-%m-%d"), 
-            (dateutil.parser.isoparse(json['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
-        )
+        account_type = None
+        roles = []
+        if user:
+            account_type = user.get('account_type')
+            roles = user.get('roles', [])
+
+        is_ii_user = account_type == 'II' or ('II' in roles and account_type != 'Senior II' and account_type != 'IA')
+        if is_ii_user and user:
+            imageData = self.qm.getImageDataForUser(start_date, end_date, user.get('sub'))
+        else:
+            imageData = self.qm.getImageData(start_date, end_date)
         output = {}
         
         for image in imageData:

@@ -1,6 +1,7 @@
 from main_classes import Database, ConfigClass, EnumClasses
 import os
 import requests
+from urllib.parse import urlparse
 
 class QueryManager():
     '''
@@ -68,7 +69,7 @@ class QueryManager():
             "exact": "true"
         }
 
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=5)
         response.raise_for_status()
 
         users = response.json()
@@ -77,6 +78,104 @@ class QueryManager():
 
         keycloak_user_id = users[0]["id"]
         return keycloak_user_id
+
+    def _get_keycloak_role(self, role_name):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        url = f"{keycloak_url}/admin/realms/{realm}/roles/{role_name}"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
+    def _assign_realm_role(self, user_id, role_representation):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/realm"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(url, headers=headers, json=[role_representation], timeout=5)
+        response.raise_for_status()
+
+    def createKeycloakUser(self, username, password, role_name):
+        token = self.get_keycloak_admin_token()
+        config = ConfigClass._instance
+        keycloak_url = config.getKeycloakURL()
+        realm = config.getKeycloakRealm()
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        # Check for existing user
+        query_url = f"{keycloak_url}/admin/realms/{realm}/users"
+        query_params = {"username": username, "exact": "true"}
+        response = requests.get(query_url, headers=headers, params=query_params, timeout=5)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 403:
+                raise ValueError("Keycloak admin client lacks permission to manage users. Ensure the admin client has realm-management roles: view-users and manage-users.")
+            raise
+        if response.json():
+            raise ValueError("Username already exists")
+
+        # Create user
+        create_url = f"{keycloak_url}/admin/realms/{realm}/users"
+        payload = {
+            "username": username,
+            "enabled": True,
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": password,
+                    "temporary": False
+                }
+            ]
+        }
+        response = requests.post(create_url, headers=headers, json=payload, timeout=5)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 403:
+                raise ValueError("Keycloak admin client lacks permission to create users. Ensure the admin client has realm-management manage-users.")
+            raise
+
+        # Fetch new user ID (prefer Location header)
+        location = response.headers.get("Location")
+        user_id = None
+        if location:
+            path = urlparse(location).path or ""
+            user_id = path.rsplit("/", 1)[-1] if "/" in path else None
+        if not user_id:
+            response = requests.get(query_url, headers=headers, params=query_params, timeout=5)
+            response.raise_for_status()
+            users = response.json()
+            if not users:
+                raise ValueError("User creation failed")
+            user_id = users[0]["id"]
+
+        # Assign role
+        role_rep = self._get_keycloak_role(role_name)
+        self._assign_realm_role(user_id, role_rep)
+
+        # Ensure user exists in cache (default to not present)
+        query = """
+            INSERT INTO user_cache (keycloak_user_id, is_present)
+            VALUES (%s, FALSE)
+            ON CONFLICT (keycloak_user_id) DO NOTHING
+        """
+        self.db.executeInsert(query, (user_id,))
+        return {"id": user_id, "username": username, "role": role_name}
 
     def get_keycloak_admin_token(self):
         '''
@@ -800,6 +899,44 @@ class QueryManager():
              OR (image.upload_date >= %s AND image.upload_date < %s))"
 
         results = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date))
+        formatted = []
+        for row in results:
+            row = list(row)
+            vetter_keycloak_id = row[12]
+            row[12] = self._get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else 'Unassigned'
+            formatted.append(tuple(row))
+        return formatted
+
+    def getImageDataForUser(self, start_date, end_date, assignee_keycloak_id):
+        '''
+        Function: Gets completed image data filtered by assignee for completed images
+        Input: start_date, end_date, assignee_keycloak_id (Keycloak user ID/sub)
+        Output: same shape as getImageData
+        '''
+        imageQuery = f"""
+        SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime,
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality,
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id
+        FROM image
+        LEFT JOIN sensor ON sensor.id = image.sensor_id
+        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
+        LEFT JOIN report ON report.id = image.report_id
+        LEFT JOIN priority ON priority.id = image.priority_id
+        LEFT JOIN image_category ON image_category.id = image.image_category_id
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id
+        WHERE image.completed_date IS NOT NULL
+        AND ((image.completed_date >= %s AND image.completed_date < %s)
+             OR (image.upload_date >= %s AND image.upload_date < %s))
+        AND EXISTS (
+            SELECT 1
+            FROM task t
+            JOIN image_area ia ON ia.scvu_image_area_id = t.scvu_image_area_id
+            WHERE ia.scvu_image_id = image.scvu_image_id
+            AND t.assignee_keycloak_id = %s
+        )
+        """
+        results = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date, assignee_keycloak_id))
         formatted = []
         for row in results:
             row = list(row)

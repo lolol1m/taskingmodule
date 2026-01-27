@@ -14,6 +14,7 @@ import GenBinCount from "../components/GenBinCount";
 import UpdateSensorCategory from "../components/UpdateSensorCategory";
 import ParadeState from "../components/ParadeState";
 import InsertJson from "../components/InsertJson";
+import CreateUser from "../components/CreateUser";
 
 /* Admin page is a single page JS file named AdminPage.js. All the other JS files such as
 OPSV.js, GenBinCount.js etc... are tables embedded into the AdminPage.js file. There is a 
@@ -26,6 +27,7 @@ function AdminPage({ dateRange }) {
     const [showUpdateSensorCategory,setShowUpdateSensorCategory]=React.useState(false)
     const [showParadeState,setShowParadeState]=React.useState(false)
     const [showInsertJson,setShowInsertJson]=React.useState(false)
+    const [showCreateUser,setShowCreateUser]=React.useState(false)
     // Get role from Keycloak token
     const role = useKeycloakRole();
     
@@ -44,11 +46,12 @@ function AdminPage({ dateRange }) {
                         aria-labelledby="demo-row-radio-buttons-group-label"
                         name="row-radio-buttons-group"
                     >
-                        <FormControlLabel value="OPSV" control={<Radio />} label="Set OPS V" onClick={()=>{setShowOPSV(true); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(false);}} />
-                        <FormControlLabel value="GenBinCount" control={<Radio />} label="Generate Bin Count" onClick={()=>{setShowOPSV(false); setShowGenBinCount(true); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(false);}} />
-                        <FormControlLabel value="UpdateSensorCategory" control={<Radio />} label="Update Sensor Category" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(true); setShowParadeState(false); setShowInsertJson(false);}} />
-                        <FormControlLabel value="ParadeState" control={<Radio />} label="Upload Parade State" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(true); setShowInsertJson(false);}} />
-                        <FormControlLabel value="InsertJson" control={<Radio />} label="Insert JSON" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(true);}} />
+                        <FormControlLabel value="OPSV" control={<Radio />} label="Set OPS V" onClick={()=>{setShowOPSV(true); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(false); setShowCreateUser(false);}} />
+                        <FormControlLabel value="GenBinCount" control={<Radio />} label="Generate Bin Count" onClick={()=>{setShowOPSV(false); setShowGenBinCount(true); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(false); setShowCreateUser(false);}} />
+                        <FormControlLabel value="UpdateSensorCategory" control={<Radio />} label="Update Sensor Category" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(true); setShowParadeState(false); setShowInsertJson(false); setShowCreateUser(false);}} />
+                        <FormControlLabel value="ParadeState" control={<Radio />} label="Upload Parade State" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(true); setShowInsertJson(false); setShowCreateUser(false);}} />
+                        <FormControlLabel value="InsertJson" control={<Radio />} label="Insert JSON" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(true); setShowCreateUser(false);}} />
+                        <FormControlLabel value="CreateUser" control={<Radio />} label="Create User" onClick={()=>{setShowOPSV(false); setShowGenBinCount(false); setShowUpdateSensorCategory(false); setShowParadeState(false); setShowInsertJson(false); setShowCreateUser(true);}} />
                     </RadioGroup>
                     </FormControl>
                 </div>
@@ -71,6 +74,10 @@ function AdminPage({ dateRange }) {
 
                 <div>
                     {showInsertJson?<InsertJson />:null}
+                </div>
+
+                <div>
+                    {showCreateUser?<CreateUser />:null}
                 </div>
             </div>
         );
