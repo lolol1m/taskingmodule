@@ -7,7 +7,7 @@ class API {
     constructor(api_link = import.meta.env.VITE_BACKEND_URL) {
         this.client =  axios.create({
             baseURL: api_link,
-            timeout: 1000,
+            timeout: 5000,
         })
         //TODO: Integrate with keycloak js
           this.client.interceptors.request.use(
@@ -35,11 +35,12 @@ class API {
         );
         this.client.interceptors.response.use(
             (response) => {
-                console.log(`Response successful! ${response.status}`)
+                console.log(`Response successful! ${response.statusText}`)
                 return response
             },
         async (error) => {
     const originalRequest = error.config;
+    console.log("There is an error:", error)
     
    /*
     if (error.response?.status === 401 && !originalRequest._retry) {

@@ -50,6 +50,20 @@ const getUsername = () => _kc.tokenParsed?.preferred_username;
 
 const hasRole = (roles) => roles.some((role) => _kc.hasRealmRole(role));
 
+const readUserRoleSingle= () => {
+    try {
+   
+//note for realm 
+    if (UserService.hasRole(["IA"])) return 'IA'
+    if (UserService.hasRole(['Senior II'])) return 'Senior II'
+    if (UserService.hasRole(['II'])) return 'II'
+    return roles[0] || null
+  } catch (error) {
+    console.warn('Unable to read user role', error)
+    return null
+  }
+}
+
 const UserService = {
   initKeycloak,
   doLogin,
@@ -60,6 +74,7 @@ const UserService = {
   updateToken,
   getUsername,
   hasRole,
+  readUserRoleSingle
 };
 
 export default UserService;

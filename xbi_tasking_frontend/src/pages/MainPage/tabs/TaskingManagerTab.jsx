@@ -16,19 +16,6 @@ const api = new API()
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
-const readUserRole = () => {
-  try {
-   
-//note for realm 
-    if (UserService.hasRole(["IA"])) return 'IA'
-    if (UserService.hasRole(['Senior II'])) return 'Senior II'
-    if (UserService.hasRole(['II'])) return 'II'
-    return roles[0] || null
-  } catch (error) {
-    console.warn('Unable to read user role', error)
-    return null
-  }
-}
 
 const normalizeImageName = (value) => {
   if (!value || typeof value !== 'string') return value
@@ -559,7 +546,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     }
   }
 
-  const role = readUserRole()
+  const role = UserService.readUserRoleSingle()
   if (role === 'II') {
     return <div className="tasking-manager__notice">You do not have permission to view this tab.</div>
   }

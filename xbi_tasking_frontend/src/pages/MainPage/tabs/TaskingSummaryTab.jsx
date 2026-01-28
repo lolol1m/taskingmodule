@@ -20,19 +20,7 @@ const api = new API()
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
-const readUserRole = () => {
-  try {
-   
-//note for realm 
-    if (UserService.hasRole(["IA"])) return 'IA'
-    if (UserService.hasRole(['Senior II'])) return 'Senior II'
-    if (UserService.hasRole(['II'])) return 'II'
-    return roles[0] || null
-  } catch (error) {
-    console.warn('Unable to read user role', error)
-    return null
-  }
-}
+
 
 const updateWorkingRow = (prev, rowId, field, value, baseData = null) => {
   const key = String(rowId)
@@ -960,7 +948,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     await processTask('/startTasks')
   }
 
-  const role = readUserRole()
+  const role = UserService.readUserRoleSingle()
   const isShow =
     role === 'II'
       ? { CT: true, VF: false, VP: false, CI: false }
