@@ -9,6 +9,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import dayjs from 'dayjs'
 import API from '../../../api/api'
 import UserService from '../../../auth/UserService'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
 
@@ -51,6 +52,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const [actionsEnabled, setActionsEnabled] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [areaOptions, setAreaOptions] = useState([])
+  const { addNotification } = useNotifications()
   const [formInput, setFormInput] = useState({
     imageFileName: '',
     sensorName: '',
@@ -467,10 +469,16 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
       if (hasPriority) {
         await api.postUpdateTaskingManagerData(prioritiesPayload)
-    
       }
 
       alert('Tasking Manager updated successfully.')
+      const summaryParts = []
+      if (hasTasks) summaryParts.push(`${tasksPayload.Tasks.length} tasks assigned`)
+      if (hasPriority) summaryParts.push(`${Object.keys(prioritiesPayload).length} priorities updated`)
+      addNotification({
+        title: 'Tasking Manager updated',
+        meta: `Just now · ${summaryParts.join(' · ')}`,
+      })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Manager update failed', err)
@@ -490,6 +498,10 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
     resetForm()
     setModalOpen(false)
+    addNotification({
+      title: 'TTG created',
+      meta: `Just now · ${payload.areas.length} areas`,
+    })
     setRefreshKey((prev) => prev + 1)
   }
 

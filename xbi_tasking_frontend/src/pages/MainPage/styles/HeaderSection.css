@@ -53,6 +53,13 @@
   font-family: inherit;
 }
 
+.notification-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  filter: var(--notification-icon-filter);
+}
+
 .icon-badge {
   position: absolute;
   top: -6px;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Box } from '@mui/material'
 import DatePickerModal from '../../components/DatePicker.jsx'
+import NotificationsProvider from '../../components/notifications/NotificationsProvider.jsx'
 import ContentSection from './sections/ContentSection.jsx'
 import HeaderSection from './sections/HeaderSection.jsx'
 import SidebarSection from './sections/SidebarSection.jsx'
@@ -70,30 +71,32 @@ function MainPage() {
       <DatePickerModal open={open} onClose={() => setOpen(false)} onApply={handleApply} />
       {dateRange && (
         <>
-          <HeaderSection username={username} />
+          <NotificationsProvider>
+            <HeaderSection username={username} />
 
-          <main className={`layout ${isCollapsed ? 'is-collapsed' : ''}`}>
-            <SidebarSection
-              isCollapsed={isCollapsed}
-              setIsCollapsed={setIsCollapsed}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              adminOpen={adminOpen}
-              setAdminOpen={setAdminOpen}
-              settingsOpen={settingsOpen}
-              setSettingsOpen={setSettingsOpen}
-              isDarkMode={isDarkMode}
-              setIsDarkMode={setIsDarkMode}
-              onLogout={handleLogout}
-            />
+            <main className={`layout ${isCollapsed ? 'is-collapsed' : ''}`}>
+              <SidebarSection
+                isCollapsed={isCollapsed}
+                setIsCollapsed={setIsCollapsed}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                adminOpen={adminOpen}
+                setAdminOpen={setAdminOpen}
+                settingsOpen={settingsOpen}
+                setSettingsOpen={setSettingsOpen}
+                isDarkMode={isDarkMode}
+                setIsDarkMode={setIsDarkMode}
+                onLogout={handleLogout}
+              />
 
-            <ContentSection
-              activeTab={activeTab}
-              dateRange={dateRange}
-              onOpenDatePicker={() => setOpen(true)}
-              isCollapsed={isCollapsed}
-            />
-          </main>
+              <ContentSection
+                activeTab={activeTab}
+                dateRange={dateRange}
+                onOpenDatePicker={() => setOpen(true)}
+                isCollapsed={isCollapsed}
+              />
+            </main>
+          </NotificationsProvider>
         </>
       )}
     </Box>

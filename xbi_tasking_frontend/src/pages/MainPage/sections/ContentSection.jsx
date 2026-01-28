@@ -5,6 +5,7 @@ import CompletedImagesTab from '../tabs/CompletedImagesTab.jsx'
 import CreateUserTab from '../tabs/CreateUserTab.jsx'
 import UserPresenceTab from '../tabs/UserPresenceTab.jsx'
 import SetOpsVTab from '../tabs/SetOpsVTab.jsx'
+import UploadsTab from '../tabs/UploadsTab.jsx'
 
 const tabMap = {
   summary: TaskingSummaryTab,
@@ -12,7 +13,8 @@ const tabMap = {
   completed: CompletedImagesTab,
   "admin-create-user": CreateUserTab,
   "admin-presence": UserPresenceTab,
-  "admin-opsv": SetOpsVTab
+  "admin-opsv": SetOpsVTab,
+  "admin-uploads": UploadsTab
 }
 
 function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed }) {

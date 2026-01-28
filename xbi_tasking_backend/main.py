@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import argparse
 import uvicorn
 import json
+import time
 from fastapi.openapi.docs import (
     get_redoc_html,
     get_swagger_ui_html,
@@ -33,6 +34,25 @@ origins = [
     "http://127.0.0.1:3000",
 ]
 mc = MainController()
+
+NOTIFICATIONS = []
+
+def push_notification(title, meta=None, user=None):
+    suffix = ""
+    if user and isinstance(user, dict):
+        username = user.get("preferred_username")
+        if username:
+            suffix = f" · {username}"
+    notification = {
+        "id": f"{int(time.time() * 1000)}-{secrets.token_hex(4)}",
+        "title": title,
+        "meta": f"{meta or 'Just now'}{suffix}",
+        "read": False,
+    }
+    NOTIFICATIONS.insert(0, notification)
+    if len(NOTIFICATIONS) > 200:
+        del NOTIFICATIONS[200:]
+    return notification
 
 # Keycloak authentication - can be enabled/disabled via environment variable
 KEYCLOAK_ENABLED = os.getenv('KEYCLOAK_ENABLED', 'true').lower() == 'true'  # Default to true
@@ -204,6 +224,10 @@ async def redoc_html():
 @app.get("/")
 async def index():
     return "it works"
+
+@app.get("/notifications")
+async def get_notifications(user: dict = Depends(get_current_user)):
+    return {"Notifications": NOTIFICATIONS}
 
 # Keycloak authentication endpoints - frontend never talks to Keycloak directly
 @app.get("/auth/login")
@@ -565,9 +589,15 @@ async def insertDSTAData(file: UploadFile, user: dict = Depends(get_current_user
     try:
         json_data = json.loads(contents.decode('utf-8'))
         result = mc.insertDSTAData(json_data)
+        if result.get("success"):
+            images = result.get("images_inserted")
+            areas = result.get("areas_inserted")
+            meta = f"Just now · {images} images, {areas} areas"
+            push_notification("Upload completed", meta, user)
         return result
     except Exception as e:
         from fastapi.responses import JSONResponse
+        push_notification("Upload failed", "Just now · Upload error", user)
         return JSONResponse(
             status_code=500,
             content={"error": str(e), "detail": "Failed to insert data"}
@@ -713,6 +743,11 @@ async def createUser(request: Request, user: dict = Depends(get_current_user)):
         result = mc.createUser(data)
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
+        push_notification(
+            "User created",
+            f"Just now · {data.get('username', 'user')} ({data.get('role', 'role')})",
+            user,
+        )
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

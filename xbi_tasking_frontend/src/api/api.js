@@ -116,6 +116,11 @@ class API {
         return response.data
     }
 
+    async createUser(body) {
+        const response = await this.client.post("/createUser", body)
+        return response.data
+    }
+
     async getAreas() {
         const response = await this.client.get("/getAreas")
         return response.data
@@ -169,6 +174,13 @@ class API {
     }
         async postInsertTTGData(body){ 
         const response = await this.client.post("/insertTTGData", body)
+        return response.data
+    }
+
+    async insertDSTAData(formData) {
+        const response = await this.client.post("/insertDSTAData", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        })
         return response.data
     }
 
