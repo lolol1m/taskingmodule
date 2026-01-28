@@ -18,6 +18,10 @@ import {
   Badge as BadgeIcon,
   Lock as LockIcon 
 } from '@mui/icons-material';
+import API from '../../../api/api'
+import useNotifications from '../../../components/notifications/useNotifications.js'
+
+const api = new API()
 
 
 const CreateUserTab = () => {
@@ -29,6 +33,7 @@ const CreateUserTab = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', msg: '' });
+  const { addNotification } = useNotifications()
 
   const roles = [
     { value: 'II', label: 'II' },
@@ -47,11 +52,20 @@ const CreateUserTab = () => {
     setStatus({ type: '', msg: '' });
 
     try {
-      await api.client.post('/users/create', formData);
-      setStatus({ type: 'success', msg: 'User created successfully!' });
+      const response = await api.createUser(formData);
+      setStatus({ type: 'success', msg: response?.message || 'User created successfully!' });
       setFormData({ username: '', password: '', role: 'II' });
+      addNotification({
+        title: 'User created',
+        meta: `Just now · ${formData.username} (${formData.role})`,
+      })
     } catch (err) {
-      setStatus({ type: 'error', msg: err.response?.data?.message || 'Failed to create user' });
+      const message = err.response?.data?.detail || err.response?.data?.message || 'Failed to create user';
+      setStatus({ type: 'error', msg: message });
+      addNotification({
+        title: 'User creation failed',
+        meta: 'Just now · Please try again',
+      })
     } finally {
       setLoading(false);
     }

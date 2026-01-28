@@ -13,7 +13,6 @@ import {
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 import useNotifications from '../../../components/notifications/useNotifications.js'
-import { ToastContainer, toast} from 'react-toastify';
 const api = new API()
 
 const readUserRole = () => {
@@ -163,9 +162,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     }
   }
 
-  useEffect(() => {
-    toast("Successfully loaded all users!")
-  })
   const dropdownFieldSx = (backgroundColor = 'transparent') => ({
     '& .MuiOutlinedInput-root': {
       height: 28,
