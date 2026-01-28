@@ -8,6 +8,38 @@
 2. Select or create realm: `xbi-tasking`
 3. Click **Create** (if new) or select existing realm
 
+### 1.5. Configure Frontend Client
+**This is the REQUIRED client for authentication.**
+
+1. Go to **Clients** → **Create client** (or edit existing `xbi-tasking-frontend`)
+2. Fill in:
+   - **Client type**: OpenID Connect
+   - **Client ID**: `xbi-tasking-frontend`
+   - Click **Next**
+3. In **Capability config**:
+   - **DISABLE Client authentication** (makes it public)
+   - **Enable Standard flow** (Authorization Code Flow) - 
+   - Click **Next**
+4. In **Login settings**:
+   - **Root URL**: Leave empty | http://localhost:5173
+   - **Home URL**: Leave empty | http://localhost:5173
+   - **Valid redirect URIs**: 
+     ```
+     http://localhost:5000/auth/callback |*
+     ```
+   - **Valid post logout redirect URIs**:
+     ```
+     http://localhost:3000/* | *
+     ```
+   - **Web origins**: 
+     ```
+     http://localhost:5000 | *
+     ```
+   - Click **Save**
+5. Go to **Credentials** tab
+6. Copy the **Client secret** - you'll need this for backend config
+
+
 ### 2. Configure Backend Client
 
 **This is the REQUIRED client for authentication.**
@@ -84,6 +116,8 @@ If you don't need Keycloak user listing, you can skip this section and leave `ad
    - `query-users` (to query users by role)
    - `view-realm` (to access realm info)
    - `manage-users` (to manage users info)
+
+   
    
 ## Backend Configuration
 
