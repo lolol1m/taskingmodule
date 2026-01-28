@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import useNotifications from './useNotifications.js'
 
 function NotificationsPanel() {
-  const { notifications, markAllRead } = useNotifications()
+  const { notifications, markAllRead, markRead } = useNotifications()
   const [open, setOpen] = useState(false)
   const panelRef = useRef(null)
   const toggleRef = useRef(null)
@@ -47,7 +47,18 @@ function NotificationsPanel() {
         </div>
         {notifications.length ? (
           notifications.map((item) => (
-            <div className="notification-item" key={item.id}>
+            <div
+              className="notification-item"
+              key={item.id}
+              onClick={() => markRead(item.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  markRead(item.id)
+                }
+              }}
+            >
               <div className="notification-item__title">{item.title}</div>
               <div className="notification-item__meta">{item.meta}</div>
             </div>

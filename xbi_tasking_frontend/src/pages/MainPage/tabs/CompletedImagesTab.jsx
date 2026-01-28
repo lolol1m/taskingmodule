@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
 
@@ -60,6 +61,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const { addNotification } = useNotifications()
 
   const columns = useMemo(
     () => [
@@ -110,6 +112,10 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
     try {
       setLoading(true)
       await api.uncompleteImages({ 'SCVU Image ID': selection })
+      addNotification({
+        title: 'Images uncompleted',
+        meta: `Just now · ${selection.length} images`,
+      })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Uncomplete images failed:', err)

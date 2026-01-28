@@ -1,3 +1,34 @@
 #root {
   min-height: 100vh;
 }
+
+.Toastify__toast {
+  background: #15161a;
+  border: 1px solid #23242a;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  color: #e5e7eb;
+  font-family: inherit;
+}
+
+.Toastify__toast-body {
+  font-size: 13px;
+  color: #e5e7eb;
+}
+
+.Toastify__progress-bar {
+  background: #2563eb;
+}
+
+.Toastify__close-button {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+.Toastify__toast--success .Toastify__progress-bar {
+  background: #22c55e;
+}
+
+.Toastify__toast--error .Toastify__progress-bar {
+  background: #ef4444;
+}

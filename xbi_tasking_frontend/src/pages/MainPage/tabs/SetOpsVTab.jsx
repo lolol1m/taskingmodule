@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
 
@@ -34,6 +35,7 @@ function SetOpsVTab() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const { addNotification } = useNotifications()
 
   const columns = useMemo(
     () => [
@@ -89,6 +91,11 @@ function SetOpsVTab() {
         'OPS V': hasSelection(selectionModel.ids, row.id),
       }))
       await api.setOpsvAreas({ Areas: payload })
+      const selectedCount = selectionModel?.ids?.size || 0
+      addNotification({
+        title: 'OPS V updated',
+        meta: `Just now · ${selectedCount} areas updated`,
+      })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('OPS V update failed:', err)

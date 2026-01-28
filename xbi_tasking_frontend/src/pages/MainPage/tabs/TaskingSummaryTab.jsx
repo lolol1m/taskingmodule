@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 import { ToastContainer, toast} from 'react-toastify';
 const api = new API()
 
@@ -133,6 +134,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   const [showDetails, setShowDetails] = useState(false)
   const [openCopy, setOpenCopy] = useState(false)
   const [clipboardValue, setClipboardValue] = useState('')
+  const { addNotification } = useNotifications()
   const handleTooltipClose = () => setOpenCopy(false)
 
   const rows = useMemo(() => buildRows(workingData || inputData), [workingData, inputData])
@@ -651,6 +653,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     })
     try {
       await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
+      const actionTitle =
+        apiPath === '/startTasks' ? 'Tasks started' : apiPath === '/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+      addNotification({
+        title: actionTitle,
+        meta: `Just now · ${taskIds.length} tasks`,
+      })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Summary task update failed:', err)
@@ -718,6 +726,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     }
     try {
       await saveAndComplete()
+      addNotification({
+        title: 'Images completed',
+        meta: `Just now · ${imageIds.length} images`,
+      })
     } catch (err) {
       console.error('Tasking Summary complete failed:', err)
       alert('Unable to complete images. Please try again.')
@@ -753,6 +765,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
     try {
       await api.postUpdateTaskingSummaryData(payload)
+      addNotification({
+        title: 'Tasking Summary updated',
+        meta: `Just now · ${selection.length} rows updated`,
+      })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Summary update failed:', err)
