@@ -12,6 +12,9 @@ import useNotifications from '../../../components/notifications/useNotifications
 
 const api = new API()
 
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
+
 const readUserRole = () => {
   try {
     const rawUser = localStorage.getItem('user')
@@ -179,13 +182,14 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   }
 
   const fetchUsers = async () => {
-  
-
     try {
-
+      setError(null)
       const data = await api.getUsers()
       if (data?.Warning) {
-        alert(data.Warning)
+        addNotification({
+          title: 'User list warning',
+          meta: data.Warning,
+        })
       }
       if (Array.isArray(data?.Users) && data.Users.length) {
         setAssignees([{ id: 'Multiple', name: 'Multiple' }, ...data.Users])
@@ -194,6 +198,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       }
     } catch (err) {
       console.warn('Failed to load users', err)
+      const message = getErrorMessage(err, 'Unable to load users.')
+      setError(message)
+      addNotification({
+        title: 'User list failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -213,7 +223,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       setRows(formatData(data))
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
-      setError('Unable to load tasking manager data.')
+      const message = getErrorMessage(err, 'Unable to load tasking manager data.')
+      setError(message)
+      addNotification({
+        title: 'Load failed',
+        meta: 'Just now · Tasking Manager unavailable',
+      })
     } finally {
       setLoading(false)
     }
@@ -221,13 +236,19 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
   const fetchAreas = async () => {
     try {
-     
+      setError(null)
       const data = await api.getAreas()
       const areas = Array.isArray(data?.Areas) ? data.Areas : []
       const names = Array.from(new Set(areas.map((area) => area?.['Area Name']).filter(Boolean)))
       setAreaOptions(names)
     } catch (err) {
       console.warn('Unable to load areas', err)
+      const message = getErrorMessage(err, 'Unable to load areas.')
+      setError(message)
+      addNotification({
+        title: 'Area list failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -404,8 +425,23 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             startIcon={isEnabled ? <DeleteOutlineIcon fontSize="small" /> : <LockOutlinedIcon fontSize="small" />}
             onClick={async () => {
               if (!isEnabled) return
-              await api.postDeleteImage({ 'SCVU Image ID': params.id })
-              setRefreshKey((prev) => prev + 1)
+              try {
+                setError(null)
+                await api.postDeleteImage({ 'SCVU Image ID': params.id })
+                addNotification({
+                  title: 'TTG deleted',
+                  meta: 'Just now · Image removed',
+                })
+                setRefreshKey((prev) => prev + 1)
+              } catch (err) {
+                console.error('TTG delete failed', err)
+                const message = getErrorMessage(err, 'Unable to delete TTG.')
+                setError(message)
+                addNotification({
+                  title: 'TTG delete failed',
+                  meta: 'Just now · Please try again',
+                })
+              }
             }}
           >
             Delete TTG
@@ -458,11 +494,15 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     const hasPriority = Object.keys(prioritiesPayload).length > 0
 
     if (!hasTasks && !hasPriority) {
-      alert('No tasks to assign or priorities to update.')
+      addNotification({
+        title: 'Nothing to update',
+        meta: 'Select tasks or priorities first',
+      })
       return
     }
 
     try {
+      setError(null)
       if (hasTasks) {
         await api.postAssignTask(tasksPayload)
         localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
@@ -472,7 +512,6 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         await api.postUpdateTaskingManagerData(prioritiesPayload)
       }
 
-      alert('Tasking Manager updated successfully.')
       const summaryParts = []
       if (hasTasks) summaryParts.push(`${tasksPayload.Tasks.length} tasks assigned`)
       if (hasPriority) summaryParts.push(`${Object.keys(prioritiesPayload).length} priorities updated`)
@@ -483,7 +522,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Manager update failed', err)
-      alert('Unable to apply changes. Please try again.')
+      const message = getErrorMessage(err, 'Unable to apply changes.')
+      setError(message)
+      addNotification({
+        title: 'Update failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -495,15 +539,25 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       imageDateTime: toISOLocal(formInput.imageDateTime),
       areas: formInput.areas || [],
     }
-    await api.postInsertTTGData(payload)
-
-    resetForm()
-    setModalOpen(false)
-    addNotification({
-      title: 'TTG created',
-      meta: `Just now · ${payload.areas.length} areas`,
-    })
-    setRefreshKey((prev) => prev + 1)
+    try {
+      setError(null)
+      await api.postInsertTTGData(payload)
+      resetForm()
+      setModalOpen(false)
+      addNotification({
+        title: 'TTG created',
+        meta: `Just now · ${payload.areas.length} areas`,
+      })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('TTG create failed', err)
+      const message = getErrorMessage(err, 'Unable to create TTG.')
+      setError(message)
+      addNotification({
+        title: 'TTG creation failed',
+        meta: 'Just now · Please try again',
+      })
+    }
   }
 
   const role = readUserRole()

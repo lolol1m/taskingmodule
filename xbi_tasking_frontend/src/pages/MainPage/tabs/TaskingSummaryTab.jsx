@@ -15,6 +15,9 @@ import API from '../../../api/api'
 import useNotifications from '../../../components/notifications/useNotifications.js'
 const api = new API()
 
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
+
 const readUserRole = () => {
   try {
     const rawUser = localStorage.getItem('user')
@@ -50,6 +53,30 @@ const buildRows = (inputData) => {
   if (!inputData) return []
 
   const rows = []
+  const taskProgress = new Map()
+
+  Object.keys(inputData).forEach((key) => {
+    const entry = inputData[key]
+    if (!entry || entry['Parent ID'] === undefined) return
+    const parentId = Number(entry['Parent ID'])
+    if (!Number.isFinite(parentId)) return
+    const status = entry['Task Status']
+    const normalized = typeof status === 'string' ? status.trim().toLowerCase() : ''
+    const current = taskProgress.get(parentId) || { completed: 0, total: 0 }
+    current.total += 1
+    if (normalized === 'completed') {
+      current.completed += 1
+    }
+    taskProgress.set(parentId, current)
+  })
+
+  const resolveTaskCompleted = (entry, key) => {
+    const progress = taskProgress.get(Number(key))
+    if (progress && progress.total > 0) {
+      return `${progress.completed}/${progress.total}`
+    }
+    return entry['Task Completed']
+  }
   Object.keys(inputData).forEach((key) => {
     const entry = inputData[key]
     if (!entry) return
@@ -67,7 +94,7 @@ const buildRows = (inputData) => {
         areaName: entry['Area'],
         assignee: entry['Assignee'],
         report: entry['Report'],
-        taskCompleted: entry['Task Completed'],
+        taskCompleted: resolveTaskCompleted(entry, key),
         priority: entry['Priority'],
         imageCategory: entry['Image Category'],
         imageQuality: entry['Image Quality'],
@@ -110,6 +137,13 @@ const parseProgress = (value) => {
   const [completed, total] = value.split('/').map((item) => Number(item))
   if (!total || Number.isNaN(completed) || Number.isNaN(total)) return null
   return Math.round((completed / total) * 100)
+}
+
+const normalizeStatus = (value) => {
+  if (!value) return ''
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'in_progress' || normalized === 'inprogress') return 'in progress'
+  return normalized
 }
 
 function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
@@ -538,7 +572,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       setInputData(data)
     } catch (err) {
       console.error('Tasking Summary fetch failed:', err)
-      setError('Unable to load tasking summary data.')
+      const message = getErrorMessage(err, 'Unable to load tasking summary data.')
+      setError(message)
+      addNotification({
+        title: 'Load failed',
+        meta: 'Just now · Tasking Summary unavailable',
+      })
     } finally {
       setLoading(false)
     }
@@ -621,6 +660,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       }))
     } catch (err) {
       console.warn(`Failed to load ${key} values`, err)
+      const message = getErrorMessage(err, `Unable to load ${key} options.`)
+      setError(message)
+      addNotification({
+        title: `${key} options failed`,
+        meta: 'Just now · Please try again',
+      })
       setDropdownValues((prev) => ({
         ...prev,
         [key]: prev[key]?.length ? prev[key] : readCachedOptions(key),
@@ -630,7 +675,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const processTask = async (apiPath) => {
     if (selection.length === 0) {
-      alert('Please select a row')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a row first',
+      })
       return
     }
 
@@ -639,8 +687,35 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       return row?.parentId !== undefined
     })
     if (taskRows.length === 0) {
-      alert('Please select a task row')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a task row',
+      })
       return
+    }
+
+    const allowedStatuses = {
+      '/startTasks': ['incomplete', 'not started'],
+      '/completeTasks': ['in progress'],
+      '/verifyPass': ['verifying'],
+      '/verifyFail': ['verifying'],
+    }
+    const expected = allowedStatuses[apiPath]
+    if (expected) {
+      const invalid = taskRows
+        .map((rowId) => rows.find((item) => item.id === rowId))
+        .filter((row) => {
+          const status = normalizeStatus(row?.taskStatus)
+          return !expected.includes(status)
+        })
+      if (invalid.length) {
+        const expectedLabel = expected.map((value) => value.replace(/\b\w/g, (c) => c.toUpperCase())).join(', ')
+        addNotification({
+          title: 'Invalid task status',
+          meta: `Expected ${expectedLabel} · ${invalid.length} task(s) not ready`,
+        })
+        return
+      }
     }
 
     const taskIds = taskRows.map((rowId) => {
@@ -648,6 +723,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       return row?.scvuTaskId || rowId
     })
     try {
+      setError(null)
       await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
       const actionTitle =
         apiPath === '/startTasks' ? 'Tasks started' : apiPath === '/completeTasks' ? 'Tasks completed' : 'Tasks updated'
@@ -658,13 +734,21 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Summary task update failed:', err)
-      alert('Unable to update tasks. Please try again.')
+      const message = getErrorMessage(err, 'Unable to update tasks.')
+      setError(message)
+      addNotification({
+        title: 'Task update failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
   const processImage = async (apiPath) => {
     if (selection.length === 0) {
-      alert('Please select an Image Row to be completed')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Select an image row to complete',
+      })
       return
     }
 
@@ -674,7 +758,24 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     })
 
     if (imageIds.length === 0) {
-      alert('Please select only Image Rows')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select only image rows',
+      })
+      return
+    }
+
+    const incomplete = imageIds
+      .map((rowId) => rows.find((item) => item.id === rowId))
+      .filter((row) => {
+        const progressValue = parseProgress(row?.taskCompleted)
+        return progressValue !== null && progressValue < 100
+      })
+    if (apiPath === '/completeImages' && incomplete.length) {
+      addNotification({
+        title: 'Cannot complete image',
+        meta: 'All tasks must be completed first',
+      })
       return
     }
 
@@ -716,11 +817,17 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         await api.postUpdateTaskingSummaryData(dataToSave)
       } catch (err) {
         console.error('Tasking Summary save failed:', err)
-        alert('Error saving changes. Image will not be completed.')
+        const message = getErrorMessage(err, 'Error saving changes. Image will not be completed.')
+        setError(message)
+        addNotification({
+          title: 'Save failed',
+          meta: 'Just now · Image not completed',
+        })
         return
       }
     }
     try {
+      setError(null)
       await saveAndComplete()
       addNotification({
         title: 'Images completed',
@@ -728,7 +835,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       })
     } catch (err) {
       console.error('Tasking Summary complete failed:', err)
-      alert('Unable to complete images. Please try again.')
+      const message = getErrorMessage(err, 'Unable to complete images.')
+      setError(message)
+      addNotification({
+        title: 'Complete failed',
+        meta: 'Just now · Please try again',
+      })
       return
     }
 
@@ -737,7 +849,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const processSendData = async () => {
     if (selection.length === 0) {
-      alert('Please select a row')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a row first',
+      })
       return
     }
 
@@ -755,11 +870,15 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     })
 
     if (hasNull) {
-      alert('Your selected row(s) has an empty value in the dropdown')
+      addNotification({
+        title: 'Missing values',
+        meta: 'Fill all dropdowns before saving',
+      })
       return
     }
 
     try {
+      setError(null)
       await api.postUpdateTaskingSummaryData(payload)
       addNotification({
         title: 'Tasking Summary updated',
@@ -768,7 +887,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Summary update failed:', err)
-      alert('Unable to save changes. Please try again.')
+      const message = getErrorMessage(err, 'Unable to save changes.')
+      setError(message)
+      addNotification({
+        title: 'Save failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -799,18 +923,27 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const copyClipboard = async () => {
     if (selection.length === 0) {
-      alert('Please select a task')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a task',
+      })
       return
     }
     const firstId = selection[0]
     const parentId = workingData?.[String(firstId)]?.['Parent ID']
     if (parentId === undefined || parentId === null) {
-      alert('Please select tasks only')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select task rows only',
+      })
       return
     }
     const imageId = workingData?.[String(parentId)]?.['Image ID']
     if (!imageId) {
-      alert('Unable to find image ID')
+      addNotification({
+        title: 'Image ID missing',
+        meta: 'Unable to copy to clipboard',
+      })
       return
     }
     setClipboardValue(String(imageId))
@@ -818,6 +951,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       await navigator.clipboard.writeText(String(imageId))
     } catch (error) {
       console.warn('Clipboard copy failed', error)
+      addNotification({
+        title: 'Clipboard failed',
+        meta: 'Could not copy image ID',
+      })
     }
     setOpenCopy(true)
     await processTask('/startTasks')
