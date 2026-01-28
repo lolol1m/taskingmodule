@@ -1,4 +1,5 @@
 import { createContext, useEffect, useMemo, useState } from 'react'
+import { toast } from 'react-toastify'
 import API from '../../api/api.js'
 
 export const NotificationsContext = createContext(null)
@@ -18,10 +19,25 @@ function NotificationsProvider({ children }) {
   const [notifications, setNotifications] = useState([])
 
   const addNotification = (next) => {
+    const notificationId = next?.id || `${Date.now()}-${Math.random()}`
     setNotifications((prev) => [
-      { ...next, id: next.id || `${Date.now()}-${Math.random()}`, read: false },
+      { ...next, id: notificationId, read: false },
       ...prev,
     ])
+    if (!next?.silent) {
+      const content = (
+        <div className="toast-notification">
+          <div className="toast-notification__title">{next?.title}</div>
+          {next?.meta ? <div className="toast-notification__meta">{next.meta}</div> : null}
+        </div>
+      )
+      toast(content, {
+        toastId: notificationId,
+        className: 'toast-notification-shell',
+        bodyClassName: 'toast-notification-body',
+        progressClassName: 'toast-notification-progress',
+      })
+    }
   }
 
   const markRead = (id) => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import useNotifications from './useNotifications.js'
+import notificationIcon from '../../assets/notification.png'
 
 function NotificationsPanel() {
   const { notifications, markAllRead, markRead } = useNotifications()
@@ -35,7 +36,7 @@ function NotificationsPanel() {
           setOpen((prev) => !prev)
         }}
       >
-        🔔
+        <img className="notification-icon" src={notificationIcon} alt="" />
         {unreadCount ? <span className="icon-badge">{unreadCount}</span> : null}
       </button>
       <div ref={panelRef} className={`notification-panel ${open ? '' : 'is-hidden'}`}>

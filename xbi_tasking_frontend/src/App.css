@@ -6,23 +6,61 @@
   background: #15161a;
   border: 1px solid #23242a;
   border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
   color: #e5e7eb;
   font-family: inherit;
+  padding: 0;
 }
 
 .Toastify__toast-body {
-  font-size: 13px;
-  color: #e5e7eb;
+  margin: 0;
+  padding: 0;
 }
 
 .Toastify__progress-bar {
   background: #2563eb;
+  border-radius: 999px;
 }
 
 .Toastify__close-button {
   color: #9ca3af;
   opacity: 1;
+  margin-left: 6px;
+}
+
+.toast-notification-shell {
+  background: #15161a;
+  border: 1px solid #23242a;
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+}
+
+.toast-notification-body {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+}
+
+.toast-notification {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toast-notification__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.toast-notification__meta {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.toast-notification-progress {
+  background: #2563eb;
+  border-radius: 999px;
 }
 
 .Toastify__toast--success .Toastify__progress-bar {
