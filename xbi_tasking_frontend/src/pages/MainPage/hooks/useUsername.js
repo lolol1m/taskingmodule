@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
+import UserService from '../../../auth/UserService'
 
 function useUsername() {
   const [username, setUsername] = useState('')
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    const storedUsername = localStorage.getItem('username')
-
+   // const storedUser = localStorage.getItem('user')
+    const storedUsername = UserService.getUsername()
+ if (storedUsername) {
+      setUsername(storedUsername)
+    }
+    /*
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser)
@@ -21,7 +25,7 @@ function useUsername() {
 
     if (storedUsername) {
       setUsername(storedUsername)
-    }
+    }*/
   }, [])
 
   return username

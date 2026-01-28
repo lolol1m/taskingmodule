@@ -1,5 +1,5 @@
 import axios from 'axios'
-
+import UserService from '../auth/UserService';
 /*
 There is no need to stringy the body as axios will do it automatically 
 */
@@ -12,15 +12,20 @@ class API {
         //TODO: Integrate with keycloak js
           this.client.interceptors.request.use(
             (config) => {
-                const token = localStorage.getItem("access_token"); 
-                if (!token) {
-                    window.location.href = `${api_link}/auth/login` //redirect to login
-                    this.#__redirectToLogin()
-                    this.#__clearAuthTokens();
+           
+
+                const isLoggedIn = UserService.isLoggedIn()
+                if(!isLoggedIn) {
+                    UserService.updateToken()
+                }
+                const token = UserService.getToken() 
+                               
+                if (!token) { //somehow if it still doesn't get the token for some reason
+                    UserService.doLogin()
                     throw new Error('Not authenticated')
                 }
                 config.headers.Authorization = `Bearer ${token}`
-
+               
 
                 return config;
             },
@@ -35,8 +40,8 @@ class API {
             },
         async (error) => {
     const originalRequest = error.config;
-
-   
+    
+   /*
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true; // prevent infinite loops
 
@@ -88,6 +93,7 @@ class API {
 
     
     return Promise.reject(error);
+    */
   }
         )
 

@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import AuthGuard from './components/AuthGuard.jsx'
+import {AuthGuard, KeycloakAuthGuard} from './components/AuthGuard.jsx'
 import MainPage from './pages/MainPage'
 import './App.css'
 import {LicenseInfo} from "@mui/x-license"
@@ -12,7 +12,7 @@ function App() {
       <Route
         path="/"
         element={
-          <AuthGuard>
+          <KeycloakAuthGuard>
             <ToastContainer
 position="top-right"
 autoClose={5000}
@@ -27,7 +27,7 @@ theme="dark"
 
 />
             <MainPage />
-          </AuthGuard>
+          </KeycloakAuthGuard>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -79,6 +79,8 @@ async def keycloak_auth_middleware(request: Request, call_next):
     from main_classes.KeycloakAuth import keycloak_auth
     
     auth_header = request.headers.get("Authorization")
+    print(auth_header)
+    print("=========HERE===============")
     print(f"   [MIDDLEWARE] Authorization header present: {auth_header is not None}")
     if auth_header:
         print(f"   [MIDDLEWARE] Header starts with 'Bearer ': {auth_header.startswith('Bearer ')}")
@@ -791,6 +793,7 @@ async def getTaskingSummaryData(request: Request):
         }
     '''
     try:
+      
         data = await request.json()
         return mc.getTaskingSummaryData(data)
     except Exception as e:

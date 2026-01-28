@@ -15,7 +15,7 @@ const _kc = new Keycloak({
 
 export async function initKeycloak() {
   try {
-    authenticated = await _kc.init({ onLoad: 'login-required'});
+    const authenticated = await _kc.init({ onLoad: 'login-required', pkceMethod:"S256"});
     console.log(_kc, "Keycloak config loaded")
     if (authenticated) {
         console.log('User is authenticated');
@@ -23,7 +23,7 @@ export async function initKeycloak() {
         console.log('User is not authenticated');
     }
   
-  } catch {
+  } catch(error) {
      console.error('Failed to initialize adapter:', error);
   }
  

@@ -279,7 +279,7 @@ function MyApp() {
 
   // AuthGuard handles authentication and redirects to Keycloak before UI loads
   return (
-    <AuthGuard onAuthSuccess={setToken}>
+    <KeycloakAuthGuard onAuthSuccess={setToken}>
       {!dateRange ? (
         <DatePickerModal
           openDP={openDP}

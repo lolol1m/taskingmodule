@@ -13,17 +13,16 @@ import {
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 import { ToastContainer, toast} from 'react-toastify';
+import UserService from '../../../auth/UserService';
 const api = new API()
 
 const readUserRole = () => {
   try {
-    const rawUser = localStorage.getItem('user')
-    if (!rawUser) return null
-    const user = JSON.parse(rawUser)
-    const roles = Array.isArray(user?.roles) ? user.roles : []
-    if (roles.includes('IA')) return 'IA'
-    if (roles.includes('Senior II')) return 'Senior II'
-    if (roles.includes('II')) return 'II'
+   
+//note for realm 
+    if (UserService.hasRole(["IA"])) return 'IA'
+    if (UserService.hasRole(['Senior II'])) return 'Senior II'
+    if (UserService.hasRole(['II'])) return 'II'
     return roles[0] || null
   } catch (error) {
     console.warn('Unable to read user role', error)
