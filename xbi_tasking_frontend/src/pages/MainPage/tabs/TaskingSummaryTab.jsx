@@ -1180,6 +1180,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             backgroundColor: 'var(--table-bg)',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
+              color: 'var(--muted)',
             },
             '& .MuiDataGrid-cell': {
               display: 'flex',
@@ -1257,9 +1258,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
-              color: 'var(--muted)',
-            },
-            '& .MuiDataGrid-columnHeaderTitle': {
               color: 'var(--muted)',
             },
             '& .MuiDataGrid-row': {
