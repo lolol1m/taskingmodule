@@ -6,6 +6,9 @@ import useNotifications from '../../../components/notifications/useNotifications
 
 const api = new API()
 
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
+
 const normalizeImageName = (value) => {
   if (!value || typeof value !== 'string') return value
   return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
@@ -98,7 +101,12 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         setRows(buildRows(data))
       } catch (err) {
         console.error('Completed images fetch failed:', err)
-        setError(err?.message || 'Unable to load completed images.')
+        const message = getErrorMessage(err, 'Unable to load completed images.')
+        setError(message)
+        addNotification({
+          title: 'Load failed',
+          meta: 'Just now · Completed images unavailable',
+        })
       } finally {
         setLoading(false)
       }
@@ -119,7 +127,12 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Uncomplete images failed:', err)
-      setError(err?.message || 'Unable to uncomplete images.')
+      const message = getErrorMessage(err, 'Unable to uncomplete images.')
+      setError(message)
+      addNotification({
+        title: 'Uncomplete failed',
+        meta: 'Just now · Please try again',
+      })
     } finally {
       setLoading(false)
     }

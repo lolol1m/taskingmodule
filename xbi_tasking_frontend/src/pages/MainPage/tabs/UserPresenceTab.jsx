@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
+
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
 const readField = (obj, keys) => {
   if (!obj || typeof obj !== 'object') return undefined
@@ -48,6 +52,7 @@ function UserPresenceTab() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const { addNotification } = useNotifications()
 
   const columns = useMemo(
     () => [
@@ -68,7 +73,12 @@ function UserPresenceTab() {
         setRows(buildRows(data?.Users || []))
       } catch (err) {
         console.error('User presence fetch failed:', err)
-        setError('Unable to load user presence data.')
+        const message = getErrorMessage(err, 'Unable to load user presence data.')
+        setError(message)
+        addNotification({
+          title: 'User presence failed',
+          meta: 'Just now · Please try again',
+        })
       } finally {
         setLoading(false)
       }

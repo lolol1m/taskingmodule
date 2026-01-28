@@ -6,6 +6,9 @@ import useNotifications from '../../../components/notifications/useNotifications
 
 const api = new API()
 
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
+
 const normalizeOpsV = (value) => {
   if (value === true || value === 1) return true
   if (typeof value === 'string') {
@@ -72,7 +75,12 @@ function SetOpsVTab() {
         )
       } catch (err) {
         console.error('OPS V fetch failed:', err)
-        setError('Unable to load OPS V areas.')
+        const message = getErrorMessage(err, 'Unable to load OPS V areas.')
+        setError(message)
+        addNotification({
+          title: 'OPS V load failed',
+          meta: 'Just now · Please try again',
+        })
       } finally {
         setLoading(false)
       }
@@ -99,7 +107,12 @@ function SetOpsVTab() {
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('OPS V update failed:', err)
-      setError('Unable to update OPS V areas.')
+      const message = getErrorMessage(err, 'Unable to update OPS V areas.')
+      setError(message)
+      addNotification({
+        title: 'OPS V update failed',
+        meta: 'Just now · Please try again',
+      })
     } finally {
       setLoading(false)
     }
