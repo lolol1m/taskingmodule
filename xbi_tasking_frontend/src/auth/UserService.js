@@ -1,26 +1,35 @@
 import Keycloak from "keycloak-js";
 
-const _kc = new Keycloak('/keycloak.json');
+const _kc = new Keycloak({
+  url: import.meta.env.VITE_KEYCLOAK_URL,
+  realm: import.meta.env.VITE_KEYCLOAK_REALM,
+  clientId: import.meta.env.VITE_CLIENT_ID
+});
 
 /**
  * Initializes Keycloak instance and calls the provided callback function if successfully authenticated.
  *
  * @param onAuthenticatedCallback
  */
-const initKeycloak = (onAuthenticatedCallback) => {
-  _kc.init({
-    onLoad: 'login-required',
-    
-    pkceMethod: 'S256',
-  })
-    .then((authenticated) => {
-      if (!authenticated) {
-        console.log("user is not authenticated..!");
-      }
-      onAuthenticatedCallback();
-    })
-    .catch(console.error);
-};
+
+
+export async function initKeycloak() {
+  try {
+    authenticated = await _kc.init({ onLoad: 'login-required'});
+    console.log(_kc, "Keycloak config loaded")
+    if (authenticated) {
+        console.log('User is authenticated');
+    } else {
+        console.log('User is not authenticated');
+    }
+  
+  } catch {
+     console.error('Failed to initialize adapter:', error);
+  }
+ 
+  
+  
+}
 
 const doLogin = _kc.login;
 
