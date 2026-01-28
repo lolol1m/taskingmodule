@@ -8,6 +8,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import dayjs from 'dayjs'
 import API from '../../../api/api'
+import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
@@ -17,13 +18,11 @@ const getErrorMessage = (err, fallback = 'Something went wrong.') =>
 
 const readUserRole = () => {
   try {
-    const rawUser = localStorage.getItem('user')
-    if (!rawUser) return null
-    const user = JSON.parse(rawUser)
-    const roles = Array.isArray(user?.roles) ? user.roles : []
-    if (roles.includes('IA')) return 'IA'
-    if (roles.includes('Senior II')) return 'Senior II'
-    if (roles.includes('II')) return 'II'
+   
+//note for realm 
+    if (UserService.hasRole(["IA"])) return 'IA'
+    if (UserService.hasRole(['Senior II'])) return 'Senior II'
+    if (UserService.hasRole(['II'])) return 'II'
     return roles[0] || null
   } catch (error) {
     console.warn('Unable to read user role', error)

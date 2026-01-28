@@ -16,6 +16,7 @@ const BACKEND_URL = process.env.REACT_APP_DB_API_URL || 'http://localhost:5000';
  * AuthGuard component that ensures user is authenticated before rendering children
  * Redirects to backend login endpoint (which redirects to Keycloak) if not authenticated
  */
+
 export default function AuthGuard({ children, onAuthSuccess }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);

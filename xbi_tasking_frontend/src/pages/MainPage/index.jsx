@@ -7,6 +7,7 @@ import HeaderSection from './sections/HeaderSection.jsx'
 import SidebarSection from './sections/SidebarSection.jsx'
 import useUsername from './hooks/useUsername.js'
 import './styles/index.css'
+import UserService from '../../auth/UserService.js'
 
 function MainPage() {
   const [dateRange, setDateRange] = useState(() => {
@@ -26,17 +27,9 @@ function MainPage() {
   const username = useUsername()
 
   const handleLogout = () => {
-    localStorage.removeItem('keycloak_token')
-    localStorage.removeItem('username')
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('id_token')
-    localStorage.removeItem('user')
+  
     localStorage.removeItem('tasking_date_range')
-    sessionStorage.removeItem('token')
-    sessionStorage.removeItem('username')
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-    window.location.href = `${backendUrl}/auth/logout`
+    UserService.doLogout()
   }
 
   const handleApply = (range) => {

@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import AuthGuard from './components/AuthGuard.jsx'
+import {AuthGuard, KeycloakAuthGuard} from './components/AuthGuard.jsx'
 import MainPage from './pages/MainPage'
 import './App.css'
 import 'react-toastify/dist/ReactToastify.css'
@@ -13,7 +13,7 @@ function App() {
       <Route
         path="/"
         element={
-          <AuthGuard>
+          <KeycloakAuthGuard>
             <ToastContainer
               position="top-right"
               autoClose={4000}
@@ -26,7 +26,7 @@ function App() {
               theme="dark"
             />
             <MainPage />
-          </AuthGuard>
+          </KeycloakAuthGuard>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
