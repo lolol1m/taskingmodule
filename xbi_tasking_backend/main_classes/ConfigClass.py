@@ -1,18 +1,11 @@
 import configparser
 
 
-class Singleton(object):
-    _instance = None
-    def __new__(class_, config_file_path, *args, **kwargs):
-        if not isinstance(class_._instance, class_):
-            class_._instance = object.__new__(class_, *args, **kwargs)
-        return class_._instance
-
-class ConfigClass(Singleton):
-    '''
-    ConfigClass contains all the functions to read the config file
-    '''
-    def __init__(self,config_file_path):
+class ConfigClass:
+    """
+    ConfigClass contains all the functions to read the config file.
+    """
+    def __init__(self, config_file_path):
         self.config = configparser.ConfigParser()
         self.config.read(config_file_path)
     
@@ -49,3 +42,11 @@ class ConfigClass(Singleton):
     def getKeycloakAdminClientSecret(self):
         return self.config.get('Keycloak', 'admin_client_secret')
 
+    def getAutoInitDb(self):
+        return self.config.getboolean('Database', 'auto_init_db', fallback=True)
+
+    def getKeycloakAllowedClientIDs(self):
+        raw = self.config.get('Keycloak', 'allowed_client_ids', fallback='').strip()
+        if not raw:
+            return [self.getKeycloakClientID()]
+        return [client_id.strip() for client_id in raw.split(',') if client_id.strip()]
