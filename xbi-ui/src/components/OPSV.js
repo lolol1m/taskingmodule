@@ -16,7 +16,7 @@ function OPSV() {
 
         // GET request from api to retrieve data from database.
         const getData = () => {
-                Axios.get('/getAreas').then(
+                Axios.get('/lookup/getAreas').then(
                         (response) => {  // { data: { 'Areas': [ {'ID': 1024362, 'Area Name': 'G074', 'OPS V': False}, {'ID': 1024362, 'Area Name': 'G074', 'OPS V': False} ] } }
                                 // data from database with an additional key named 'id' with same value as 'ID' appended to fix unique table row id problem.  { data: { 'Areas': [ {'ID': 1024362, 'Area Name': 'G074', 'OPS V': False, id: 1024362}, {'ID': 1024362, 'Area Name': 'G074', 'OPS V': False, id: 1024362} ] } }
                                 let data = response['data']['Areas'];
@@ -83,7 +83,7 @@ function OPSV() {
         // Used to update fields OPSV True or False.
         const postData = (trueList) => {  // trueList = { 'Areas': [ {'ID': 1024362, 'Area Name': 'G074', 'OPS V': False}, {'ID': 1024362, 'Area Name': 'G074', 'OPS V': False} ] }
                 console.log(trueList, 'opsv id true');
-                Axios.post('/setOpsvAreas', trueList)
+                Axios.post('/lookup/setOpsvAreas', trueList)
                 .then((response) => {
                 console.log(response);
                 }, (error) => {

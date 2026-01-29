@@ -24,7 +24,7 @@ function ParadeState() {
         try {
             const response = await Axios({
                 method: 'post',
-                url: "/updateUsers",
+                url: "/users/updateUsers",
                 data: {'file':selectedFile},
                 headers: { 'Content-Type': 'multipart/form-data' },
             });

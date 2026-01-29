@@ -19,7 +19,7 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
     () => {
 
 
-      axios.post('/getCompleteImageData', {
+      axios.post('/tasking/getCompleteImageData', {
         "Start Date": dateRange['Start Date'],
         "End Date": dateRange['End Date'],
       })
@@ -122,7 +122,7 @@ function CompletedImages({ dateRange }) { // dateRange has "Start Date" and "End
       <Box display="flex" justifyContent="space-evenly" alignItems='center' sx={{ width: "60%", margin: 'auto', paddingBottom: '10px', paddingTop: '10px', }} >
         <Button variant="contained" onClick={() => { reloadCITable() }}>Refresh</Button>
         <Button variant="contained" onClick={refresh}>Change Display Date</Button>
-        <Button variant="contained" onClick={() => { processImage('/uncompleteImages') }}>Uncomplete Image</Button>
+        <Button variant="contained" onClick={() => { processImage('/tasking/uncompleteImages') }}>Uncomplete Image</Button>
       </Box>
       {<DataGridPro
         rows={rows}

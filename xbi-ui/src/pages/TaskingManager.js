@@ -70,7 +70,7 @@ export default function TaskingManager({ dateRange }) {
   /* useEffect for initialising stuff */
   useEffect(
     () => {
-      axios.get('/getUsers')
+      axios.get('/users/getUsers')
         .then(
           res => {
             if (res['data']['Warning']) {
@@ -86,7 +86,7 @@ export default function TaskingManager({ dateRange }) {
             }
           }
         );
-      axios.post('/getTaskingManagerData', dateRange)
+      axios.post('/tasking/getTaskingManagerData', dateRange)
         .then(
           res => {
             if (res['data'] && res['data'] !== undefined) {
@@ -431,7 +431,7 @@ export default function TaskingManager({ dateRange }) {
     // console.log(params)
 
     const deleteTTG = (id) => {
-      axios.post('/deleteImage', { 'SCVU Image ID': id })
+      axios.post('/images/deleteImage', { 'SCVU Image ID': id })
         .then(res => console.log(res))
         .catch(err => console.log(err));
       setReload(!reload);
@@ -575,7 +575,7 @@ export default function TaskingManager({ dateRange }) {
       return;
     }
     
-    axios.post('/assignTask', postTasks)
+    axios.post('/tasking/assignTask', postTasks)
       .then(
         res => {
           console.log("Assign task response:", res);
@@ -633,7 +633,7 @@ export default function TaskingManager({ dateRange }) {
     
     // Update tasking manager data (priority, etc.) - only if there are updates
     if (postTm && Object.keys(postTm).length > 0) {
-    axios.post('/updateTaskingManagerData', postTm)
+    axios.post('/tasking/updateTaskingManagerData', postTm)
       .then(
         res => {
             console.log("Update priority response:", res);
@@ -700,7 +700,7 @@ export default function TaskingManager({ dateRange }) {
     data['areas'] = data['areas'].map(
       area => area
     )
-    axios.post('/insertTTGData', data)
+    axios.post('/images/insertTTGData', data)
       .then(
         res => {
           console.log(res);

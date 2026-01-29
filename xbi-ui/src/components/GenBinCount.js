@@ -21,7 +21,7 @@ function GenBinCount({ dateRange }) {
     // POST request to api to submit user selected date to database to retrieve respective data. This function is called in the onload useeffect function.
     // Data will be automatically GET upon posting.
     const postData = () => {  // dateRange = { 'Start Date': date, 'End Date': date }.
-        Axios.post('/getXBIReportData', dateRange)
+        Axios.post('/reports/getXBIReportData', dateRange)
         .then((response) => {  // { data: { Category: ['S1', 'S2'], Exploitable: [1, 2], Unexploitable: [11, 22], Remarks: "Lorem ipsum" } } 
             setGenBinCountData([response['data']]);  // [ { Category: ['S1', 'S2'], Exploitable: [1, 2], Unexploitable: [11, 22], Remarks: "Lorem ipsum" } ]
             // Exploitable and Unexploitable array order must follow order of Category
@@ -38,7 +38,7 @@ function GenBinCount({ dateRange }) {
 
     // Download button call backend to get excel file to download.
     const downloadExcel = () => {  // dateRange = { 'Start Date': date, 'End Date': date }.
-        Axios.post('/getXBIReportDataForExcel', dateRange, {responseType: 'blob'})
+        Axios.post('/reports/getXBIReportDataForExcel', dateRange, {responseType: 'blob'})
         .then(({data: blob}) => {
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);

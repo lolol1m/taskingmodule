@@ -71,7 +71,7 @@ const TaskingSummary = (dateRange) => {
         setReloadRows(prev => prev + 1);
         // Also directly trigger data fetch
         if (dateRange && dateRange.dateRange) {
-          axios.post('/getTaskingSummaryData', dateRange.dateRange)
+          axios.post('/tasking/getTaskingSummaryData', dateRange.dateRange)
             .then(function (response) {
               setInputData(response.data);
             })
@@ -101,7 +101,7 @@ const TaskingSummary = (dateRange) => {
   useEffect(
     () => {
 
-      axios.post('/getTaskingSummaryData', dateRange.dateRange) // function to call DB API and get the TS data for that daterange
+      axios.post('/tasking/getTaskingSummaryData', dateRange.dateRange) // function to call DB API and get the TS data for that daterange
       .then(function (response) {
 
         setInputData(response.data); // place the data from the DB API into inputData
@@ -144,9 +144,9 @@ const TaskingSummary = (dateRange) => {
           return rows
         });
         setWorkingData(inputData)
-        getDropdownValues("/getReport", "Report")
-        getDropdownValues("/getCloudCover", "Cloud Cover")
-        getDropdownValues("/getImageCategory", "Image Category")
+        getDropdownValues("/lookup/getReport", "Report")
+        getDropdownValues("/lookup/getCloudCover", "Cloud Cover")
+        getDropdownValues("/lookup/getImageCategory", "Image Category")
         // ^ call the function to populate dropdownValue for each value, ensure the string is the correct key name according to the DB data
       }
     }, [inputData]); // this useEffect will only run after inputData has changed, which mean that inputData has been populated by the DB call
@@ -483,7 +483,7 @@ const TaskingSummary = (dateRange) => {
         let copyText = String(_.get(workingData, copyImageIdDictPath)) // get imageID of that task's parent
 
         setClipboardValue(copyText)
-        processTask('/startTasks') // call DB API to set state from Incomplete to In Progress
+        processTask('/tasking/startTasks') // call DB API to set state from Incomplete to In Progress
         handleTooltipOpen() // open the popup to show what ID was copied to clipboard
         Copy(copyText) // function to copy the text to the clipboard
       }
@@ -628,7 +628,7 @@ const TaskingSummary = (dateRange) => {
       
       if (hasChanges && Object.keys(dataToSave).length > 0) {
         // Save changes first, then complete
-        axios.post("/updateTaskingSummaryData", dataToSave)
+        axios.post("/tasking/updateTaskingSummaryData", dataToSave)
           .then(function (response) {
             console.log("Changes saved before completing image:", response);
             saveAndComplete();
@@ -658,7 +658,7 @@ const TaskingSummary = (dateRange) => {
       setToSendData({ ...toSendData })
 
     });
-    let apiPath = "/updateTaskingSummaryData"
+    let apiPath = "/tasking/updateTaskingSummaryData"
     console.log(toSendData, "tosenddata")
     console.log(isNullPresent)
     if (isNullPresent == false){
@@ -743,10 +743,10 @@ const TaskingSummary = (dateRange) => {
             <Button variant="contained" onClick={() => {copyClipboard()}}>Start task</Button>
             </Tooltip>
         </ClickAwayListener> {/* button will show according to the value of each key in isShow. remember to write in the DB api address when ecalling the processTask/Image */}
-        { isShow.CT ? <Button variant="contained" onClick={() => {processTask('/completeTasks')}}>Complete Task</Button>  : null} 
-        { isShow.VF ? <Button variant="contained" onClick={() => {processTask('/verifyFail')}}>Verify Fail</Button> : null}
-        { isShow.VP ? <Button variant="contained" onClick={() => {processTask('/verifyPass')}} >Verify Pass</Button> : null}
-        { isShow.CI ? <Button variant="contained" onClick={() => {processImage('/completeImages')}}>Complete Image</Button> : null}
+        { isShow.CT ? <Button variant="contained" onClick={() => {processTask('/tasking/completeTasks')}}>Complete Task</Button>  : null} 
+        { isShow.VF ? <Button variant="contained" onClick={() => {processTask('/tasking/verifyFail')}}>Verify Fail</Button> : null}
+        { isShow.VP ? <Button variant="contained" onClick={() => {processTask('/tasking/verifyPass')}} >Verify Pass</Button> : null}
+        { isShow.CI ? <Button variant="contained" onClick={() => {processImage('/tasking/completeImages')}}>Complete Image</Button> : null}
         <Button variant="contained" onClick={processSendData}>Apply Change</Button>
       </Box>
 

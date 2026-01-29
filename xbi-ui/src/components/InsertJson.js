@@ -27,7 +27,7 @@ function InsertJson() {
         try {
             const response = await Axios({
                 method: 'post',
-                url: "/insertDSTAData",
+                url: "/images/insertDSTAData",
                 data: formData,
                 headers: { 'Content-Type': 'multipart/form-data' },
             });

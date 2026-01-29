@@ -26,7 +26,7 @@ function CreateUser() {
     }
 
     try {
-      const res = await axios.post("/createUser", {
+      const res = await axios.post("/users/createUser", {
         username: username.trim(),
         password: password.trim(),
         role,

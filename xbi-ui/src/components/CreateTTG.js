@@ -114,7 +114,7 @@ const CreateTTGModal = (props) => {
   useEffect( // gets areas to fill in area dropdown in modal
     () => {
       console.log("areas gotten");
-      axios.get('/getAreas')
+      axios.get('/lookup/getAreas')
         .then(
           res => {
             // console.log(res);

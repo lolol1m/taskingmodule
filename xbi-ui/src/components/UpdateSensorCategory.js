@@ -18,7 +18,7 @@ function UpdateSensorCategory() {
 
   // GET request from api to retrieve data from database.
   const getData = () => {  // { data: {'CAT_A': ['sensor 1', 'sensor 2'], 'CAT_B': ['sensor 3', 'sensor 4'], 'UNCATEGORISED': ['sensor 5', 'sensor 6']} }.
-    Axios.get('/getSensorCategory').then(
+    Axios.get('/lookup/getSensorCategory').then(
       (response) => {
         setData(formatData(response['data']));  // Set data read from database into data usestate. data = [ {Category: 'cat_a', Name: ['S1', 'S2']}, {Category: 'cat_b', Name: ['S3', 'S4']} ].
         setCategories(categoryList(response['data']));  // Set data read from database into categories usestate. categories = [{value: 'cat_a', label: 'cat_a'}, {value: 'cat_b', label: 'cat_b'}].
@@ -62,7 +62,7 @@ function UpdateSensorCategory() {
   // POST request to api to submit data to database. This function is called in the onClick function in confirm button inside modal.
   // Used to update the category for the selected sensor name.
   const postData = (sensorName, sensorCategory) => {  // { Sensors: [{Name: 'S1', Category: 'cat_a'}] }.
-    Axios.post('/updateSensorCategory', {
+    Axios.post('/lookup/updateSensorCategory', {
       Sensors: [{'Name': sensorName, 'Category': sensorCategory}]
     })
     .then((response) => {
