@@ -113,73 +113,73 @@ class API {
     }
 
     async getUsers() {
-        const response = await this.client.get("/getUsers")
+        const response = await this.client.get("/users/getUsers")
         return response.data
     }
 
     async createUser(body) {
-        const response = await this.client.post("/createUser", body)
+        const response = await this.client.post("/users/createUser", body)
         return response.data
     }
 
     async getAreas() {
-        const response = await this.client.get("/getAreas")
+        const response = await this.client.get("/lookup/getAreas")
         return response.data
     }
 
     async getCompleteImageData(body) {
-        const response = await this.client.post("/getCompleteImageData", body)
+        const response = await this.client.post("/tasking/getCompleteImageData", body)
         return response.data
     }
 
     async uncompleteImages(body) {
-        const response = await this.client.post("/uncompleteImages", body)
+        const response = await this.client.post("/tasking/uncompleteImages", body)
         return response.data
     }
 
     async setOpsvAreas(body) {
-        const response = await this.client.post("/setOpsvAreas", body)
+        const response = await this.client.post("/lookup/setOpsvAreas", body)
         return response.data
     }
 
     async postTaskingManagerData(body) {
-        const response =await  this.client.post("/getTaskingManagerData",  body)
+        const response =await  this.client.post("/tasking/getTaskingManagerData",  body)
         return response.data
     }
 
         async postTaskingSummaryData(body) {
-        const response =await  this.client.post("/getTaskingSummaryData",  body)
+        const response =await  this.client.post("/tasking/getTaskingSummaryData",  body)
         return response.data
     }
 
     async postUpdateTaskingSummaryData(body) {
-        const response = await this.client.post("/updateTaskingSummaryData", body)
+        const response = await this.client.post("/tasking/updateTaskingSummaryData", body)
         return response.data
     }
 
     async postDeleteImage(body){
-        const response = await this.client.post("/deleteImage", body)
+        const response = await this.client.post("/images/deleteImage", body)
         return response.data
 
     }
 
     async postAssignTask(body){ 
-              const response = await this.client.post("/assignTask",  body)
+              const response = await this.client.post("/tasking/assignTask",  body)
         return response.data
     }
 
     async postUpdateTaskingManagerData(body){ 
-        const response = await this.client.post("/updateTaskingManagerData",  body)
+        const response = await this.client.post("/tasking/updateTaskingManagerData",  body)
     
         return response.data
     }
         async postInsertTTGData(body){ 
-        const response = await this.client.post("/insertTTGData", body)
+        const response = await this.client.post("/images/insertTTGData", body)
         return response.data
     }
 
     async insertDSTAData(formData) {
-        const response = await this.client.post("/insertDSTAData", formData, {
+        const response = await this.client.post("/images/insertDSTAData", formData, {
             headers: { "Content-Type": "multipart/form-data" },
         })
         return response.data
@@ -187,12 +187,12 @@ class API {
 
 
     async postGetCompleteImageData(body){
-        const response =  await this.client.post("/getCompleteImageData", body)
+        const response =  await this.client.post("/tasking/getCompleteImageData", body)
         return response.data
     }
 
     async postUncompleteImages(body) {
-        const response =  await this.client.post("/uncompleteImages", body)
+        const response =  await this.client.post("/tasking/uncompleteImages", body)
         return response.data
     }
 

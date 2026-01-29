@@ -683,10 +683,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     }
 
     const allowedStatuses = {
-      '/startTasks': ['incomplete', 'not started'],
-      '/completeTasks': ['in progress'],
-      '/verifyPass': ['verifying'],
-      '/verifyFail': ['verifying'],
+      '/tasking/startTasks': ['incomplete', 'not started'],
+      '/tasking/completeTasks': ['in progress'],
+      '/tasking/verifyPass': ['verifying'],
+      '/tasking/verifyFail': ['verifying'],
     }
     const expected = allowedStatuses[apiPath]
     if (expected) {
@@ -714,7 +714,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       setError(null)
       await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
       const actionTitle =
-        apiPath === '/startTasks' ? 'Tasks started' : apiPath === '/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+        apiPath === '/tasking/startTasks' ? 'Tasks started' : apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
       addNotification({
         title: actionTitle,
         meta: `Just now · ${taskIds.length} tasks`,
@@ -759,7 +759,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         const progressValue = parseProgress(row?.taskCompleted)
         return progressValue !== null && progressValue < 100
       })
-    if (apiPath === '/completeImages' && incomplete.length) {
+    if (apiPath === '/tasking/completeImages' && incomplete.length) {
       addNotification({
         title: 'Cannot complete image',
         meta: 'All tasks must be completed first',
@@ -945,7 +945,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       })
     }
     setOpenCopy(true)
-    await processTask('/startTasks')
+    await processTask('/tasking/startTasks')
   }
 
   const role = UserService.readUserRoleSingle()
@@ -985,9 +985,9 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   }, [workingData])
 
   useEffect(() => {
-    fetchDropdownValues('/getReport', 'Report')
-    fetchDropdownValues('/getCloudCover', 'Cloud Cover')
-    fetchDropdownValues('/getImageCategory', 'Image Category')
+    fetchDropdownValues('/lookup/getReport', 'Report')
+    fetchDropdownValues('/lookup/getCloudCover', 'Cloud Cover')
+    fetchDropdownValues('/lookup/getImageCategory', 'Image Category')
   }, [refreshKey, dateRange])
 
   useEffect(() => {
@@ -1053,7 +1053,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.CT ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processTask('/completeTasks')}
+                onClick={() => processTask('/tasking/completeTasks')}
                 disabled={!selection.length}
               >
                 Complete Task
@@ -1062,7 +1062,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.VF ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processTask('/verifyFail')}
+                onClick={() => processTask('/tasking/verifyFail')}
                 disabled={!selection.length}
               >
                 Verify Fail
@@ -1071,7 +1071,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.VP ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processTask('/verifyPass')}
+                onClick={() => processTask('/tasking/verifyPass')}
                 disabled={!selection.length}
               >
                 Verify Pass
@@ -1080,7 +1080,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.CI ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processImage('/completeImages')}
+                onClick={() => processImage('/tasking/completeImages')}
                 disabled={!selection.length}
               >
                 Complete Image
