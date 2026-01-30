@@ -255,7 +255,16 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const getValueOption = (value) => {
     if (!value) return null
     if (typeof value === 'object' && value.id) return value
-    const found = assignees.find((opt) => opt?.id === value || opt === value)
+    const normalized = typeof value === 'string' ? value.toLowerCase() : value
+    const found = assignees.find((opt) => {
+      if (!opt) return false
+      if (opt?.id === value || opt === value) return true
+      if (typeof value === 'string') {
+        const optionName = opt?.name
+        return optionName === value || optionName?.toLowerCase() === normalized
+      }
+      return false
+    })
     return found || null
   }
 
