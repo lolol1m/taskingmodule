@@ -41,60 +41,24 @@ class API {
         async (error) => {
     const originalRequest = error.config;
     console.log("There is an error:", error)
-    
-   /*
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true; // prevent infinite loops
-
-      const refreshToken = localStorage.getItem("refresh_token");
-      if (!refreshToken) {
-        this.#__redirectToLogin();
-        this.#__clearAuthTokens();
-        return Promise.reject(new Error("Refresh token missing"));
-      }
-
+    if (error.response?.status === 401 && !originalRequest?._retry) {
+      originalRequest._retry = true
       try {
-        
-        const refreshResponse = await axios.post(
-          `${api_link}/auth/refresh`,
-          { refresh_token: refreshToken },
-          { headers: { "Content-Type": "application/json" } }
-        );
-
-        const refreshedToken = refreshResponse.data?.access_token;
-        if (!refreshedToken) {
-          this.#__redirectToLogin();
-        this.#__clearAuthTokens();
-          return Promise.reject(new Error("Refresh failed"));
-        }
-
-
-         if (refreshResponse.data?.access_token) {
-    localStorage.setItem('access_token', refreshResponse.data?.access_token)
-  }
-  if (refreshResponse.data?.refresh_token) {
-    localStorage.setItem('refresh_token', refreshResponse.data?.refresh_token)
-  }
-  if (refreshResponse.data?.id_token) {
-    localStorage.setItem('id_token', refreshResponse.data?.id_token)
-  }
-
-    
-        
-
-        
-        originalRequest.headers.Authorization = `Bearer ${refreshedToken}`;
-        return this.client(originalRequest);
+        await UserService.updateToken(() => {
+          const refreshedToken = UserService.getToken()
+          if (refreshedToken) {
+            originalRequest.headers = originalRequest.headers || {}
+            originalRequest.headers.Authorization = `Bearer ${refreshedToken}`
+          }
+        })
+        return this.client(originalRequest)
       } catch (refreshError) {
-        this.#__clearAuthTokens();
-        this.#__redirectToLogin();
-        return Promise.reject(refreshError);
+        UserService.doLogin()
+        return Promise.reject(refreshError)
       }
     }
 
-    
     return Promise.reject(error);
-    */
   }
         )
 
