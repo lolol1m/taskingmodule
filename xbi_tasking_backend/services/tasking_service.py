@@ -54,29 +54,9 @@ class TaskingService:
             areas = self.qm.getTaskingManagerDataForImage(image[0])
             image_areas = self.qm.getTaskingManagerDataForTask(image[0])
 
-            # Filter out assigned areas; keep only unassigned areas in Tasking Manager
-            if areas:
-                all_area_ids = {area[0] for area in areas}
-                assigned_area_ids = {
-                    area_id for area_id, assignee, _ in image_areas
-                    if assignee is not None and assignee != 'Unassigned' and assignee != ''
-                }
-                unassigned_area_ids = all_area_ids - assigned_area_ids
-                if not unassigned_area_ids:
-                    # All areas assigned, hide this image entirely
-                    continue
-
-                # Keep only task rows that correspond to unassigned areas
-                image_areas = [
-                    area_tuple for area_tuple in image_areas
-                    if area_tuple[0] in unassigned_area_ids
-                ]
-
             output[image[0]] = format_tasking_manager_image(image, image_areas)
 
             for area in areas:
-                if area[0] not in unassigned_area_ids:
-                    continue
                 # Use negative area ID to avoid conflicts with image IDs
                 output[-area[0]] = format_tasking_manager_area(image, area, image_areas)
         return output
