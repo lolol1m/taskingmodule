@@ -63,3 +63,59 @@
   color: var(--danger);
   font-size: 0.9rem;
 }
+
+.admin-bin__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-bin__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.admin-bin__table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--table-bg);
+}
+
+.admin-bin__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 540px;
+  font-size: 13px;
+}
+
+.admin-bin__table th,
+.admin-bin__table td {
+  border-bottom: 1px solid var(--border-strong);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.admin-bin__table thead th {
+  background: var(--row-bg);
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.admin-bin__table tbody tr:nth-of-type(even) {
+  background: var(--row-bg);
+}
+
+.admin-bin__remarks {
+  text-align: left;
+  white-space: pre-wrap;
+  min-width: 200px;
+}
+
+.admin-bin__note {
+  color: var(--muted);
+  font-size: 12px;
+}

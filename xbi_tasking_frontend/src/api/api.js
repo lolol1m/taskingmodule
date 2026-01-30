@@ -196,6 +196,24 @@ class API {
         return response.data
     }
 
+    async getXbiReportData(body) {
+        const response = await this.client.post("/reports/getXBIReportData", body)
+        return response.data
+    }
+
+    async getXbiReportDataForExcel(body) {
+        return this.client.post("/reports/getXBIReportDataForExcel", body, { responseType: 'blob' })
+    }
+
+    async getSensorCategory() {
+        const response = await this.client.get("/lookup/getSensorCategory")
+        return response.data
+    }
+
+    async updateSensorCategory(body) {
+        const response = await this.client.post("/lookup/updateSensorCategory", body)
+        return response.data
+    }
 
 
 
