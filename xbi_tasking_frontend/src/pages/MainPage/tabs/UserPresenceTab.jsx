@@ -17,6 +17,13 @@ const readField = (obj, keys) => {
   }, undefined)
 }
 
+const formatTimestamp = (value) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString()
+}
+
 const buildRows = (users) => {
   if (!Array.isArray(users)) return []
   return users.map((entry, index) => {
@@ -25,16 +32,16 @@ const buildRows = (users) => {
         id: `${entry}-${index}`,
         user: entry,
         role: '—',
-        status: 'Unknown',
-        lastActive: '—',
+        status: 'Absent',
+        lastUpdated: '—',
       }
     }
 
     const username = readField(entry, ['username', 'user', 'name', 'User', 'Username', 'Name'])
     const role = readField(entry, ['role', 'Role'])
     const isPresent = readField(entry, ['is_present', 'isPresent', 'present', 'Present'])
-    const status = typeof isPresent === 'boolean' ? (isPresent ? 'Online' : 'Offline') : readField(entry, ['status', 'Status'])
-    const lastActive = readField(entry, ['lastActive', 'last_active', 'Last Active', 'LastActive'])
+    const status = typeof isPresent === 'boolean' ? (isPresent ? 'Present' : 'Absent') : readField(entry, ['status', 'Status']) || 'Absent'
+    const lastUpdated = readField(entry, ['last_updated', 'lastUpdated', 'Last Updated', 'LastUpdated'])
     const resolvedUser = username ?? '—'
 
     return {
@@ -42,7 +49,7 @@ const buildRows = (users) => {
       user: resolvedUser,
       role: role ?? '—',
       status: status ?? 'Unknown',
-      lastActive: lastActive ?? '—',
+      lastUpdated: formatTimestamp(lastUpdated),
     }
   })
 }
@@ -59,7 +66,7 @@ function UserPresenceTab() {
       { field: 'user', headerName: 'User', minWidth: 180, flex: 1 },
       { field: 'role', headerName: 'Role', minWidth: 140, flex: 0.7 },
       { field: 'status', headerName: 'Status', minWidth: 140, flex: 0.7 },
-      { field: 'lastActive', headerName: 'Last Active', minWidth: 160, flex: 0.8 },
+      { field: 'lastUpdated', headerName: 'Last Updated', minWidth: 180, flex: 0.9 },
     ],
     [],
   )
@@ -92,7 +99,7 @@ function UserPresenceTab() {
       <div className="content__topbar">
         <div className="content__heading">
           <div className="content__title">User Presence</div>
-          <div className="content__subtitle">Monitor active users currently online.</div>
+          <div className="content__subtitle">Availability from the latest parade state upload.</div>
         </div>
         <div className="content__controls">
           <div className="action-bar">

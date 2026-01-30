@@ -40,9 +40,18 @@ class DatabaseSchemaManager:
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS user_cache (
                             keycloak_user_id VARCHAR(255) PRIMARY KEY,
-                            is_present BOOLEAN DEFAULT FALSE
+                            is_present BOOLEAN DEFAULT FALSE,
+                            last_updated TIMESTAMP
                         )
                     """)
+                    cursor.execute("""
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_name = 'user_cache' AND column_name = 'last_updated'
+                    """)
+                    if not cursor.fetchone():
+                        cursor.execute("ALTER TABLE user_cache ADD COLUMN last_updated TIMESTAMP")
+                        logger.info("Added last_updated to user_cache table")
 
                     cursor.execute("""
                         SELECT column_name 
@@ -73,6 +82,17 @@ class DatabaseSchemaManager:
                 self._create_schema()
                 self._insert_initial_data()
                 logger.info("Database schema created and initialized")
+
+            if user_cache_exists:
+                with self._db._get_cursor() as cursor:
+                    cursor.execute("""
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_name = 'user_cache' AND column_name = 'last_updated'
+                    """)
+                    if not cursor.fetchone():
+                        cursor.execute("ALTER TABLE user_cache ADD COLUMN last_updated TIMESTAMP")
+                        logger.info("Added last_updated to user_cache table")
 
             with self._db._get_cursor() as cursor:
                 cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS assignee_id")
@@ -139,7 +159,8 @@ class DatabaseSchemaManager:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS user_cache (
                     keycloak_user_id VARCHAR(255) PRIMARY KEY,
-                    is_present BOOLEAN DEFAULT FALSE
+                    is_present BOOLEAN DEFAULT FALSE,
+                    last_updated TIMESTAMP
                 )
             """)
 

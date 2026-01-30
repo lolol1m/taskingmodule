@@ -222,21 +222,26 @@ class KeycloakQueries:
         user_ids = [entry["id"] for entry in user_map.values()]
         placeholders = ','.join(['%s'] * len(user_ids))
         query = f"""
-            SELECT keycloak_user_id, is_present
+            SELECT keycloak_user_id, is_present, last_updated
             FROM user_cache
             WHERE keycloak_user_id IN ({placeholders})
         """
         result = self.db.executeSelect(query, tuple(user_ids))
-        presence_map = {row[0]: row[1] for row in result}
+        presence_map = {row[0]: {"is_present": row[1], "last_updated": row[2]} for row in result}
 
         output = []
         for username, entry in user_map.items():
             roles_for_user = sorted(entry["roles"])
+            presence = presence_map.get(entry["id"], {})
+            last_updated = presence.get("last_updated")
+            if last_updated is not None:
+                last_updated = last_updated.isoformat()
             output.append({
                 "id": entry["id"],
                 "name": username,
                 "role": ", ".join(roles_for_user) if roles_for_user else None,
-                "is_present": bool(presence_map.get(entry["id"], False)),
+                "is_present": bool(presence.get("is_present", False)),
+                "last_updated": last_updated,
             })
 
         output.sort(key=lambda item: item["name"].lower())
@@ -280,7 +285,7 @@ class KeycloakQueries:
         Input: NIL
         Output: NIL
         '''
-        query = f"UPDATE user_cache SET is_present = False"
+        query = "UPDATE user_cache SET is_present = False, last_updated = NOW()"
         self.db.executeUpdate(query)
 
     #TODO: figure out how the new user add system is going to work and change this accordingly
@@ -299,7 +304,11 @@ class KeycloakQueries:
                 continue
             user_id_tuples.append((user_id,))
             
-        query = f"INSERT INTO user_cache (keycloak_user_id, is_present) VALUES (%s, FALSE) ON CONFLICT (keycloak_user_id) DO NOTHING"
+        query = """
+            INSERT INTO user_cache (keycloak_user_id, is_present, last_updated)
+            VALUES (%s, FALSE, NOW())
+            ON CONFLICT (keycloak_user_id) DO NOTHING
+        """
         self.db.executeInsertMany(query, user_id_tuples)
     
     #TODO: figure out how the new user add system is going to work and change this accordingly
@@ -317,5 +326,5 @@ class KeycloakQueries:
                 continue
             user_id_tuples.append((user_id,))
 
-        query = f"UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
+        query = "UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
         self.db.executeUpdateMany(query, user_id_tuples)
