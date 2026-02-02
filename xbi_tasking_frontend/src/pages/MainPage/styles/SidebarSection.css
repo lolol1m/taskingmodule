@@ -324,7 +324,6 @@
   max-height: 34px;
   border-radius: 8px;
   font-family: inherit;
-  color: white;
   text-align: left;
   position: relative;
   width: 100%;
@@ -408,6 +407,11 @@
 .app-shell.is-light .caret-arrow,
 .app-shell.is-light .collapse-arrow {
   filter: brightness(0) invert(0);
+}
+
+/* Light mode text colors */
+.app-shell.is-light .sidebar__item--sub {
+  color: var(--subtext);
 }
 
 .caret.is-open .caret-arrow {
