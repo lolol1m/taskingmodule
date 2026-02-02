@@ -25,6 +25,7 @@ function MainPage() {
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const username = useUsername()
+  const userRole = UserService.readUserRoleSingle()
 
   const handleLogout = () => {
   
@@ -87,6 +88,7 @@ function MainPage() {
                 isDarkMode={isDarkMode}
                 setIsDarkMode={setIsDarkMode}
                 onLogout={handleLogout}
+                userRole={userRole}
               />
 
               <ContentSection
