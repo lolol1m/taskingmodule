@@ -171,6 +171,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [selection, setSelection] = useState([])
   const [searchText, setSearchText] = useState('')
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const [showDetails, setShowDetails] = useState(false)
   const [openCopy, setOpenCopy] = useState(false)
   const [clipboardValue, setClipboardValue] = useState('')
@@ -554,13 +555,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     setVisibilityModel(columnVisibilityModel)
   }, [columnVisibilityModel])
 
-  const filterModel = useMemo(
-    () => ({
-      items: [],
+  useEffect(() => {
+    setFilterModel((prev) => ({
+      ...prev,
       quickFilterValues: searchText ? [searchText] : [],
-    }),
-    [searchText],
-  )
+    }))
+  }, [searchText])
 
   const getTreeDataPath = (row) => {
     if (row.treePath && Array.isArray(row.treePath)) {
@@ -1175,6 +1175,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           checkboxSelection
           disableRowSelectionOnClick
           filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
           onRowSelectionModelChange={(model) => {
             if (Array.isArray(model)) {
               setSelection(model)

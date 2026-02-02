@@ -83,6 +83,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchText, setSearchText] = useState('')
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const { addNotification } = useNotifications()
 
   const columns = useMemo(
@@ -105,13 +106,12 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
     [],
   )
 
-  const filterModel = useMemo(
-    () => ({
-      items: [],
+  useEffect(() => {
+    setFilterModel((prev) => ({
+      ...prev,
       quickFilterValues: searchText ? [searchText] : [],
-    }),
-    [searchText],
-  )
+    }))
+  }, [searchText])
 
   useEffect(() => {
     if (!dateRange) return
@@ -211,6 +211,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
           checkboxSelection
           disableRowSelectionOnClick
           filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
           onRowSelectionModelChange={(model) => {
             if (Array.isArray(model)) {
               setSelection(model)

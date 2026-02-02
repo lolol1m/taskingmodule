@@ -58,6 +58,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchText, setSearchText] = useState('')
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const [actionsEnabled, setActionsEnabled] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [areaOptions, setAreaOptions] = useState([])
@@ -635,13 +636,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     },
   }
 
-  const filterModel = useMemo(
-    () => ({
-      items: [],
+  useEffect(() => {
+    setFilterModel((prev) => ({
+      ...prev,
       quickFilterValues: searchText ? [searchText] : [],
-    }),
-    [searchText],
-  )
+    }))
+  }, [searchText])
 
   return (
     <div className="tasking-manager">
@@ -699,6 +699,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
           filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
           checkboxSelection
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}
