@@ -183,7 +183,9 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
               />
             </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
-              Refresh
+
+              <span>Refresh</span>
+               
             </Button>
             <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
               <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
