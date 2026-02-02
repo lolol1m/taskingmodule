@@ -134,6 +134,24 @@ const normalizeStatus = (value) => {
   return normalized
 }
 
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   const [inputData, setInputData] = useState(null)
   const [workingData, setWorkingData] = useState(null)
@@ -152,6 +170,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selection, setSelection] = useState([])
+  const [searchText, setSearchText] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [openCopy, setOpenCopy] = useState(false)
   const [clipboardValue, setClipboardValue] = useState('')
@@ -534,6 +553,14 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   useEffect(() => {
     setVisibilityModel(columnVisibilityModel)
   }, [columnVisibilityModel])
+
+  const filterModel = useMemo(
+    () => ({
+      items: [],
+      quickFilterValues: searchText ? [searchText] : [],
+    }),
+    [searchText],
+  )
 
   const getTreeDataPath = (row) => {
     if (row.treePath && Array.isArray(row.treePath)) {
@@ -1022,11 +1049,20 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         </div>
         <div className="content__controls">
           <div className="action-bar">
+            <div className="search">
+              <input
+                type="text"
+                placeholder="Search tasking summary"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
             </Button>
-            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
-              Change Display Date
+            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
+              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
+              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>
@@ -1138,6 +1174,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           }}
           checkboxSelection
           disableRowSelectionOnClick
+          filterModel={filterModel}
           onRowSelectionModelChange={(model) => {
             if (Array.isArray(model)) {
               setSelection(model)

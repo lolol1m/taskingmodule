@@ -57,6 +57,24 @@ const buildRows = (inputData) => {
   return rows
 }
 
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [inputData, setInputData] = useState(null)
   const [rows, setRows] = useState([])
@@ -64,6 +82,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchText, setSearchText] = useState('')
   const { addNotification } = useNotifications()
 
   const columns = useMemo(
@@ -84,6 +103,14 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
       { field: 'priority', headerName: 'Priority', minWidth: 100, flex: 0.6 },
     ],
     [],
+  )
+
+  const filterModel = useMemo(
+    () => ({
+      items: [],
+      quickFilterValues: searchText ? [searchText] : [],
+    }),
+    [searchText],
   )
 
   useEffect(() => {
@@ -147,11 +174,20 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         </div>
         <div className="content__controls">
           <div className="action-bar">
+            <div className="search">
+              <input
+                type="text"
+                placeholder="Search completed images"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
             </Button>
-            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
-              Change Display Date
+            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
+              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
+              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>
@@ -174,6 +210,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
           columns={columns}
           checkboxSelection
           disableRowSelectionOnClick
+          filterModel={filterModel}
           onRowSelectionModelChange={(model) => {
             if (Array.isArray(model)) {
               setSelection(model)

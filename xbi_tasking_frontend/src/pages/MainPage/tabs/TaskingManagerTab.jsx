@@ -32,6 +32,24 @@ const toISOLocal = (date) => {
   )}:${pad(d.getSeconds())}.${ms}Z`
 }
 
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const [rows, setRows] = useState([])
   const [assignees, setAssignees] = useState([{ id: 'Multiple', name: 'Multiple' }])
@@ -39,6 +57,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchText, setSearchText] = useState('')
   const [actionsEnabled, setActionsEnabled] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [areaOptions, setAreaOptions] = useState([])
@@ -616,6 +635,14 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     },
   }
 
+  const filterModel = useMemo(
+    () => ({
+      items: [],
+      quickFilterValues: searchText ? [searchText] : [],
+    }),
+    [searchText],
+  )
+
   return (
     <div className="tasking-manager">
       <div className="content__topbar">
@@ -625,11 +652,20 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         </div>
            <div className="content__controls">
           <div className="action-bar">
+            <div className="search">
+              <input
+                type="text"
+                placeholder="Search tasking manager"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
             </Button>
-            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
-              Change Display Date
+            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
+              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
+              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>
@@ -662,6 +698,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           columns={columns}
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
+          filterModel={filterModel}
           checkboxSelection
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}

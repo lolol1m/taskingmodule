@@ -68,12 +68,37 @@
   text-transform: none !important;
   font-family: inherit !important;
   font-weight: 600 !important;
-  border-radius: 10px !important;
+  border-radius: 999px !important;
   padding: 6px 14px !important;
   background: var(--panel) !important;
   color: var(--text) !important;
   border: 1px solid var(--border-strong) !important;
   box-shadow: none !important;
+}
+
+.tasking-summary__button--date {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px !important;
+}
+
+.date-button__icon {
+  width: 13px;
+  height: 13px;
+  display: inline-block;
+  object-fit: contain;
+  filter: invert(1);
+}
+
+.app-shell.is-light .date-button__icon {
+  filter: invert(0);
+}
+
+.date-button__label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .tasking-summary__button:hover {
