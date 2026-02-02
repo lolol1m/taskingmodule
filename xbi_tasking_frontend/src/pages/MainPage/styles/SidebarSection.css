@@ -164,6 +164,17 @@
   font-size: 12px;
 }
 
+.sidebar__popover-item-active{
+  border: none;
+  background: var(--active);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12px;
+}
+
 .sidebar__popover-item:hover {
   background: var(--hover);
 }

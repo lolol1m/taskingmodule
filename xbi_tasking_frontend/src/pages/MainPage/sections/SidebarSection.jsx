@@ -33,7 +33,7 @@ function SidebarSection({
     <aside className="sidebar" style={{ width: isCollapsed ? '72px' : '290px' }}>
       <div className="sidebar__content" ref={navRef}>
 
-        {adminOpen && <span className="sidebar__active-indicator" style={indicatorStyle} />}
+        {(adminOpen || !isCollapsed) && <span className="sidebar__active-indicator" style={indicatorStyle} />}
         <div className="sidebar__section">
           <div className="sidebar__title">
             <button
@@ -130,12 +130,12 @@ function SidebarSection({
             </div>
             <div className="sidebar__popover sidebar__popover--admin">
               <div className="sidebar__popover-title">Admin</div>
-              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-presence")}>User Presence</button>
-              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-opsv")}>Set OPS V</button>
-              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-bin")}>Generate Bin Count</button>
-              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-sensor")}>Update Sensor Category</button>
-              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-uploads")}>Uploads</button>
-              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-create-user")}>Create User</button>
+              <button className={`sidebar__popover-item${activeTab === 'admin-presence' ? '-active' : ''}`} onClick={() => setActiveTab("admin-presence")}>User Presence</button>
+              <button className={`sidebar__popover-item${activeTab === 'admin-opsv' ? '-active' : ''}`}onClick={() => setActiveTab("admin-opsv")}>Set OPS V</button>
+              <button className={`sidebar__popover-item${activeTab === 'admin-bin' ? '-active' : ''}`} onClick={() => setActiveTab("admin-bin")}>Generate Bin Count</button>
+              <button className={`sidebar__popover-item${activeTab === 'admin-sensor' ? '-active' : ''}`} onClick={() => setActiveTab("admin-sensor")}>Update Sensor Category</button>
+              <button className={`sidebar__popover-item${activeTab === 'admin-uploads' ? '-active' : ''}`} onClick={() => setActiveTab("admin-uploads")}>Uploads</button>
+              <button className={`sidebar__popover-item${activeTab === 'admin-create-user' ? '-active' : ''}`} onClick={() => setActiveTab("admin-create-user")}>Create User</button>
             </div>
           </div>
         </div>

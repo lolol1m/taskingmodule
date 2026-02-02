@@ -19,6 +19,7 @@
   --badge-border: rgb(0, 0, 90);
   --table-bg: #111318;
   --row-bg: #0f1014;
+  --active:rgb(0, 49, 139);
   --notification-icon-filter: invert(1);
 
   min-height: 100vh;
