@@ -336,7 +336,7 @@
   transition: opacity 250ms ease;
 }
 
-.sidebar__text {
+.sidebar__item.is-active.sidebar__text {
   white-space: nowrap;
   margin-bottom: 2.5px;
 }
