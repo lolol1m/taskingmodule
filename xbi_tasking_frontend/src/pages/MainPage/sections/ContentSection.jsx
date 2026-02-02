@@ -21,13 +21,13 @@ const tabMap = {
   "admin-sensor": UpdateSensorCategoryTab
 }
 
-function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed }) {
+function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {
   const ActiveTab = tabMap[activeTab]
 
   return (
     <section className="content">
       {ActiveTab ? (
-        <ActiveTab dateRange={dateRange} onOpenDatePicker={onOpenDatePicker} isCollapsed={isCollapsed} />
+        <ActiveTab dateRange={dateRange} onOpenDatePicker={onOpenDatePicker} isCollapsed={isCollapsed} userRole={userRole} />
       ) : (
         <TabPlaceholder title="Not found" description="No view is mapped for this selection." />
       )}

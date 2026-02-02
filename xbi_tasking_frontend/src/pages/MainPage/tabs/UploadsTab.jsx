@@ -19,7 +19,7 @@ const formatFileSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function UploadsTab() {
+function UploadsTab({ userRole }) {
   const [selectedFiles, setSelectedFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -28,8 +28,16 @@ function UploadsTab() {
   const { addNotification } = useNotifications()
   const inputRef = useRef(null)
 
+  // Only IA can upload parade state CSV
+  const canUploadCSV = userRole === 'IA'
+
   const handleFiles = (fileList) => {
-    const files = Array.from(fileList || [])
+    let files = Array.from(fileList || [])
+    if (!files.length) return
+    // Filter out CSV files if user cannot upload them
+    if (!canUploadCSV) {
+      files = files.filter((f) => getFileType(f.name) !== 'csv')
+    }
     if (!files.length) return
     setSelectedFiles((prev) => {
       const existingNames = new Set(prev.map((f) => f.name))
@@ -114,7 +122,11 @@ function UploadsTab() {
       <div className="content__topbar">
         <div className="content__heading">
           <div className="content__title">Uploads</div>
-          <div className="content__subtitle">Upload DSTA JSON files for tasking data and/or CSV files for parade state.</div>
+          <div className="content__subtitle">
+            {canUploadCSV
+              ? 'Upload DSTA JSON files for tasking data and/or CSV files for parade state.'
+              : 'Upload DSTA JSON files for tasking data.'}
+          </div>
         </div>
         <div className="content__controls">
           <div className="action-bar">
@@ -158,7 +170,7 @@ function UploadsTab() {
           </div>
           <div className="uploads-dropzone__types">
             <span className="uploads-type uploads-type--json">JSON</span>
-            <span className="uploads-type uploads-type--csv">CSV</span>
+            {canUploadCSV && <span className="uploads-type uploads-type--csv">CSV</span>}
           </div>
           <input
             ref={inputRef}
@@ -166,7 +178,7 @@ function UploadsTab() {
             key={inputKey}
             type="file"
             multiple
-            accept=".json,.csv,application/json,text/csv"
+            accept={canUploadCSV ? '.json,.csv,application/json,text/csv' : '.json,application/json'}
             onChange={(event) => handleFiles(event.target.files)}
           />
         </div>
@@ -217,36 +229,38 @@ function UploadsTab() {
               </div>
             </div>
 
-            {/* CSV Parade State Group - Always visible */}
-            <div className="uploads-group">
-              <div className="uploads-group__label">
-                <span className="uploads-type uploads-type--csv">CSV</span>
-                <span>Parade State ({csvFiles.length})</span>
+            {/* CSV Parade State Group - Only visible for IA */}
+            {canUploadCSV && (
+              <div className="uploads-group">
+                <div className="uploads-group__label">
+                  <span className="uploads-type uploads-type--csv">CSV</span>
+                  <span>Parade State ({csvFiles.length})</span>
+                </div>
+                <div className="uploads-group__files">
+                  {csvFiles.length > 0 ? (
+                    csvFiles.map((file) => (
+                      <div className="uploads-file" key={file.name}>
+                        <span className="uploads-file__name">{file.name}</span>
+                        <span className="uploads-file__size">{formatFileSize(file.size)}</span>
+                        <button
+                          className="uploads-file__remove"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeFile(file.name)
+                          }}
+                          type="button"
+                          disabled={loading}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="uploads-group__empty">No CSV files selected</div>
+                  )}
+                </div>
               </div>
-              <div className="uploads-group__files">
-                {csvFiles.length > 0 ? (
-                  csvFiles.map((file) => (
-                    <div className="uploads-file" key={file.name}>
-                      <span className="uploads-file__name">{file.name}</span>
-                      <span className="uploads-file__size">{formatFileSize(file.size)}</span>
-                      <button
-                        className="uploads-file__remove"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeFile(file.name)
-                        }}
-                        type="button"
-                        disabled={loading}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="uploads-group__empty">No CSV files selected</div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

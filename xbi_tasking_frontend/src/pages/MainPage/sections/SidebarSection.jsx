@@ -25,6 +25,8 @@ function SidebarSection({
 }) {
   // II role has limited access - no Tasking Manager or Admin
   const isBasicUser = userRole === 'II'
+  // Only IA can create users
+  const canCreateUsers = userRole === 'IA'
   const { navRef, indicatorStyle } = useActiveIndicator({
     activeTab,
     isCollapsed,
@@ -133,12 +135,14 @@ function SidebarSection({
                 >
                   <span className="sidebar__text">Uploads</span>
                 </button>
-                <button
-                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('admin-create-user')}
-                >
-                  <span className="sidebar__text">Create User</span>
-                </button>
+                {canCreateUsers && (
+                  <button
+                    className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
+                    onClick={() => setActiveTab('admin-create-user')}
+                  >
+                    <span className="sidebar__text">Create User</span>
+                  </button>
+                )}
               </div>
               <div className="sidebar__popover sidebar__popover--admin">
                 <div className="sidebar__popover-title">Admin</div>
@@ -147,7 +151,9 @@ function SidebarSection({
                 <button className={`sidebar__popover-item${activeTab === 'admin-bin' ? '-active' : ''}`} onClick={() => setActiveTab("admin-bin")}>Generate Bin Count</button>
                 <button className={`sidebar__popover-item${activeTab === 'admin-sensor' ? '-active' : ''}`} onClick={() => setActiveTab("admin-sensor")}>Update Sensor Category</button>
                 <button className={`sidebar__popover-item${activeTab === 'admin-uploads' ? '-active' : ''}`} onClick={() => setActiveTab("admin-uploads")}>Uploads</button>
-                <button className={`sidebar__popover-item${activeTab === 'admin-create-user' ? '-active' : ''}`} onClick={() => setActiveTab("admin-create-user")}>Create User</button>
+                {canCreateUsers && (
+                  <button className={`sidebar__popover-item${activeTab === 'admin-create-user' ? '-active' : ''}`} onClick={() => setActiveTab("admin-create-user")}>Create User</button>
+                )}
               </div>
             </div>
           </div>

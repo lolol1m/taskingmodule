@@ -96,6 +96,7 @@ function MainPage() {
                 dateRange={dateRange}
                 onOpenDatePicker={() => setOpen(true)}
                 isCollapsed={isCollapsed}
+                userRole={userRole}
               />
             </main>
           </NotificationsProvider>
