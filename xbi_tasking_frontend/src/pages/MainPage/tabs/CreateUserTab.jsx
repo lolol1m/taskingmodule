@@ -98,7 +98,7 @@ const CreateUserTab = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <Typography variant="caption" sx={{ color: 'var(--muted)', mb: 1, display: 'block' }}>
+          <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
             USERNAME
           </Typography>
           <TextField
@@ -109,6 +109,7 @@ const CreateUserTab = () => {
             placeholder="e.g. jdoe_admin"
             variant="outlined"
             required
+            autoComplete='new-username'
             sx={inputStyles}
             InputProps={{
               startAdornment: (
@@ -119,15 +120,16 @@ const CreateUserTab = () => {
             }}
           />
 
-          <Typography variant="caption" sx={{ color: 'var(--muted)', mt: 3, mb: 1, display: 'block' }}>
+          <Typography variant="caption" sx={{ mt: 3, mb: 1, display: 'block' }}>
             PASSWORD
           </Typography>
           <TextField
             fullWidth
             name="password"
+            autoComplete='new-password'
             type={showPassword ? 'text' : 'password'}
             value={formData.password}
-          
+  
             onChange={handleChange}
             placeholder="••••••••"
             variant="outlined"
