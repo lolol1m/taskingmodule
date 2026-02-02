@@ -339,6 +339,9 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       renderInput: (inputParams) => <TextField {...inputParams} placeholder="Assignee" size="small" />,
       size: 'small',
       fullWidth: true,
+      ListboxProps: {
+        style: { maxHeight: 200, overflow: 'auto' },
+      },
     }
 
     const handleChange = (newValue) => {
