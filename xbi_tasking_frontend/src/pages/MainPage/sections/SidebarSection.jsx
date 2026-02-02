@@ -32,7 +32,8 @@ function SidebarSection({
   return (
     <aside className="sidebar" style={{ width: isCollapsed ? '72px' : '290px' }}>
       <div className="sidebar__content" ref={navRef}>
-        <span className="sidebar__active-indicator" style={indicatorStyle} />
+
+        {adminOpen && <span className="sidebar__active-indicator" style={indicatorStyle} />}
         <div className="sidebar__section">
           <div className="sidebar__title">
             <button
@@ -129,12 +130,12 @@ function SidebarSection({
             </div>
             <div className="sidebar__popover sidebar__popover--admin">
               <div className="sidebar__popover-title">Admin</div>
-              <button className="sidebar__popover-item">User Presence</button>
-              <button className="sidebar__popover-item">Set OPS V</button>
-              <button className="sidebar__popover-item">Generate Bin Count</button>
-              <button className="sidebar__popover-item">Update Sensor Category</button>
-              <button className="sidebar__popover-item">Uploads</button>
-              <button className="sidebar__popover-item">Create User</button>
+              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-presence")}>User Presence</button>
+              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-opsv")}>Set OPS V</button>
+              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-bin")}>Generate Bin Count</button>
+              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-sensor")}>Update Sensor Category</button>
+              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-uploads")}>Uploads</button>
+              <button className="sidebar__popover-item" onClick={() => setActiveTab("admin-create-user")}>Create User</button>
             </div>
           </div>
         </div>
