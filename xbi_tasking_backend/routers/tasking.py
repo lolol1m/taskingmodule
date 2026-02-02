@@ -21,7 +21,7 @@ router = APIRouter(prefix="/tasking", tags=["tasking"])
 
 
 @router.post("/getTaskingSummaryData")
-async def get_tasking_summary_data(request: Request, payload: DateRangePayload) -> KeyValueMapResponse:
+async def get_tasking_summary_data(request: Request, payload: DateRangePayload, user: dict = Depends(get_current_user)) -> KeyValueMapResponse:
     '''
     Function: Get Data for Tasking Summary page
     
@@ -65,9 +65,11 @@ async def get_tasking_summary_data(request: Request, payload: DateRangePayload) 
                         "Parent ID": 0 
                     },
         }
+    
+    Note: II users only see tasks assigned to them. Senior II and IA see all tasks.
     '''
     try:
-        return await run_blocking(request.app.state.tasking_service.get_tasking_summary, model_to_dict(payload))
+        return await run_blocking(request.app.state.tasking_service.get_tasking_summary, model_to_dict(payload), user)
     except Exception:
         logger.exception("getTaskingSummaryData failed")
         return error_response(500, "Tasking summary failed", "tasking_summary_failed")

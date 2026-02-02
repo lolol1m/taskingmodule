@@ -17,16 +17,39 @@ class TaskingService:
         self.qm = query_manager
         self._image_service = image_service
 
-    def get_tasking_summary(self, payload):
+    def get_tasking_summary(self, payload, user=None):
         output = {}
-        image_datas = self.qm.getTaskingSummaryImageData(
-            dateutil.parser.isoparse(payload['Start Date']).strftime(f"%Y-%m-%d"), 
-            (dateutil.parser.isoparse(payload['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
-        )
+        start_date = dateutil.parser.isoparse(payload['Start Date']).strftime(f"%Y-%m-%d")
+        end_date = (dateutil.parser.isoparse(payload['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
+
+        # Check if user is a basic II user (only sees their own tasks)
+        is_ii_user = False
+        assignee_keycloak_id = None
+        if user:
+            account_type = user.get('account_type')
+            roles = user.get('roles', []) or []
+            # Basic II user: has II role but not Senior II or IA
+            is_ii_user = account_type == 'II' or ('II' in roles and account_type not in ('Senior II', 'IA'))
+            if is_ii_user:
+                assignee_keycloak_id = user.get('sub')
+
+        # Get image data based on user role
+        if is_ii_user and assignee_keycloak_id:
+            image_datas = self.qm.getTaskingSummaryImageDataForUser(start_date, end_date, assignee_keycloak_id)
+        else:
+            image_datas = self.qm.getTaskingSummaryImageData(start_date, end_date)
+
         if not image_datas:
             return output
+
         image_ids = [image_data[0] for image_data in image_datas]
-        area_rows = self.qm.getTaskingSummaryAreaDataForImages(image_ids)
+
+        # Get area data based on user role
+        if is_ii_user and assignee_keycloak_id:
+            area_rows = self.qm.getTaskingSummaryAreaDataForImagesForUser(image_ids, assignee_keycloak_id)
+        else:
+            area_rows = self.qm.getTaskingSummaryAreaDataForImages(image_ids)
+
         area_map = {}
         for row in area_rows:
             image_id, task_id, area_name, task_status, remarks, username, v10, opsv = row

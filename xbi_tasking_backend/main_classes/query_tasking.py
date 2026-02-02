@@ -227,6 +227,30 @@ class TaskingQueries:
         AND (image.upload_date >= %s AND image.upload_date < %s)"
         return self.db.executeSelect(query, (start_date, end_date))
 
+    def getTaskingSummaryImageDataForUser(self, start_date, end_date, assignee_keycloak_id):
+        '''
+        Function:   Gets data for tasking summary filtered by assignee (for II users)
+        Input:      start_date, end_date, assignee_keycloak_id
+        Output:     nested list with id, sensor_name, image_file_name, image_id, upload_date, image_datetime, report, priority, image_category, quality, cloud_cover, ew_status, target_tracing
+        '''
+        query = f"SELECT DISTINCT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, COALESCE(cloud_cover.name, NULL) as cloud_cover_name, \
+        COALESCE(ew_status.name, NULL) as ew_status_name, image.target_tracing \
+        FROM image \
+        LEFT JOIN sensor ON sensor.id = image.sensor_id \
+        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id \
+        LEFT JOIN report ON report.id = image.report_id \
+        LEFT JOIN priority ON priority.id = image.priority_id \
+        LEFT JOIN image_category ON image_category.id = image.image_category_id \
+        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id \
+        JOIN image_area ON image_area.scvu_image_id = image.scvu_image_id \
+        JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id \
+        WHERE image.completed_date IS NULL \
+        AND (image.upload_date >= %s AND image.upload_date < %s) \
+        AND task.assignee_keycloak_id = %s"
+        return self.db.executeSelect(query, (start_date, end_date, assignee_keycloak_id))
+
     def getTaskingSummaryAreaData(self, image_id):
         '''
         Function:   Gets data for tasking summary area
@@ -285,6 +309,40 @@ class TaskingQueries:
         for row in results:
             image_id, task_id, area_name, task_status, remarks, assignee_keycloak_id, v10, opsv = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else 'Unassigned'
+            formatted_results.append((image_id, task_id, area_name, task_status, remarks, username, v10, opsv))
+        return formatted_results
+
+    def getTaskingSummaryAreaDataForImagesForUser(self, image_ids, assignee_keycloak_id):
+        '''
+        Function:   Gets data for tasking summary areas for multiple images filtered by assignee (for II users)
+        Input:      image_ids, assignee_keycloak_id
+        Output:     list of tuples with image_id, task_id, area_name, task_status, remarks, username, v10, opsv
+        '''
+        if not image_ids:
+            return []
+
+        placeholders = ','.join(['%s'] * len(image_ids))
+        query = f"""
+        SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
+               COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv
+        FROM task
+        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
+        JOIN area ON image_area.scvu_area_id = area.scvu_area_id
+        JOIN image ON image_area.scvu_image_id = image.scvu_image_id
+        JOIN task_status ON task.task_status_id = task_status.id
+        WHERE image.scvu_image_id IN ({placeholders})
+        AND task.assignee_keycloak_id = %s
+        ORDER BY image.scvu_image_id, area.area_name
+        """
+        results = self.db.executeSelect(query, tuple(image_ids) + (assignee_keycloak_id,))
+
+        user_ids = [row[5] for row in results if row[5]]
+        usernames = self.keycloak.get_keycloak_usernames_bulk(user_ids)
+
+        formatted_results = []
+        for row in results:
+            image_id, task_id, area_name, task_status, remarks, assignee_kc_id, v10, opsv = row
+            username = usernames.get(assignee_kc_id) if assignee_kc_id else 'Unassigned'
             formatted_results.append((image_id, task_id, area_name, task_status, remarks, username, v10, opsv))
         return formatted_results
 

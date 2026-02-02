@@ -127,11 +127,17 @@ class QueryManager():
     def getTaskingSummaryImageData(self, start_date, end_date):
         return self._tasking.getTaskingSummaryImageData(start_date, end_date)
 
+    def getTaskingSummaryImageDataForUser(self, start_date, end_date, assignee_keycloak_id):
+        return self._tasking.getTaskingSummaryImageDataForUser(start_date, end_date, assignee_keycloak_id)
+
     def getTaskingSummaryAreaData(self, image_id):
         return self._tasking.getTaskingSummaryAreaData(image_id)
 
     def getTaskingSummaryAreaDataForImages(self, image_ids):
         return self._tasking.getTaskingSummaryAreaDataForImages(image_ids)
+
+    def getTaskingSummaryAreaDataForImagesForUser(self, image_ids, assignee_keycloak_id):
+        return self._tasking.getTaskingSummaryAreaDataForImagesForUser(image_ids, assignee_keycloak_id)
 
     def startTask(self, task_id):
         return self._tasking.startTask(task_id)

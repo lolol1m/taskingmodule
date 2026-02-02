@@ -14,6 +14,19 @@ def is_admin_user(user: dict) -> bool:
     return account_type == "IA" or "IA" in roles
 
 
+def is_basic_ii_user(user: dict) -> bool:
+    """Returns True if user is a basic II user (not Senior II or IA)"""
+    account_type = user.get("account_type")
+    roles = user.get("roles", []) or []
+    # Basic II user: has II role but not Senior II or IA
+    if account_type == "II":
+        return True
+    if account_type in ("Senior II", "IA"):
+        return False
+    # Fallback: check roles directly
+    return "II" in roles and "Senior II" not in roles and "IA" not in roles
+
+
 async def get_current_user(request: Request):
     """
     Dependency to get current authenticated user from request state
