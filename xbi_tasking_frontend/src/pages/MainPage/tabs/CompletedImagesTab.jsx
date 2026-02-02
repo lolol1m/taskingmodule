@@ -1,83 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import API from '../../../api/api'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+const api = new API()
 
-const refreshAccessToken = async () => {
-  const storedRefresh = localStorage.getItem('refresh_token')
-  if (!storedRefresh) {
-    return null
-  }
-
-  const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: storedRefresh }),
-  })
-
-  if (!response.ok) {
-    return null
-  }
-
-  const data = await response.json()
-  if (data.access_token) {
-    localStorage.setItem('access_token', data.access_token)
-  }
-  if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token)
-  }
-  if (data.id_token) {
-    localStorage.setItem('id_token', data.id_token)
-  }
-
-  return data.access_token || null
-}
-
-const clearAuthTokens = () => {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('id_token')
-  localStorage.removeItem('user')
-  localStorage.removeItem('username')
-}
-
-const redirectToLogin = () => {
-  clearAuthTokens()
-  window.location.href = `${BACKEND_URL}/auth/login`
-}
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('access_token')
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-
-  const response = await fetch(url, { ...options, headers })
-  if (response.status !== 401) {
-    return response
-  }
-
-  const refreshedToken = await refreshAccessToken()
-  if (!refreshedToken) {
-    redirectToLogin()
-    return response
-  }
-
-  const retryHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${refreshedToken}`,
-  }
-
-  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
-  if (retryResponse.status === 401) {
-    redirectToLogin()
-  }
-  return retryResponse
-}
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
 const normalizeImageName = (value) => {
   if (!value || typeof value !== 'string') return value
@@ -127,6 +57,24 @@ const buildRows = (inputData) => {
   return rows
 }
 
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [inputData, setInputData] = useState(null)
   const [rows, setRows] = useState([])
@@ -134,6 +82,9 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchText, setSearchText] = useState('')
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
+  const { addNotification } = useNotifications()
 
   const columns = useMemo(
     () => [
@@ -156,22 +107,20 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   )
 
   useEffect(() => {
+    setFilterModel((prev) => ({
+      ...prev,
+      quickFilterValues: searchText ? [searchText] : [],
+    }))
+  }, [searchText])
+
+  useEffect(() => {
     if (!dateRange) return
 
     const fetchCompletedImages = async () => {
       try {
         setLoading(true)
         setError(null)
-        const response = await fetchWithAuth(`${BACKEND_URL}/getCompleteImageData`, {
-          method: 'POST',
-          body: JSON.stringify(dateRange),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch (${response.status})`)
-        }
-
-        const data = await response.json()
+        const data = await api.getCompleteImageData(dateRange)
         const sampleKey = data ? Object.keys(data)[0] : null
         const sampleEntry = sampleKey != null ? data[sampleKey] : null
         console.log('Completed images sample entry:', { sampleKey, sampleEntry })
@@ -179,7 +128,12 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         setRows(buildRows(data))
       } catch (err) {
         console.error('Completed images fetch failed:', err)
-        setError(err?.message || 'Unable to load completed images.')
+        const message = getErrorMessage(err, 'Unable to load completed images.')
+        setError(message)
+        addNotification({
+          title: 'Load failed',
+          meta: 'Just now · Completed images unavailable',
+        })
       } finally {
         setLoading(false)
       }
@@ -192,17 +146,20 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
     if (!selection.length) return
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`${BACKEND_URL}/uncompleteImages`, {
-        method: 'POST',
-        body: JSON.stringify({ 'SCVU Image ID': selection }),
+      await api.uncompleteImages({ 'SCVU Image ID': selection })
+      addNotification({
+        title: 'Images uncompleted',
+        meta: `Just now · ${selection.length} images`,
       })
-      if (!response.ok) {
-        throw new Error(`Failed to uncomplete (${response.status})`)
-      }
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Uncomplete images failed:', err)
-      setError(err?.message || 'Unable to uncomplete images.')
+      const message = getErrorMessage(err, 'Unable to uncomplete images.')
+      setError(message)
+      addNotification({
+        title: 'Uncomplete failed',
+        meta: 'Just now · Please try again',
+      })
     } finally {
       setLoading(false)
     }
@@ -217,11 +174,22 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         </div>
         <div className="content__controls">
           <div className="action-bar">
+            <div className="search">
+              <input
+                type="text"
+                placeholder="Search completed images"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
-              Refresh
+
+              <span>Refresh</span>
+               
             </Button>
-            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
-              Change Display Date
+            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
+              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
+              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>
@@ -244,6 +212,8 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
           columns={columns}
           checkboxSelection
           disableRowSelectionOnClick
+          filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
           onRowSelectionModelChange={(model) => {
             if (Array.isArray(model)) {
               setSelection(model)

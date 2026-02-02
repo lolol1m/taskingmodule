@@ -1,4 +1,5 @@
 import logo from '../../../assets/xbi.png'
+import NotificationsPanel from '../../../components/notifications/NotificationsPanel.jsx'
 
 function HeaderSection({ username }) {
   return (
@@ -9,16 +10,12 @@ function HeaderSection({ username }) {
   
       </div>
       <div className="app-header__right">
-              {username && (
+        {username && (
           <>
-  
             <span className="app-title app-user">{username}</span>
           </>
         )}
-        <button className="icon-button" aria-label="Notifications">
-          🔔
-          <span className="icon-badge">3</span>
-        </button>
+        <NotificationsPanel />
       </div>
     </header>
   )

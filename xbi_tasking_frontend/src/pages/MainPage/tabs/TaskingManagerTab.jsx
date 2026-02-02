@@ -7,79 +7,15 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import dayjs from 'dayjs'
+import API from '../../../api/api'
+import UserService from '../../../auth/UserService'
+import useNotifications from '../../../components/notifications/useNotifications.js'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+const api = new API()
 
-const redirectToLogin = () => {
-  window.location.href = `${BACKEND_URL}/auth/login`
-}
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
-const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('access_token')
-  if (!token) {
-    redirectToLogin()
-    throw new Error('Not authenticated')
-  }
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${token}`,
-  }
-  const response = await fetch(url, { ...options, headers })
-  if (response.status !== 401) {
-    return response
-  }
-
-  const refreshToken = localStorage.getItem('refresh_token')
-  if (!refreshToken) {
-    redirectToLogin()
-    throw new Error('Refresh token missing')
-  }
-
-  const refreshResponse = await fetch(`${BACKEND_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
-  if (!refreshResponse.ok) {
-    redirectToLogin()
-    throw new Error('Refresh failed')
-  }
-  const refreshed = await refreshResponse.json()
-  const refreshedToken = refreshed?.access_token
-  if (!refreshedToken) {
-    redirectToLogin()
-    throw new Error('Refresh failed')
-  }
-  localStorage.setItem('access_token', refreshedToken)
-
-  const retryHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${refreshedToken}`,
-  }
-  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
-  if (retryResponse.status === 401) {
-    redirectToLogin()
-  }
-  return retryResponse
-}
-
-const readUserRole = () => {
-  try {
-    const rawUser = localStorage.getItem('user')
-    if (!rawUser) return null
-    const user = JSON.parse(rawUser)
-    const roles = Array.isArray(user?.roles) ? user.roles : []
-    if (roles.includes('IA')) return 'IA'
-    if (roles.includes('Senior II')) return 'Senior II'
-    if (roles.includes('II')) return 'II'
-    return roles[0] || null
-  } catch (error) {
-    console.warn('Unable to read user role', error)
-    return null
-  }
-}
 
 const normalizeImageName = (value) => {
   if (!value || typeof value !== 'string') return value
@@ -96,6 +32,24 @@ const toISOLocal = (date) => {
   )}:${pad(d.getSeconds())}.${ms}Z`
 }
 
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const [rows, setRows] = useState([])
   const [assignees, setAssignees] = useState([{ id: 'Multiple', name: 'Multiple' }])
@@ -103,9 +57,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchText, setSearchText] = useState('')
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const [actionsEnabled, setActionsEnabled] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [areaOptions, setAreaOptions] = useState([])
+  const { addNotification } = useNotifications()
   const [formInput, setFormInput] = useState({
     imageFileName: '',
     sensorName: '',
@@ -232,10 +189,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/getUsers`)
-      const data = await response.json()
+      setError(null)
+      const data = await api.getUsers()
       if (data?.Warning) {
-        alert(data.Warning)
+        addNotification({
+          title: 'User list warning',
+          meta: data.Warning,
+        })
       }
       if (Array.isArray(data?.Users) && data.Users.length) {
         setAssignees([{ id: 'Multiple', name: 'Multiple' }, ...data.Users])
@@ -244,6 +204,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       }
     } catch (err) {
       console.warn('Failed to load users', err)
+      const message = getErrorMessage(err, 'Unable to load users.')
+      setError(message)
+      addNotification({
+        title: 'User list failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -252,14 +218,10 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetchWithAuth(`${BACKEND_URL}/getTaskingManagerData`, {
-        method: 'POST',
-        body: JSON.stringify(dateRange),
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to fetch (${response.status})`)
-      }
-      const data = await response.json()
+     
+      var response = await api.postTaskingManagerData(dateRange)
+      
+      const data = response
       if (!fetchTaskingManager.hasLogged) {
         console.log('[TaskingManager] Raw response sample:', data)
         fetchTaskingManager.hasLogged = true
@@ -267,7 +229,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       setRows(formatData(data))
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
-      setError('Unable to load tasking manager data.')
+      const message = getErrorMessage(err, 'Unable to load tasking manager data.')
+      setError(message)
+      addNotification({
+        title: 'Load failed',
+        meta: 'Just now · Tasking Manager unavailable',
+      })
     } finally {
       setLoading(false)
     }
@@ -275,13 +242,19 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
   const fetchAreas = async () => {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/getAreas`)
-      const data = await response.json()
+      setError(null)
+      const data = await api.getAreas()
       const areas = Array.isArray(data?.Areas) ? data.Areas : []
       const names = Array.from(new Set(areas.map((area) => area?.['Area Name']).filter(Boolean)))
       setAreaOptions(names)
     } catch (err) {
       console.warn('Unable to load areas', err)
+      const message = getErrorMessage(err, 'Unable to load areas.')
+      setError(message)
+      addNotification({
+        title: 'Area list failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -302,7 +275,16 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
   const getValueOption = (value) => {
     if (!value) return null
     if (typeof value === 'object' && value.id) return value
-    const found = assignees.find((opt) => opt?.id === value || opt === value)
+    const normalized = typeof value === 'string' ? value.toLowerCase() : value
+    const found = assignees.find((opt) => {
+      if (!opt) return false
+      if (opt?.id === value || opt === value) return true
+      if (typeof value === 'string') {
+        const optionName = opt?.name
+        return optionName === value || optionName?.toLowerCase() === normalized
+      }
+      return false
+    })
     return found || null
   }
 
@@ -357,6 +339,9 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       renderInput: (inputParams) => <TextField {...inputParams} placeholder="Assignee" size="small" />,
       size: 'small',
       fullWidth: true,
+      ListboxProps: {
+        style: { maxHeight: 200, overflow: 'auto' },
+      },
     }
 
     const handleChange = (newValue) => {
@@ -456,12 +441,25 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             variant={isEnabled ? 'outlined' : 'text'}
             disabled={!isEnabled}
             startIcon={isEnabled ? <DeleteOutlineIcon fontSize="small" /> : <LockOutlinedIcon fontSize="small" />}
-            onClick={() => {
+            onClick={async () => {
               if (!isEnabled) return
-              fetchWithAuth(`${BACKEND_URL}/deleteImage`, {
-                method: 'POST',
-                body: JSON.stringify({ 'SCVU Image ID': params.id }),
-              }).then(() => setRefreshKey((prev) => prev + 1))
+              try {
+                setError(null)
+                await api.postDeleteImage({ 'SCVU Image ID': params.id })
+                addNotification({
+                  title: 'TTG deleted',
+                  meta: 'Just now · Image removed',
+                })
+                setRefreshKey((prev) => prev + 1)
+              } catch (err) {
+                console.error('TTG delete failed', err)
+                const message = getErrorMessage(err, 'Unable to delete TTG.')
+                setError(message)
+                addNotification({
+                  title: 'TTG delete failed',
+                  meta: 'Just now · Please try again',
+                })
+              }
             }}
           >
             Delete TTG
@@ -514,31 +512,40 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     const hasPriority = Object.keys(prioritiesPayload).length > 0
 
     if (!hasTasks && !hasPriority) {
-      alert('No tasks to assign or priorities to update.')
+      addNotification({
+        title: 'Nothing to update',
+        meta: 'Select tasks or priorities first',
+      })
       return
     }
 
     try {
+      setError(null)
       if (hasTasks) {
-        await fetchWithAuth(`${BACKEND_URL}/assignTask`, {
-          method: 'POST',
-          body: JSON.stringify(tasksPayload),
-        })
+        await api.postAssignTask(tasksPayload)
         localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
       }
 
       if (hasPriority) {
-        await fetchWithAuth(`${BACKEND_URL}/updateTaskingManagerData`, {
-          method: 'POST',
-          body: JSON.stringify(prioritiesPayload),
-        })
+        await api.postUpdateTaskingManagerData(prioritiesPayload)
       }
 
-      alert('Tasking Manager updated successfully.')
+      const summaryParts = []
+      if (hasTasks) summaryParts.push(`${tasksPayload.Tasks.length} tasks assigned`)
+      if (hasPriority) summaryParts.push(`${Object.keys(prioritiesPayload).length} priorities updated`)
+      addNotification({
+        title: 'Tasking Manager updated',
+        meta: `Just now · ${summaryParts.join(' · ')}`,
+      })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Tasking Manager update failed', err)
-      alert('Unable to apply changes. Please try again.')
+      const message = getErrorMessage(err, 'Unable to apply changes.')
+      setError(message)
+      addNotification({
+        title: 'Update failed',
+        meta: 'Just now · Please try again',
+      })
     }
   }
 
@@ -550,16 +557,28 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       imageDateTime: toISOLocal(formInput.imageDateTime),
       areas: formInput.areas || [],
     }
-    await fetchWithAuth(`${BACKEND_URL}/insertTTGData`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-    resetForm()
-    setModalOpen(false)
-    setRefreshKey((prev) => prev + 1)
+    try {
+      setError(null)
+      await api.postInsertTTGData(payload)
+      resetForm()
+      setModalOpen(false)
+      addNotification({
+        title: 'TTG created',
+        meta: `Just now · ${payload.areas.length} areas`,
+      })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('TTG create failed', err)
+      const message = getErrorMessage(err, 'Unable to create TTG.')
+      setError(message)
+      addNotification({
+        title: 'TTG creation failed',
+        meta: 'Just now · Please try again',
+      })
+    }
   }
 
-  const role = readUserRole()
+  const role = UserService.readUserRoleSingle()
   if (role === 'II') {
     return <div className="tasking-manager__notice">You do not have permission to view this tab.</div>
   }
@@ -620,6 +639,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     },
   }
 
+  useEffect(() => {
+    setFilterModel((prev) => ({
+      ...prev,
+      quickFilterValues: searchText ? [searchText] : [],
+    }))
+  }, [searchText])
+
   return (
     <div className="tasking-manager">
       <div className="content__topbar">
@@ -629,11 +655,20 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         </div>
            <div className="content__controls">
           <div className="action-bar">
+            <div className="search">
+              <input
+                type="text"
+                placeholder="Search tasking manager"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
             </Button>
-            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
-              Change Display Date
+            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
+              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
+              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>
@@ -666,6 +701,8 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           columns={columns}
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
+          filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
           checkboxSelection
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}

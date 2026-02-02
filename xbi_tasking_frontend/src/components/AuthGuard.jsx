@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Box, Button, CircularProgress, Container, CssBaseline, Typography } from '@mui/material'
 import { jwtDecode } from 'jwt-decode'
+import UserService from '../auth/UserService'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
 
@@ -106,12 +107,76 @@ const refreshTokens = async () => {
   }
 }
 
-function AuthGuard({ children }) {
+
+
+export function KeycloakAuthGuard({ children }) {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState(null);
+  const isInitializing = useRef(false); 
+  useEffect(() => {
+    
+    if (isInitializing.current) return;
+    isInitializing.current = true;
+
+    const initialize = async () => {
+      try {
+        await UserService.initKeycloak();
+        console.log("AAAAAAAAAAAAAA")
+        setIsInitialized(true); 
+
+      } catch (err) {
+       console.log(err)
+        setError(err.message || "Failed to connect to auth server");
+      }
+    };
+
+    initialize();
+  }, []);
+
+  if (!isInitialized && !error) {
+    return (
+      <Container component="main" maxWidth="xs">
+        <CssBaseline />
+        <Box display="flex" flexDirection="column" alignItems="center" mt={8}>
+          <CircularProgress />
+          <Typography variant="h6" mt={2}>Initializing...</Typography>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container component="main" maxWidth="xs">
+        <CssBaseline />
+        <Box display="flex" flexDirection="column" alignItems="center" mt={8} gap={2}>
+          <Typography variant="h6" color="error">Authentication Error</Typography>
+          <Typography variant="body2">{error}</Typography>
+          <Button variant="contained" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (!UserService.isLoggedIn) {
+     UserService.doLogin(); 
+     return null;
+  }
+
+
+  return children;
+}
+
+
+export function AuthGuard({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    
     let expiryTimeoutId
     let refreshTimeoutId
 
@@ -289,4 +354,4 @@ function AuthGuard({ children }) {
   return children
 }
 
-export default AuthGuard
+

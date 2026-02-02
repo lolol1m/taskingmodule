@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Box } from '@mui/material'
 import DatePickerModal from '../../components/DatePicker.jsx'
+import NotificationsProvider from '../../components/notifications/NotificationsProvider.jsx'
 import ContentSection from './sections/ContentSection.jsx'
 import HeaderSection from './sections/HeaderSection.jsx'
 import SidebarSection from './sections/SidebarSection.jsx'
 import useUsername from './hooks/useUsername.js'
 import './styles/index.css'
+import UserService from '../../auth/UserService.js'
 
 function MainPage() {
   const [dateRange, setDateRange] = useState(() => {
@@ -23,19 +25,12 @@ function MainPage() {
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const username = useUsername()
+  const userRole = UserService.readUserRoleSingle()
 
   const handleLogout = () => {
-    localStorage.removeItem('keycloak_token')
-    localStorage.removeItem('username')
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('id_token')
-    localStorage.removeItem('user')
+  
     localStorage.removeItem('tasking_date_range')
-    sessionStorage.removeItem('token')
-    sessionStorage.removeItem('username')
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-    window.location.href = `${backendUrl}/auth/logout`
+    UserService.doLogout()
   }
 
   const handleApply = (range) => {
@@ -77,30 +72,34 @@ function MainPage() {
       <DatePickerModal open={open} onClose={() => setOpen(false)} onApply={handleApply} />
       {dateRange && (
         <>
-          <HeaderSection username={username} />
+          <NotificationsProvider>
+            <HeaderSection username={username} />
 
-          <main className={`layout ${isCollapsed ? 'is-collapsed' : ''}`}>
-            <SidebarSection
-              isCollapsed={isCollapsed}
-              setIsCollapsed={setIsCollapsed}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              adminOpen={adminOpen}
-              setAdminOpen={setAdminOpen}
-              settingsOpen={settingsOpen}
-              setSettingsOpen={setSettingsOpen}
-              isDarkMode={isDarkMode}
-              setIsDarkMode={setIsDarkMode}
-              onLogout={handleLogout}
-            />
+            <main className={`layout ${isCollapsed ? 'is-collapsed' : ''}`}>
+              <SidebarSection
+                isCollapsed={isCollapsed}
+                setIsCollapsed={setIsCollapsed}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                adminOpen={adminOpen}
+                setAdminOpen={setAdminOpen}
+                settingsOpen={settingsOpen}
+                setSettingsOpen={setSettingsOpen}
+                isDarkMode={isDarkMode}
+                setIsDarkMode={setIsDarkMode}
+                onLogout={handleLogout}
+                userRole={userRole}
+              />
 
-            <ContentSection
-              activeTab={activeTab}
-              dateRange={dateRange}
-              onOpenDatePicker={() => setOpen(true)}
-              isCollapsed={isCollapsed}
-            />
-          </main>
+              <ContentSection
+                activeTab={activeTab}
+                dateRange={dateRange}
+                onOpenDatePicker={() => setOpen(true)}
+                isCollapsed={isCollapsed}
+                userRole={userRole}
+              />
+            </main>
+          </NotificationsProvider>
         </>
       )}
     </Box>

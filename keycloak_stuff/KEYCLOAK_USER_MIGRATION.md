@@ -6,7 +6,6 @@ This guide explains how to migrate existing database users to Keycloak and integ
 
 The system currently has:
 - **Database accounts**: `accounts` table with account types (II, Senior II, IA) and password hashes
-- **Database users**: `users` table with user names (II User, Senior II User, IA User)
 - **Old authentication**: Password-based login using `accountLogin` endpoint
 
 After migration:
@@ -36,12 +35,8 @@ Before running the migration, create the roles in Keycloak:
 
 ## Step 2: Run Migration Script
 
-The migration script will:
-- Read users from the database (`users` table)
-- Create corresponding users in Keycloak
-- Assign appropriate roles based on account type
-- Set passwords (from the original account passwords)
--* If there are no rows for users there is no need to migrate because there's nothing to migrate
+The migration script is now deprecated because the legacy `users` table has been removed.
+If you still need to backfill Keycloak users, do it directly in Keycloak (see Step 1 and Step 3).
 ### Run the script:
 
 ```bash
@@ -145,13 +140,8 @@ The system uses the following role hierarchy:
 
 The `accounts` table is no longer used for authentication but can be kept for reference.
 
-The `users` table is still used for:
-- Task assignment (assignee_id references users.id)
-- User dropdown lists in the UI
-
-**Note**: The `users` table should be kept in sync with Keycloak users. You may want to:
-- Create a sync script to update the `users` table when new users are added to Keycloak
-- Or use Keycloak user IDs directly in the database (requires schema changes)
+The legacy `users` table has been removed. Presence is tracked in `user_cache` and
+user identity/roles come from Keycloak.
 
 ## Troubleshooting
 
@@ -183,7 +173,7 @@ The `users` table is still used for:
 1. **Update passwords**: After migration, users should change their passwords in Keycloak
 2. **Add more users**: Create additional users in Keycloak and assign appropriate roles
 3. **Remove old login**: Once fully migrated, you can remove the old `accountLogin` endpoint
-4. **Sync users table**: Consider creating a sync mechanism between Keycloak users and the database `users` table
+4. **Sync presence cache**: Ensure `user_cache` stays in sync with Keycloak presence if needed
 
 ## Security Notes
 

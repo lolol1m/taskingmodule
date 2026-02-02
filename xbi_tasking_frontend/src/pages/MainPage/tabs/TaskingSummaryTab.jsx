@@ -11,99 +11,16 @@ import {
   Typography,
 } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import API from '../../../api/api'
+import { ToastContainer, toast} from 'react-toastify';
+import UserService from '../../../auth/UserService';
+import useNotifications from '../../../components/notifications/useNotifications.js'
+const api = new API()
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+const getErrorMessage = (err, fallback = 'Something went wrong.') =>
+  err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
-const refreshAccessToken = async () => {
-  const storedRefresh = localStorage.getItem('refresh_token')
-  if (!storedRefresh) {
-    return null
-  }
 
-  const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: storedRefresh }),
-  })
-
-  if (!response.ok) {
-    return null
-  }
-
-  const data = await response.json()
-  if (data.access_token) {
-    localStorage.setItem('access_token', data.access_token)
-  }
-  if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token)
-  }
-  if (data.id_token) {
-    localStorage.setItem('id_token', data.id_token)
-  }
-
-  return data.access_token || null
-}
-
-const clearAuthTokens = () => {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('id_token')
-  localStorage.removeItem('user')
-  localStorage.removeItem('username')
-}
-
-const redirectToLogin = () => {
-  clearAuthTokens()
-  window.location.href = `${BACKEND_URL}/auth/login`
-}
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('access_token')
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-
-  const response = await fetch(url, { ...options, headers })
-  if (response.status !== 401) {
-    return response
-  }
-
-  const refreshedToken = await refreshAccessToken()
-  if (!refreshedToken) {
-    redirectToLogin()
-    return response
-  }
-
-  const retryHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-    Authorization: `Bearer ${refreshedToken}`,
-  }
-
-  const retryResponse = await fetch(url, { ...options, headers: retryHeaders })
-  if (retryResponse.status === 401) {
-    redirectToLogin()
-  }
-  return retryResponse
-}
-
-const readUserRole = () => {
-  try {
-    const rawUser = localStorage.getItem('user')
-    if (!rawUser) return null
-    const user = JSON.parse(rawUser)
-    const roles = Array.isArray(user?.roles) ? user.roles : []
-    if (roles.includes('IA')) return 'IA'
-    if (roles.includes('Senior II')) return 'Senior II'
-    if (roles.includes('II')) return 'II'
-    return roles[0] || null
-  } catch (error) {
-    console.warn('Unable to read user role', error)
-    return null
-  }
-}
 
 const updateWorkingRow = (prev, rowId, field, value, baseData = null) => {
   const key = String(rowId)
@@ -124,6 +41,30 @@ const buildRows = (inputData) => {
   if (!inputData) return []
 
   const rows = []
+  const taskProgress = new Map()
+
+  Object.keys(inputData).forEach((key) => {
+    const entry = inputData[key]
+    if (!entry || entry['Parent ID'] === undefined) return
+    const parentId = Number(entry['Parent ID'])
+    if (!Number.isFinite(parentId)) return
+    const status = entry['Task Status']
+    const normalized = typeof status === 'string' ? status.trim().toLowerCase() : ''
+    const current = taskProgress.get(parentId) || { completed: 0, total: 0 }
+    current.total += 1
+    if (normalized === 'completed') {
+      current.completed += 1
+    }
+    taskProgress.set(parentId, current)
+  })
+
+  const resolveTaskCompleted = (entry, key) => {
+    const progress = taskProgress.get(Number(key))
+    if (progress && progress.total > 0) {
+      return `${progress.completed}/${progress.total}`
+    }
+    return entry['Task Completed']
+  }
   Object.keys(inputData).forEach((key) => {
     const entry = inputData[key]
     if (!entry) return
@@ -141,7 +82,7 @@ const buildRows = (inputData) => {
         areaName: entry['Area'],
         assignee: entry['Assignee'],
         report: entry['Report'],
-        taskCompleted: entry['Task Completed'],
+        taskCompleted: resolveTaskCompleted(entry, key),
         priority: entry['Priority'],
         imageCategory: entry['Image Category'],
         imageQuality: entry['Image Quality'],
@@ -186,6 +127,31 @@ const parseProgress = (value) => {
   return Math.round((completed / total) * 100)
 }
 
+const normalizeStatus = (value) => {
+  if (!value) return ''
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'in_progress' || normalized === 'inprogress') return 'in progress'
+  return normalized
+}
+
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   const [inputData, setInputData] = useState(null)
   const [workingData, setWorkingData] = useState(null)
@@ -204,9 +170,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selection, setSelection] = useState([])
+  const [searchText, setSearchText] = useState('')
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const [showDetails, setShowDetails] = useState(false)
   const [openCopy, setOpenCopy] = useState(false)
   const [clipboardValue, setClipboardValue] = useState('')
+  const { addNotification } = useNotifications()
   const handleTooltipClose = () => setOpenCopy(false)
 
   const rows = useMemo(() => buildRows(workingData || inputData), [workingData, inputData])
@@ -260,6 +229,29 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     },
     '& .MuiAutocomplete-endAdornment': {
       right: 6,
+    },
+  })
+
+  const inlineTextFieldSx = () => ({
+    width: '100%',
+    minWidth: 0,
+    '& .MuiOutlinedInput-root': {
+      height: 28,
+      minHeight: 28,
+      paddingRight: 8,
+      alignItems: 'center',
+      borderRadius: 6,
+      backgroundColor: 'transparent',
+      color: 'var(--text)',
+    },
+    '& .MuiOutlinedInput-input': {
+      padding: '0 10px',
+      textAlign: 'left',
+      color: 'var(--text)',
+    },
+    '& .MuiInputBase-input::placeholder': {
+      color: 'var(--muted)',
+      opacity: 1,
     },
   })
 
@@ -326,7 +318,30 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           )
         },
       },
-      { field: 'remarks', headerName: 'Remarks', minWidth: 140, flex: 0.9, editable: true },
+      {
+        field: 'remarks',
+        headerName: 'Remarks',
+        minWidth: 140,
+        flex: 0.9,
+        renderCell: (params) => {
+          if (!params?.row) return ''
+          const rowId = params.row.id
+          const currentValue = getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? ''
+          return (
+            <TextField
+              value={currentValue ?? ''}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) =>
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Remarks', event.target.value, inputData))
+              }
+              placeholder="Add remarks"
+              size="small"
+              fullWidth
+              sx={inlineTextFieldSx()}
+            />
+          )
+        },
+      },
       {
         field: 'imageStatus',
         headerName: 'Image Status',
@@ -392,7 +407,30 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           )
         },
       },
-      { field: 'imageQuality', headerName: 'Image Quality', minWidth: 120, flex: 0.6, editable: true },
+      {
+        field: 'imageQuality',
+        headerName: 'Image Quality',
+        minWidth: 140,
+        flex: 0.7,
+        renderCell: (params) => {
+          if (!params?.row?.childId) return ''
+          const rowId = params.row.id
+          const currentValue = getWorkingValue(rowId, 'Image Quality') ?? params?.row?.imageQuality ?? ''
+          return (
+            <TextField
+              value={currentValue ?? ''}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) =>
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
+              }
+              placeholder="Image quality"
+              size="small"
+              fullWidth
+              sx={inlineTextFieldSx()}
+            />
+          )
+        },
+      },
       {
         field: 'cloudCover',
         headerName: 'Cloud Cover',
@@ -420,7 +458,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           )
         },
       },
-      { field: 'ewStatus', headerName: 'EW Status', minWidth: 100, flex: 0.5 },
+      {
+        field: 'ewStatus',
+        headerName: 'EW Status',
+        minWidth: 100,
+        flex: 0.5,
+        renderCell: (params) => params?.row?.ewStatus || '—',
+      },
       {
         field: 'targetTracing',
         headerName: 'Target Tracing',
@@ -511,6 +555,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     setVisibilityModel(columnVisibilityModel)
   }, [columnVisibilityModel])
 
+  useEffect(() => {
+    setFilterModel((prev) => ({
+      ...prev,
+      quickFilterValues: searchText ? [searchText] : [],
+    }))
+  }, [searchText])
+
   const getTreeDataPath = (row) => {
     if (row.treePath && Array.isArray(row.treePath)) {
       return row.treePath.filter((item) => item != null).map((item) => item?.toString() || '')
@@ -527,20 +578,21 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetchWithAuth(`${BACKEND_URL}/getTaskingSummaryData`, {
-        method: 'POST',
-        body: JSON.stringify(dateRange),
-      })
+ 
+      const data = await api.postTaskingSummaryData(dateRange)
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch (${response.status})`)
-      }
+  
 
-      const data = await response.json()
+
       setInputData(data)
     } catch (err) {
       console.error('Tasking Summary fetch failed:', err)
-      setError('Unable to load tasking summary data.')
+      const message = getErrorMessage(err, 'Unable to load tasking summary data.')
+      setError(message)
+      addNotification({
+        title: 'Load failed',
+        meta: 'Just now · Tasking Summary unavailable',
+      })
     } finally {
       setLoading(false)
     }
@@ -610,9 +662,9 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const fetchDropdownValues = async (path, key) => {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}${path}`)
-      if (!response.ok) return
-      const data = await response.json()
+      const response = await api.client({url: `${path}`, method: "get"})
+     
+      const data =  response.data
       const normalized = normalizeOptions(data, key)
       if (normalized.length) {
         writeCachedOptions(key, normalized)
@@ -623,6 +675,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       }))
     } catch (err) {
       console.warn(`Failed to load ${key} values`, err)
+      const message = getErrorMessage(err, `Unable to load ${key} options.`)
+      setError(message)
+      addNotification({
+        title: `${key} options failed`,
+        meta: 'Just now · Please try again',
+      })
       setDropdownValues((prev) => ({
         ...prev,
         [key]: prev[key]?.length ? prev[key] : readCachedOptions(key),
@@ -632,7 +690,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const processTask = async (apiPath) => {
     if (selection.length === 0) {
-      alert('Please select a row')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a row first',
+      })
       return
     }
 
@@ -641,25 +702,68 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       return row?.parentId !== undefined
     })
     if (taskRows.length === 0) {
-      alert('Please select a task row')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a task row',
+      })
       return
+    }
+
+    const allowedStatuses = {
+      '/tasking/startTasks': ['incomplete', 'not started'],
+      '/tasking/completeTasks': ['in progress'],
+      '/tasking/verifyPass': ['verifying'],
+      '/tasking/verifyFail': ['verifying'],
+    }
+    const expected = allowedStatuses[apiPath]
+    if (expected) {
+      const invalid = taskRows
+        .map((rowId) => rows.find((item) => item.id === rowId))
+        .filter((row) => {
+          const status = normalizeStatus(row?.taskStatus)
+          return !expected.includes(status)
+        })
+      if (invalid.length) {
+        const expectedLabel = expected.map((value) => value.replace(/\b\w/g, (c) => c.toUpperCase())).join(', ')
+        addNotification({
+          title: 'Invalid task status',
+          meta: `Expected ${expectedLabel} · ${invalid.length} task(s) not ready`,
+        })
+        return
+      }
     }
 
     const taskIds = taskRows.map((rowId) => {
       const row = rows.find((item) => item.id === rowId)
       return row?.scvuTaskId || rowId
     })
-    await fetchWithAuth(`${BACKEND_URL}${apiPath}`, {
-      method: 'POST',
-      body: JSON.stringify({ 'SCVU Task ID': taskIds }),
-    })
-
-    setRefreshKey((prev) => prev + 1)
+    try {
+      setError(null)
+      await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
+      const actionTitle =
+        apiPath === '/tasking/startTasks' ? 'Tasks started' : apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+      addNotification({
+        title: actionTitle,
+        meta: `Just now · ${taskIds.length} tasks`,
+      })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('Tasking Summary task update failed:', err)
+      const message = getErrorMessage(err, 'Unable to update tasks.')
+      setError(message)
+      addNotification({
+        title: 'Task update failed',
+        meta: 'Just now · Please try again',
+      })
+    }
   }
 
   const processImage = async (apiPath) => {
     if (selection.length === 0) {
-      alert('Please select an Image Row to be completed')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Select an image row to complete',
+      })
       return
     }
 
@@ -669,7 +773,24 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     })
 
     if (imageIds.length === 0) {
-      alert('Please select only Image Rows')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select only image rows',
+      })
+      return
+    }
+
+    const incomplete = imageIds
+      .map((rowId) => rows.find((item) => item.id === rowId))
+      .filter((row) => {
+        const progressValue = parseProgress(row?.taskCompleted)
+        return progressValue !== null && progressValue < 100
+      })
+    if (apiPath === '/tasking/completeImages' && incomplete.length) {
+      addNotification({
+        title: 'Cannot complete image',
+        meta: 'All tasks must be completed first',
+      })
       return
     }
 
@@ -696,27 +817,46 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
     const saveAndComplete = async () => {
       const username = localStorage.getItem('username')
-      await fetchWithAuth(`${BACKEND_URL}${apiPath}`, {
-        method: 'POST',
-        body: JSON.stringify({
+      await api.client({
+        url: `${apiPath}`,
+        method: 'post',
+        data: {
           'SCVU Image ID': imageIds,
           Vetter: username || '',
-        }),
+        },
       })
     }
 
     if (hasChanges && Object.keys(dataToSave).length > 0) {
-      const saveResponse = await fetchWithAuth(`${BACKEND_URL}/updateTaskingSummaryData`, {
-        method: 'POST',
-        body: JSON.stringify(dataToSave),
-      })
-      if (!saveResponse.ok) {
-        alert('Error saving changes. Image will not be completed.')
+      try {
+        await api.postUpdateTaskingSummaryData(dataToSave)
+      } catch (err) {
+        console.error('Tasking Summary save failed:', err)
+        const message = getErrorMessage(err, 'Error saving changes. Image will not be completed.')
+        setError(message)
+        addNotification({
+          title: 'Save failed',
+          meta: 'Just now · Image not completed',
+        })
         return
       }
+    }
+    try {
+      setError(null)
       await saveAndComplete()
-    } else {
-      await saveAndComplete()
+      addNotification({
+        title: 'Images completed',
+        meta: `Just now · ${imageIds.length} images`,
+      })
+    } catch (err) {
+      console.error('Tasking Summary complete failed:', err)
+      const message = getErrorMessage(err, 'Unable to complete images.')
+      setError(message)
+      addNotification({
+        title: 'Complete failed',
+        meta: 'Just now · Please try again',
+      })
+      return
     }
 
     setRefreshKey((prev) => prev + 1)
@@ -724,7 +864,10 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const processSendData = async () => {
     if (selection.length === 0) {
-      alert('Please select a row')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a row first',
+      })
       return
     }
 
@@ -742,16 +885,30 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     })
 
     if (hasNull) {
-      alert('Your selected row(s) has an empty value in the dropdown')
+      addNotification({
+        title: 'Missing values',
+        meta: 'Fill all dropdowns before saving',
+      })
       return
     }
 
-    await fetchWithAuth(`${BACKEND_URL}/updateTaskingSummaryData`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-
-    setRefreshKey((prev) => prev + 1)
+    try {
+      setError(null)
+      await api.postUpdateTaskingSummaryData(payload)
+      addNotification({
+        title: 'Tasking Summary updated',
+        meta: `Just now · ${selection.length} rows updated`,
+      })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('Tasking Summary update failed:', err)
+      const message = getErrorMessage(err, 'Unable to save changes.')
+      setError(message)
+      addNotification({
+        title: 'Save failed',
+        meta: 'Just now · Please try again',
+      })
+    }
   }
 
   const isCellEditable = (params) => {
@@ -781,18 +938,27 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
 
   const copyClipboard = async () => {
     if (selection.length === 0) {
-      alert('Please select a task')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select a task',
+      })
       return
     }
     const firstId = selection[0]
     const parentId = workingData?.[String(firstId)]?.['Parent ID']
     if (parentId === undefined || parentId === null) {
-      alert('Please select tasks only')
+      addNotification({
+        title: 'Selection required',
+        meta: 'Please select task rows only',
+      })
       return
     }
     const imageId = workingData?.[String(parentId)]?.['Image ID']
     if (!imageId) {
-      alert('Unable to find image ID')
+      addNotification({
+        title: 'Image ID missing',
+        meta: 'Unable to copy to clipboard',
+      })
       return
     }
     setClipboardValue(String(imageId))
@@ -800,12 +966,16 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       await navigator.clipboard.writeText(String(imageId))
     } catch (error) {
       console.warn('Clipboard copy failed', error)
+      addNotification({
+        title: 'Clipboard failed',
+        meta: 'Could not copy image ID',
+      })
     }
     setOpenCopy(true)
-    await processTask('/startTasks')
+    await processTask('/tasking/startTasks')
   }
 
-  const role = readUserRole()
+  const role = UserService.readUserRoleSingle()
   const isShow =
     role === 'II'
       ? { CT: true, VF: false, VP: false, CI: false }
@@ -842,9 +1012,9 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
   }, [workingData])
 
   useEffect(() => {
-    fetchDropdownValues('/getReport', 'Report')
-    fetchDropdownValues('/getCloudCover', 'Cloud Cover')
-    fetchDropdownValues('/getImageCategory', 'Image Category')
+    fetchDropdownValues('/lookup/getReport', 'Report')
+    fetchDropdownValues('/lookup/getCloudCover', 'Cloud Cover')
+    fetchDropdownValues('/lookup/getImageCategory', 'Image Category')
   }, [refreshKey, dateRange])
 
   useEffect(() => {
@@ -879,11 +1049,20 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         </div>
         <div className="content__controls">
           <div className="action-bar">
+            <div className="search">
+              <input
+                type="text"
+                placeholder="Search tasking summary"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
             </Button>
-            <Button className="tasking-summary__button" onClick={onOpenDatePicker}>
-              Change Display Date
+            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
+              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
+              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>
@@ -910,7 +1089,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.CT ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processTask('/completeTasks')}
+                onClick={() => processTask('/tasking/completeTasks')}
                 disabled={!selection.length}
               >
                 Complete Task
@@ -919,7 +1098,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.VF ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processTask('/verifyFail')}
+                onClick={() => processTask('/tasking/verifyFail')}
                 disabled={!selection.length}
               >
                 Verify Fail
@@ -928,7 +1107,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.VP ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processTask('/verifyPass')}
+                onClick={() => processTask('/tasking/verifyPass')}
                 disabled={!selection.length}
               >
                 Verify Pass
@@ -937,7 +1116,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             {isShow.CI ? (
               <Button
                 className="tasking-summary__button"
-                onClick={() => processImage('/completeImages')}
+                onClick={() => processImage('/tasking/completeImages')}
                 disabled={!selection.length}
               >
                 Complete Image
@@ -984,8 +1163,8 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           getTreeDataPath={getTreeDataPath}
           groupingColDef={{
             headerName: 'Image/Area Name',
-            minWidth: 200,
-            flex: 1.3,
+            minWidth: showDetails ? 170 : 200,
+            flex: showDetails ? 1.05 : 1.3,
             hideDescendantCount: true,
             valueGetter: (_value, row) => {
               const nameFromGroup =
@@ -995,6 +1174,8 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           }}
           checkboxSelection
           disableRowSelectionOnClick
+          filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
           onRowSelectionModelChange={(model) => {
             if (Array.isArray(model)) {
               setSelection(model)
@@ -1025,6 +1206,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             backgroundColor: 'var(--table-bg)',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
+              color: 'var(--muted)',
             },
             '& .MuiDataGrid-cell': {
               display: 'flex',
@@ -1102,9 +1284,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
-              color: 'var(--muted)',
-            },
-            '& .MuiDataGrid-columnHeaderTitle': {
               color: 'var(--muted)',
             },
             '& .MuiDataGrid-row': {

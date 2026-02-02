@@ -54,10 +54,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-left: 1.3px;
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
 }
+
+.sidebar__item.is-active .sidebar__icon img {
+  filter: brightness(0) invert(1) !important;
+}
+
 
 .sidebar__icon img {
   width: 16px;
@@ -156,6 +162,17 @@
 .sidebar__popover-item {
   border: none;
   background: var(--panel-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.sidebar__popover-item-active{
+  border: none;
+  background: var(--active);
   color: var(--text);
   border-radius: 8px;
   padding: 8px 10px;
@@ -318,8 +335,9 @@
   transition: opacity 250ms ease;
 }
 
-.sidebar__text {
+.sidebar__item.is-active {
   white-space: nowrap;
+  margin-bottom: 2.5px;
 }
 
 .layout:not(.is-collapsed) .sidebar__title-text,
@@ -334,12 +352,13 @@
 
 .sidebar__item.is-active {
   background: transparent;
+  background-color: var(--active);
   border: none;
 }
 
-.sidebar__item.is-active:hover {
-  background: var(--hover);
-}
+
+
+
 
 .sidebar__item--toggle {
   justify-content: space-between;
@@ -388,6 +407,11 @@
 .app-shell.is-light .caret-arrow,
 .app-shell.is-light .collapse-arrow {
   filter: brightness(0) invert(0);
+}
+
+/* Light mode text colors */
+.app-shell.is-light .sidebar__item--sub {
+  color: var(--subtext);
 }
 
 .caret.is-open .caret-arrow {

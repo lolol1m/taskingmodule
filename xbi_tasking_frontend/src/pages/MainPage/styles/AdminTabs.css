@@ -1,0 +1,127 @@
+.admin-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.admin-tab__grid {
+  background: var(--table-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  overflow: auto;
+  max-width: 100%;
+  flex: 1;
+  min-height: 360px;
+  max-height: 660px;
+  scrollbar-color: var(--border-strong) var(--row-bg);
+  scrollbar-width: thin;
+}
+
+.admin-tab__grid::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.admin-tab__grid::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.admin-tab__grid::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.admin-tab__grid .MuiDataGrid-virtualScroller::-webkit-scrollbar-corner {
+  background: var(--row-bg);
+}
+
+.admin-tab__grid .MuiDataGrid-scrollbarFiller,
+.admin-tab__grid .MuiDataGrid-scrollbarFiller--header {
+  background: var(--row-bg) !important;
+}
+
+.admin-tab__error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.admin-bin__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-bin__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.admin-bin__table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--table-bg);
+}
+
+.admin-bin__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 540px;
+  font-size: 13px;
+}
+
+.admin-bin__table th,
+.admin-bin__table td {
+  border-bottom: 1px solid var(--border-strong);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.admin-bin__table thead th {
+  background: var(--row-bg);
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.admin-bin__table tbody tr:nth-of-type(even) {
+  background: var(--row-bg);
+}
+
+.admin-bin__remarks {
+  text-align: left;
+  white-space: pre-wrap;
+  min-width: 200px;
+}
+
+.admin-bin__note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}

@@ -1,27 +1,28 @@
 """
 Keycloak Authentication Middleware for FastAPI
 """
-from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 import time
-import os
+import logging
 from typing import Optional
 import httpx
-from main_classes import ConfigClass
+from config import get_config
+
+logger = logging.getLogger("xbi_tasking_backend.keycloak_auth")
 
 class KeycloakAuth:
     """
     Keycloak authentication handler for validating JWT tokens
     """
     
-    def __init__(self):
-        # Get Keycloak configuration from ConfigClass
-        config = ConfigClass._instance
-        self.keycloak_url = config.getKeycloakURL()
-        self.realm = config.getKeycloakRealm()
-        self.client_id = config.getKeycloakClientID()
-        self.client_secret = config.getKeycloakClientSecret()
+    def __init__(self, config=None, eager=True):
+        # Get Keycloak configuration from provided config
+        self._config = config or get_config()
+        self.keycloak_url = self._config.getKeycloakURL()
+        self.realm = self._config.getKeycloakRealm()
+        self.client_id = self._config.getKeycloakClientID()
+        self.client_secret = self._config.getKeycloakClientSecret()
+        self.allowed_client_ids = set(self._config.getKeycloakAllowedClientIDs())
         
         # Construct the well-known endpoint to get JWKS
         self.well_known_url = f"{self.keycloak_url}/realms/{self.realm}/.well-known/openid-configuration"
@@ -30,8 +31,8 @@ class KeycloakAuth:
         self.jwks_fetched_at = 0
         self.jwks_ttl_seconds = 3600
         
-        # Prime JWKS URL
-        self._load_public_key()
+        if eager:
+            self._load_public_key()
     
     def _load_public_key(self):
         """
@@ -45,8 +46,37 @@ class KeycloakAuth:
                     config = response.json()
                     self.jwks_url = config.get('jwks_uri')
         except Exception as e:
-            print(f"Warning: Could not load Keycloak JWKS URL: {e}")
-            print("Token validation will use introspection endpoint instead")
+            logger.warning("Could not load Keycloak JWKS URL: %s", e)
+            logger.warning("Token validation will use introspection endpoint instead")
+
+    def _validate_issuer_audience(self, claims: dict) -> bool:
+        expected_issuer = f"{self.keycloak_url}/realms/{self.realm}"
+        issuer = claims.get("iss")
+        if issuer and issuer != expected_issuer:
+            logger.warning("Token issuer mismatch: %s", issuer)
+            return False
+
+        aud = claims.get("aud")
+        azp = claims.get("azp")
+        if aud:
+            if isinstance(aud, list):
+                if not (self.allowed_client_ids.intersection(set(aud)) or azp in self.allowed_client_ids):
+                    logger.warning(
+                        "Token audience missing allowed client_id: aud=%s azp=%s allowed=%s",
+                        aud,
+                        azp,
+                        sorted(self.allowed_client_ids),
+                    )
+                    return False
+            elif aud not in self.allowed_client_ids and azp not in self.allowed_client_ids:
+                logger.warning(
+                    "Token audience mismatch: aud=%s azp=%s allowed=%s",
+                    aud,
+                    azp,
+                    sorted(self.allowed_client_ids),
+                )
+                return False
+        return True
 
     async def _get_jwks(self):
         if self.jwks_cache and (time.time() - self.jwks_fetched_at) < self.jwks_ttl_seconds:
@@ -92,11 +122,12 @@ class KeycloakAuth:
                 exp = decoded.get('exp')
                 if exp:
                     now = time.time()
-                    if exp < now:
-                        print(f"❌ Token expired. Exp: {exp}, Now: {now}, Diff: {now - exp} seconds")
+                    leeway = 60
+                    if exp < (now - leeway):
+                        logger.info("Token expired exp=%s now=%s leeway=%s", exp, now, leeway)
                         return None
             except Exception as decode_error:
-                print(f"⚠️  Could not decode token for expiration check: {decode_error}")
+                logger.warning("Could not decode token for expiration check: %s", decode_error)
             
             # Try local validation with JWKS first
             try:
@@ -111,6 +142,8 @@ class KeycloakAuth:
                         algorithms=[alg],
                         options={"verify_aud": False}
                     )
+                    if not self._validate_issuer_audience(decoded):
+                        return None
                     realm_access = decoded.get('realm_access', {})
                     realm_roles = realm_access.get('roles', [])
                     account_type = None
@@ -130,9 +163,9 @@ class KeycloakAuth:
                         'roles': realm_roles
                     }
             except JWTError as jwks_error:
-                print(f"⚠️  JWKS validation failed, falling back to introspection: {jwks_error}")
+                logger.warning("JWKS validation failed; falling back to introspection: %s", jwks_error)
             except Exception as jwks_error:
-                print(f"⚠️  JWKS validation error, falling back to introspection: {jwks_error}")
+                logger.warning("JWKS validation error; falling back to introspection: %s", jwks_error)
 
             # Use token introspection endpoint (more reliable than JWKS for validation)
             introspection_url = f"{self.keycloak_url}/realms/{self.realm}/protocol/openid-connect/token/introspect"
@@ -154,6 +187,8 @@ class KeycloakAuth:
                 if response.status_code == 200:
                     result = response.json()
                     if result.get('active', False):
+                        if not self._validate_issuer_audience(result):
+                            return None
                         # Extract roles from token
                         realm_access = result.get('realm_access', {})
                         realm_roles = realm_access.get('roles', [])
@@ -178,57 +213,19 @@ class KeycloakAuth:
                             'roles': realm_roles
                         }
                     else:
-                        print(f"❌ Token introspection returned active=False. Result: {result}")
+                        logger.info("Token introspection returned active=False")
                         return None
                 else:
-                    print(f"❌ Keycloak introspection failed: {response.status_code}")
-                    print(f"   Response text: {response.text}")
-                    print(f"   Introspection URL: {introspection_url}")
-                    print(f"   Client ID: {self.client_id}")
+                    logger.warning(
+                        "Keycloak introspection failed status=%s text=%s",
+                        response.status_code,
+                        response.text,
+                    )
+                    logger.debug("Introspection URL: %s", introspection_url)
+                    logger.debug("Client ID: %s", self.client_id)
                     return None
                     
         except Exception as e:
-            print(f"Error verifying token: {e}")
+            logger.exception("Error verifying token: %s", e)
             return None
     
-    async def get_current_user(self, credentials: HTTPAuthorizationCredentials) -> dict:
-        """
-        Extract and validate token from Authorization header
-        """
-        token = credentials.credentials
-        
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Verify token
-        token_info = await self.verify_token(token)
-        
-        if not token_info:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        return token_info
-
-# Create instance
-keycloak_auth = KeycloakAuth()
-
-# Create HTTPBearer security scheme
-security = HTTPBearer()
-
-# Dependency function for FastAPI routes
-async def get_current_user(credentials: HTTPAuthorizationCredentials = security):
-    """
-    FastAPI dependency to get current authenticated user
-    Usage: Add this as a dependency to any route that requires authentication
-    Example: @app.get("/protected", dependencies=[Depends(get_current_user)])
-    """
-    return await keycloak_auth.get_current_user(credentials)
-
-

@@ -21,7 +21,12 @@ function SidebarSection({
   isDarkMode,
   setIsDarkMode,
   onLogout,
+  userRole,
 }) {
+  // II role has limited access - no Tasking Manager or Admin
+  const isBasicUser = userRole === 'II'
+  // Only IA can create users
+  const canCreateUsers = userRole === 'IA'
   const { navRef, indicatorStyle } = useActiveIndicator({
     activeTab,
     isCollapsed,
@@ -32,7 +37,8 @@ function SidebarSection({
   return (
     <aside className="sidebar" style={{ width: isCollapsed ? '72px' : '290px' }}>
       <div className="sidebar__content" ref={navRef}>
-        <span className="sidebar__active-indicator" style={indicatorStyle} />
+
+        {(adminOpen || !isCollapsed) && <span className="sidebar__active-indicator" style={indicatorStyle} />}
         <div className="sidebar__section">
           <div className="sidebar__title">
             <button
@@ -48,6 +54,7 @@ function SidebarSection({
           <button
             className={`sidebar__item ${activeTab === 'summary' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('summary')}
+
           >
             <span className="sidebar__icon">
               <img src={checkIcon} alt="" />
@@ -57,87 +64,100 @@ function SidebarSection({
           <button
             className={`sidebar__item ${activeTab === 'completed' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('completed')}
+
           >
             <span className="sidebar__icon">
               <img src={checkMarkIcon} alt="" />
             </span>
             <span className="sidebar__text">Completed Images</span>
           </button>
-          <button
-            className={`sidebar__item ${activeTab === 'manager' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('manager')}
-          >
-            <span className="sidebar__icon">
-              <img src={layerIcon} alt="" />
-            </span>
-            <span className="sidebar__text">Tasking Manager</span>
-          </button>
-        </div>
-
-        <div className="sidebar__section">
-          <div className="sidebar__popover-wrap">
+          {!isBasicUser && (
             <button
-              className="sidebar__item sidebar__item--toggle"
-              onClick={() => setAdminOpen(!adminOpen)}
-              aria-expanded={adminOpen}
+              className={`sidebar__item ${activeTab === 'manager' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('manager')}
             >
               <span className="sidebar__icon">
-                <img src={adminIcon} alt="" />
+                <img src={layerIcon} alt="" />
               </span>
-              <span className="sidebar__text">Admin</span>
-              <span className={`caret ${adminOpen ? 'is-open' : ''}`}>
-                <img className="caret-arrow" src={downArrow} alt="" />
-              </span>
+              <span className="sidebar__text">Tasking Manager</span>
             </button>
-            <div className={`sidebar__group ${adminOpen && !isCollapsed ? 'is-open' : ''}`}>
+          )}
+        </div>
+
+        {!isBasicUser && (
+          <div className="sidebar__section">
+            <div className="sidebar__popover-wrap">
               <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-presence' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-presence')}
+                className={`sidebar__item sidebar__item--toggle ${activeTab.includes("admin") && !adminOpen && "is-active"}`}
+                onClick={() => {if(!isCollapsed){
+  setAdminOpen(!adminOpen)
+                }
+                  
+                  }}
+                aria-expanded={adminOpen}
               >
-                <span className="sidebar__text">User Presence</span>
+                <span className="sidebar__icon">
+                  <img src={adminIcon} alt="" />
+                </span>
+                <span className="sidebar__text">Admin</span>
+                <span className={`caret ${adminOpen ? 'is-open' : ''}`}>
+                  <img className="caret-arrow" src={downArrow} alt="" />
+                </span>
               </button>
-              <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-opsv' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-opsv')}
-              >
-                <span className="sidebar__text">Set OPS V</span>
-              </button>
-              <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-bin' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-bin')}
-              >
-                <span className="sidebar__text">Generate Bin Count</span>
-              </button>
-              <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-sensor' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-sensor')}
-              >
-                <span className="sidebar__text">Update Sensor Category</span>
-              </button>
-              <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-uploads' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-uploads')}
-              >
-                <span className="sidebar__text">Uploads</span>
-              </button>
-              <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-create-user')}
-              >
-                <span className="sidebar__text">Create User</span>
-              </button>
-            </div>
-            <div className="sidebar__popover sidebar__popover--admin">
-              <div className="sidebar__popover-title">Admin</div>
-              <button className="sidebar__popover-item">User Presence</button>
-              <button className="sidebar__popover-item">Set OPS V</button>
-              <button className="sidebar__popover-item">Generate Bin Count</button>
-              <button className="sidebar__popover-item">Update Sensor Category</button>
-              <button className="sidebar__popover-item">Uploads</button>
-              <button className="sidebar__popover-item">Create User</button>
+              <div className={`sidebar__group ${adminOpen && !isCollapsed ? 'is-open' : ''}`}>
+                <button
+                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-presence' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('admin-presence')}
+                >
+                  <span className="sidebar__text">User Presence</span>
+                </button>
+                <button
+                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-opsv' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('admin-opsv')}
+                >
+                  <span className="sidebar__text">Set OPS V</span>
+                </button>
+                <button
+                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-bin' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('admin-bin')}
+                >
+                  <span className="sidebar__text">Generate Bin Count</span>
+                </button>
+                <button
+                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-sensor' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('admin-sensor')}
+                >
+                  <span className="sidebar__text">Update Sensor Category</span>
+                </button>
+                <button
+                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-uploads' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('admin-uploads')}
+                >
+                  <span className="sidebar__text">Uploads</span>
+                </button>
+                {canCreateUsers && (
+                  <button
+                    className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
+                    onClick={() => setActiveTab('admin-create-user')}
+                  >
+                    <span className="sidebar__text">Create User</span>
+                  </button>
+                )}
+              </div>
+              <div className="sidebar__popover sidebar__popover--admin">
+                <div className="sidebar__popover-title">Admin</div>
+                <button className={`sidebar__popover-item${activeTab === 'admin-presence' ? '-active' : ''}`} onClick={() => setActiveTab("admin-presence")}>User Presence</button>
+                <button className={`sidebar__popover-item${activeTab === 'admin-opsv' ? '-active' : ''}`}onClick={() => setActiveTab("admin-opsv")}>Set OPS V</button>
+                <button className={`sidebar__popover-item${activeTab === 'admin-bin' ? '-active' : ''}`} onClick={() => setActiveTab("admin-bin")}>Generate Bin Count</button>
+                <button className={`sidebar__popover-item${activeTab === 'admin-sensor' ? '-active' : ''}`} onClick={() => setActiveTab("admin-sensor")}>Update Sensor Category</button>
+                <button className={`sidebar__popover-item${activeTab === 'admin-uploads' ? '-active' : ''}`} onClick={() => setActiveTab("admin-uploads")}>Uploads</button>
+                {canCreateUsers && (
+                  <button className={`sidebar__popover-item${activeTab === 'admin-create-user' ? '-active' : ''}`} onClick={() => setActiveTab("admin-create-user")}>Create User</button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="sidebar__section sidebar__section--bottom">
           <div className="sidebar__popover-wrap">
             <button
