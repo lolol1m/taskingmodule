@@ -122,8 +122,9 @@ class KeycloakAuth:
                 exp = decoded.get('exp')
                 if exp:
                     now = time.time()
-                    if exp < now:
-                        logger.info("Token expired exp=%s now=%s", exp, now)
+                    leeway = 60
+                    if exp < (now - leeway):
+                        logger.info("Token expired exp=%s now=%s leeway=%s", exp, now, leeway)
                         return None
             except Exception as decode_error:
                 logger.warning("Could not decode token for expiration check: %s", decode_error)

@@ -11,26 +11,23 @@ class API {
         })
         //TODO: Integrate with keycloak js
           this.client.interceptors.request.use(
-            (config) => {
-           
-
-                const isLoggedIn = UserService.isLoggedIn()
-                if(!isLoggedIn) {
-                    UserService.updateToken()
+            async (config) => {
+                try {
+                    await UserService.updateToken()
+                } catch (err) {
+                    console.warn('Token refresh failed', err)
                 }
-                const token = UserService.getToken() 
-                               
-                if (!token) { //somehow if it still doesn't get the token for some reason
+
+                const token = UserService.getToken()
+                if (!token) {
                     UserService.doLogin()
                     throw new Error('Not authenticated')
                 }
                 config.headers.Authorization = `Bearer ${token}`
-               
-
-                return config;
+                return config
             },
             (error) => {
-                return Promise.reject(error);
+                return Promise.reject(error)
             }
         );
         this.client.interceptors.response.use(
