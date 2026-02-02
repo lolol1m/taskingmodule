@@ -49,6 +49,7 @@ function SidebarSection({
           <button
             className={`sidebar__item ${activeTab === 'summary' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('summary')}
+
           >
             <span className="sidebar__icon">
               <img src={checkIcon} alt="" />
@@ -58,6 +59,7 @@ function SidebarSection({
           <button
             className={`sidebar__item ${activeTab === 'completed' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('completed')}
+
           >
             <span className="sidebar__icon">
               <img src={checkMarkIcon} alt="" />
@@ -78,7 +80,7 @@ function SidebarSection({
         <div className="sidebar__section">
           <div className="sidebar__popover-wrap">
             <button
-              className="sidebar__item sidebar__item--toggle"
+              className={`sidebar__item sidebar__item--toggle ${activeTab.includes("admin") && !adminOpen && "is-active"}`}
               onClick={() => {if(!isCollapsed){
 setAdminOpen(!adminOpen)
               }
