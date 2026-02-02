@@ -54,10 +54,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-left: 1.3px;
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
 }
+
+.sidebar__item.is-active .sidebar__icon img {
+  filter: brightness(0) invert(1) !important;
+}
+
 
 .sidebar__icon img {
   width: 16px;
@@ -318,6 +324,7 @@
   max-height: 34px;
   border-radius: 8px;
   font-family: inherit;
+  color: white;
   text-align: left;
   position: relative;
   width: 100%;
@@ -331,6 +338,7 @@
 
 .sidebar__text {
   white-space: nowrap;
+  margin-bottom: 2.5px;
 }
 
 .layout:not(.is-collapsed) .sidebar__title-text,
@@ -345,12 +353,13 @@
 
 .sidebar__item.is-active {
   background: transparent;
+  background-color: var(--active);
   border: none;
 }
 
-.sidebar__item.is-active:hover {
-  background: var(--hover);
-}
+
+
+
 
 .sidebar__item--toggle {
   justify-content: space-between;

@@ -79,7 +79,11 @@ function SidebarSection({
           <div className="sidebar__popover-wrap">
             <button
               className="sidebar__item sidebar__item--toggle"
-              onClick={() => setAdminOpen(!adminOpen)}
+              onClick={() => {if(!isCollapsed){
+setAdminOpen(!adminOpen)
+              }
+                
+                }}
               aria-expanded={adminOpen}
             >
               <span className="sidebar__icon">
