@@ -36,8 +36,6 @@
      http://localhost:5000 | *
      ```
    - Click **Save**
-5. Go to **Credentials** tab
-6. Copy the **Client secret** - you'll need this for backend config
 
 
 ### 2. Configure Backend Client
@@ -103,6 +101,7 @@ If you don't need Keycloak user listing, you can skip this section and leave `ad
    - **Enable Client authentication** (makes it confidential)
    - **Disable Standard flow** (not needed for service account)
    - **Enable Service accounts roles** (required for admin API access)
+   - **Enable Direct Access Grant** (required for changing user passwords)
    - Click **Next**
 4. In **Login settings**:
    - **Valid redirect URIs**: Leave empty
