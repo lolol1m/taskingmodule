@@ -104,3 +104,17 @@ class UpdateTaskingSummaryPayload(RootModel[dict]):
 
 class UpdateTaskingManagerPayload(RootModel[dict]):
     pass
+
+
+class ChangePasswordPayload(BaseModel):
+    current_password: str = Field(..., alias="currentPassword")
+    new_password: str = Field(..., alias="newPassword")
+
+    model_config = {"populate_by_name": True}
+
+
+class AdminResetPasswordPayload(BaseModel):
+    target_username: str = Field(..., alias="targetUsername")
+    new_password: str = Field(..., alias="newPassword")
+
+    model_config = {"populate_by_name": True}

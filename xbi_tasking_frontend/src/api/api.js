@@ -176,9 +176,21 @@ class API {
         return response.data
     }
 
+    async changePassword(currentPassword, newPassword) {
+        const response = await this.client.post("/users/changePassword", {
+            currentPassword,
+            newPassword,
+        })
+        return response.data
+    }
 
-
-    
+    async adminResetPassword(targetUsername, newPassword) {
+        const response = await this.client.post("/users/adminResetPassword", {
+            targetUsername,
+            newPassword,
+        })
+        return response.data
+    }
 }
  export default API
 

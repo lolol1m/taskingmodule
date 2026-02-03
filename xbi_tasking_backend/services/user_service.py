@@ -2,6 +2,7 @@ import logging
 from io import StringIO
 import csv
 from main_classes.EnumClasses import Role, ParadeStateStatus
+from main_classes.KeycloakClient import KeycloakClient
 
 
 logger = logging.getLogger("xbi_tasking_backend.user_service")
@@ -10,6 +11,7 @@ logger = logging.getLogger("xbi_tasking_backend.user_service")
 class UserService:
     def __init__(self, query_manager):
         self.qm = query_manager
+        self.kc = KeycloakClient()
 
     def get_users(self):
         output = {}
@@ -65,3 +67,80 @@ class UserService:
             self.qm.resetRecentUsers()
             self.qm.addUsers(userList)
             self.qm.updateExistingUsers(presentList)
+
+    def change_password(self, user, current_password, new_password):
+        """
+        Change the current user's password.
+        
+        Args:
+            user: The current user dict from JWT token
+            current_password: The user's current password for verification
+            new_password: The new password to set
+        
+        Returns:
+            dict with success or error key
+        """
+        username = user.get("preferred_username")
+        user_id = user.get("sub")
+
+        if not username or not user_id:
+            logger.warning("Invalid user session: username=%s, user_id=%s", username, user_id)
+            return {"error": "Invalid user session"}
+
+        if not new_password or len(new_password) < 8:
+            return {"error": "New password must be at least 8 characters"}
+
+        # Verify current password
+        try:
+            is_valid = self.kc.verify_user_credentials(username, current_password)
+            if not is_valid:
+                logger.warning("Password verification failed for user %s", username)
+                return {"error": "Current password is incorrect"}
+        except Exception as e:
+            logger.exception("Error verifying credentials for user %s: %s", username, e)
+            return {"error": "Failed to verify current password"}
+
+        try:
+            # Get admin token and set new password
+            admin_token = self.kc.get_admin_token()
+            self.kc.set_user_password(admin_token, user_id, new_password, temporary=False)
+            logger.info("Password changed successfully for user %s", username)
+            return {"success": True}
+        except Exception as e:
+            logger.exception("Failed to change password for user %s: %s", username, e)
+            return {"error": "Failed to change password"}
+
+    def admin_reset_password(self, target_username, new_password):
+        """
+        Admin function to reset another user's password.
+        Does not require current password verification.
+        
+        Args:
+            target_username: The username of the user to reset password for
+            new_password: The new password to set
+        
+        Returns:
+            dict with success or error key
+        """
+        if not target_username:
+            return {"error": "Target username is required"}
+
+        if not new_password or len(new_password) < 8:
+            return {"error": "New password must be at least 8 characters"}
+
+        try:
+            # Get admin token
+            admin_token = self.kc.get_admin_token()
+            
+            # Find the user ID by username
+            user_id = self.kc.find_user_id(admin_token, target_username)
+            if not user_id:
+                return {"error": f"User '{target_username}' not found"}
+
+            # Set new password
+            self.kc.set_user_password(admin_token, user_id, new_password, temporary=False)
+            logger.info("Password reset successfully for user %s by admin", target_username)
+            return {"success": True}
+        except Exception as e:
+            logger.exception("Failed to reset password for user %s: %s", target_username, e)
+            return {"error": "Failed to reset password"}

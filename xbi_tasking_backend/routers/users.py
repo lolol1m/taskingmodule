@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Request, UploadFile
 
 from api_utils import error_response, model_to_dict, run_blocking
-from schemas import CreateUserPayload, StatusResponse, UsersResponse
+from schemas import AdminResetPasswordPayload, ChangePasswordPayload, CreateUserPayload, StatusResponse, UsersResponse
 from security import get_current_user, is_admin_user
 
 
@@ -90,3 +90,63 @@ async def update_users(request: Request, file: UploadFile, user: dict = Depends(
         return error_response(400, str(e), "invalid_csv")
     except Exception as e:
         return error_response(500, "Failed to update users", "update_users_failed", {"error": str(e)})
+
+
+@router.post("/changePassword")
+async def change_password(request: Request, payload: ChangePasswordPayload, user: dict = Depends(get_current_user)):
+    """
+    Change the current user's password.
+    Requires the current password for verification.
+    """
+    if not user:
+        return error_response(401, "Not authenticated", "not_authenticated")
+
+    try:
+        result = await run_blocking(
+            request.app.state.user_service.change_password,
+            user,
+            payload.current_password,
+            payload.new_password
+        )
+        if "error" in result:
+            return error_response(400, result["error"], "password_change_failed")
+        return StatusResponse(status="success", message="Password changed successfully")
+    except ValueError as e:
+        return error_response(400, str(e), "password_change_failed")
+    except Exception as e:
+        logger.exception("Password change failed for user %s", user.get("preferred_username"))
+        return error_response(500, "Failed to change password", "password_change_failed")
+
+
+@router.post("/adminResetPassword")
+async def admin_reset_password(request: Request, payload: AdminResetPasswordPayload, user: dict = Depends(get_current_user)):
+    """
+    Admin endpoint to reset another user's password.
+    Only IA users can use this endpoint.
+    Does not require knowing the current password.
+    """
+    if not user:
+        return error_response(401, "Not authenticated", "not_authenticated")
+
+    if not is_admin_user(user):
+        return error_response(403, "Insufficient permissions. Only IA users can reset passwords.", "insufficient_permissions")
+
+    try:
+        result = await run_blocking(
+            request.app.state.user_service.admin_reset_password,
+            payload.target_username,
+            payload.new_password
+        )
+        if "error" in result:
+            return error_response(400, result["error"], "password_reset_failed")
+        request.app.state.notification_service.push(
+            "Password reset",
+            f"Just now · {payload.target_username}",
+            user,
+        )
+        return StatusResponse(status="success", message=f"Password reset successfully for {payload.target_username}")
+    except ValueError as e:
+        return error_response(400, str(e), "password_reset_failed")
+    except Exception as e:
+        logger.exception("Password reset failed for target user %s", payload.target_username)
+        return error_response(500, "Failed to reset password", "password_reset_failed")

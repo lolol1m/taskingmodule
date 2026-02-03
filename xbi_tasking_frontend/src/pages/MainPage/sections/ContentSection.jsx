@@ -8,6 +8,7 @@ import SetOpsVTab from '../tabs/SetOpsVTab.jsx'
 import UploadsTab from '../tabs/UploadsTab.jsx'
 import GenerateBinCountTab from '../tabs/GenerateBinCountTab.jsx'
 import UpdateSensorCategoryTab from '../tabs/UpdateSensorCategoryTab.jsx'
+import ChangePasswordTab from '../tabs/ChangePasswordTab.jsx'
 
 const tabMap = {
   summary: TaskingSummaryTab,
@@ -18,7 +19,8 @@ const tabMap = {
   "admin-opsv": SetOpsVTab,
   "admin-uploads": UploadsTab,
   "admin-bin": GenerateBinCountTab,
-  "admin-sensor": UpdateSensorCategoryTab
+  "admin-sensor": UpdateSensorCategoryTab,
+  "settings-password": ChangePasswordTab
 }
 
 function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {

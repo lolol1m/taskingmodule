@@ -100,3 +100,32 @@ class KeycloakClient:
             return None
         path = urlparse(location).path or ""
         return path.rsplit("/", 1)[-1] if "/" in path else None
+
+    def set_user_password(self, token, user_id, new_password, temporary=False):
+        """Set a new password for a user via Admin API"""
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/reset-password"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        payload = {
+            "type": "password",
+            "value": new_password,
+            "temporary": temporary,
+        }
+        response = requests.put(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+
+    def verify_user_credentials(self, username, password):
+        """Verify user credentials by attempting to get a token using admin client"""
+        keycloak_url, realm = self._base()
+        admin_client_id = self.config.getKeycloakAdminClientID()
+        admin_client_secret = self.config.getKeycloakAdminClientSecret()
+        url = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
+        data = {
+            "grant_type": "password",
+            "client_id": admin_client_id,
+            "client_secret": admin_client_secret,
+            "username": username,
+            "password": password,
+        }
+        response = requests.post(url, data=data, timeout=5)
+        return response.status_code == 200
