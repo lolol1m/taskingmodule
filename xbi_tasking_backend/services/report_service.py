@@ -3,18 +3,19 @@ from datetime import timedelta
 
 
 class ReportService:
-    def __init__(self, query_manager, excel_generator):
-        self.qm = query_manager
+    def __init__(self, report_queries, lookup_queries, excel_generator):
+        self.reports = report_queries
+        self.lookup = lookup_queries
         self.eg = excel_generator
 
     def get_xbi_report(self, start_date, end_date):
-        image_datas = self.qm.getXBIReportImage(
+        image_datas = self.reports.getXBIReportImage(
             dateutil.parser.isoparse(start_date).strftime(f"%Y-%m-%d"), 
             (dateutil.parser.isoparse(end_date) + timedelta(days=1)).strftime(f"%Y-%m-%d")
         )
         exploitable_images = {}
         unexploitable_images = {}
-        for cat in self.qm.getCategories():
+        for cat in self.lookup.getCategories():
             exploitable_images[cat[0]] = 0
             unexploitable_images[cat[0]] = [0,0,0,0]
 

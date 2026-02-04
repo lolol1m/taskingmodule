@@ -9,13 +9,14 @@ logger = logging.getLogger("xbi_tasking_backend.user_service")
 
 
 class UserService:
-    def __init__(self, query_manager):
-        self.qm = query_manager
-        self.kc = KeycloakClient()
+    def __init__(self, db, keycloak_queries, keycloak_client=None):
+        self.db = db
+        self.keycloak = keycloak_queries
+        self.kc = keycloak_client or KeycloakClient()
 
     def get_users(self):
         output = {}
-        user_objects = self.qm.getUsers()
+        user_objects = self.keycloak.getUsers()
 
         if not user_objects:
             output["Users"] = []
@@ -37,7 +38,7 @@ class UserService:
         if role not in valid_roles:
             return {"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}
 
-        result = self.qm.createKeycloakUser(username, password, role)
+        result = self.keycloak.createKeycloakUser(username, password, role)
         return {"success": True, "user": result}
 
     def update_users(self, csv_text):
@@ -63,10 +64,10 @@ class UserService:
         
         userList = tuple(userList)
         presentList = tuple(presentList)
-        with self.qm.db.transaction():
-            self.qm.resetRecentUsers()
-            self.qm.addUsers(userList)
-            self.qm.updateExistingUsers(presentList)
+        with self.db.transaction():
+            self.keycloak.resetRecentUsers()
+            self.keycloak.addUsers(userList)
+            self.keycloak.updateExistingUsers(presentList)
 
     def change_password(self, user, current_password, new_password):
         """

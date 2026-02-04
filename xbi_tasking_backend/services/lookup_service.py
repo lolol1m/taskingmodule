@@ -1,35 +1,35 @@
 class LookupService:
-    def __init__(self, query_manager):
-        self.qm = query_manager
+    def __init__(self, lookup_queries):
+        self.lookup = lookup_queries
 
     def get_priority(self):
         output = {}
-        output["Priority"] = [i[0] for i in self.qm.getPriority()]
+        output["Priority"] = [i[0] for i in self.lookup.getPriority()]
         return output
         
     def get_cloud_cover(self):
         output = {}
-        output["Cloud Cover"] = [i[0] for i in self.qm.getCloudCover()]
+        output["Cloud Cover"] = [i[0] for i in self.lookup.getCloudCover()]
         return output
 
     def get_image_category(self):
         output = {}
-        output["Image Category"] = [i[0] for i in self.qm.getImageCategory()]
+        output["Image Category"] = [i[0] for i in self.lookup.getImageCategory()]
         return output
 
     def get_report(self):
         output = {}
-        output["Report"] = [i[0] for i in self.qm.getReport()]
+        output["Report"] = [i[0] for i in self.lookup.getReport()]
         return output
 
     def get_sensor_category(self):
         output = {}
 
-        categories = self.qm.getCategories()
+        categories = self.lookup.getCategories()
         for cat in categories:
             output[cat[0]] = []
         
-        sensors = self.qm.getSensors()
+        sensors = self.lookup.getSensors()
         for sensor in sensors:
             output[sensor[1]].append(sensor[0])
 
@@ -39,10 +39,10 @@ class LookupService:
         query_inputs = []
         for sensor in payload["Sensors"]:
             query_inputs.append((sensor["Category"], sensor["Name"]))
-        self.qm.updateSensorCategory(query_inputs)
+        self.lookup.updateSensorCategory(query_inputs)
 
     def get_areas(self):
-        data = self.qm.getAreas()
+        data = self.lookup.getAreas()
         output = {}
         output["Areas"] = []
         for area in data:
@@ -56,11 +56,11 @@ class LookupService:
         return output
 
     def set_opsv_areas(self, payload):
-        self.qm.setOpsvFalse()
+        self.lookup.setOpsvFalse()
 
         opsvAreas = []
         for area in payload["Areas"]:
             if area['OPS V'] == True:
                 opsvAreas.append((area['Area Name'],))
         
-        self.qm.setOpsvAreas(opsvAreas)
+        self.lookup.setOpsvAreas(opsvAreas)

@@ -12,8 +12,10 @@ logger = logging.getLogger("xbi_tasking_backend.image_service")
 
 
 class ImageService:
-    def __init__(self, query_manager):
-        self.qm = query_manager
+    def __init__(self, db, image_queries, tasking_queries):
+        self.db = db
+        self.images = image_queries
+        self.tasking = tasking_queries
 
     def insert_dsta_data(self, payload, auto_assign = True):
         image_count = 0
@@ -31,9 +33,9 @@ class ImageService:
             for image in payload['images']:
                 error_msg = None
                 try:
-                    with self.qm.db.transaction():
-                        self.qm.insertSensor(image['sensorName'])
-                        image_inserted = self.qm.insertImage(
+                    with self.db.transaction():
+                        self.images.insertSensor(image['sensorName'])
+                        image_inserted = self.images.insertImage(
                             image['imgId'],
                             image['imageFileName'],
                             image['sensorName'],
@@ -50,15 +52,15 @@ class ImageService:
                             continue
                         for area in image['areas']:
                             try:
-                                self.qm.insertArea(area['areaName'])
-                                self.qm.insertImageAreaDSTA(
+                                self.images.insertArea(area['areaName'])
+                                self.images.insertImageAreaDSTA(
                                     image['imgId'],
                                     area['areaName']
                                 )
                                 area_count += 1
 
                                 if auto_assign:
-                                    self.qm.autoAssign(area['areaName'], image['imgId'])
+                                    self.tasking.autoAssign(area['areaName'], image['imgId'])
                                     
                             except Exception as e:
                                 error_msg = f"Error inserting area {area.get('areaName', 'unknown')} for image {image['imgId']}: {str(e)}"
@@ -100,17 +102,17 @@ class ImageService:
         missing = [field for field in required_fields if field not in payload]
         if missing:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
-        with self.qm.db.transaction():
-            self.qm.insertSensor(payload['sensorName'])
-            scvu_image_id = self.qm.insertTTGImageReturnsId(
+        with self.db.transaction():
+            self.images.insertSensor(payload['sensorName'])
+            scvu_image_id = self.images.insertTTGImageReturnsId(
                 payload['imageFileName'],
                 payload['sensorName'],
                 dateutil.parser.isoparse(payload['uploadDate']),
                 dateutil.parser.isoparse(payload['imageDateTime'])
             )
             for area_name in payload['areas']:
-                self.qm.insertArea(area_name)
-                self.qm.insertImageAreaTTG(scvu_image_id, area_name)
+                self.images.insertArea(area_name)
+                self.images.insertImageAreaTTG(scvu_image_id, area_name)
 
     def complete_images(self, payload, vetter_keycloak_id):
         current_datetime = datetime.datetime.today()
@@ -122,22 +124,22 @@ class ImageService:
         return results
 
     def _complete_image(self, scvu_image_id, vetter_keycloak_id, current_datetime):
-        tasks = self.qm.getAllTaskStatusForImage(scvu_image_id)
+        tasks = self.tasking.getAllTaskStatusForImage(scvu_image_id)
         if not tasks:
             return {"error": f"Cannot complete image {scvu_image_id}: No tasks found"}
-        completed_task_id = self.qm.getTaskStatusID("Completed")
+        completed_task_id = self.tasking.getTaskStatusID("Completed")
         incomplete_tasks = []
         for task in tasks:
             if task[1] != completed_task_id:
                 incomplete_tasks.append(task[0])
         if incomplete_tasks:
             return {"error": f"Cannot complete image {scvu_image_id}: Tasks {incomplete_tasks} are not completed"}
-        self.qm.completeImage(scvu_image_id, vetter_keycloak_id, current_datetime)
+        self.images.completeImage(scvu_image_id, vetter_keycloak_id, current_datetime)
         return {"success": f"Image {scvu_image_id} completed"}
 
     def uncomplete_images(self, payload):
         for image_id in payload["SCVU Image ID"]:
-            self.qm.uncompleteImage(image_id)
+            self.images.uncompleteImage(image_id)
 
     def format_complete_image_area(self, area_data, image_id):
         return format_complete_image_area(area_data, image_id)
@@ -157,15 +159,15 @@ class ImageService:
 
         is_ii_user = account_type == 'II' or ('II' in roles and account_type != 'Senior II' and account_type != 'IA')
         if is_ii_user and user:
-            imageData = self.qm.getImageDataForUser(start_date, end_date, user.get('sub'))
+            imageData = self.images.getImageDataForUser(start_date, end_date, user.get('sub'))
         else:
-            imageData = self.qm.getImageData(start_date, end_date)
+            imageData = self.images.getImageData(start_date, end_date)
         output = {}
         if not imageData:
             return output
 
         image_ids = [image[0] for image in imageData]
-        area_rows = self.qm.getImageAreaDataForImages(image_ids)
+        area_rows = self.images.getImageAreaDataForImages(image_ids)
         area_map = {}
         for row in area_rows:
             image_id, task_id, area_name, remarks, assignee = row
@@ -181,8 +183,8 @@ class ImageService:
 
     def delete_image(self, payload):
         scvu_image_id = payload['SCVU Image ID']
-        with self.qm.db.transaction():
-            self.qm.deleteTasksForImage(scvu_image_id)
-            self.qm.deleteImageAreasForImage(scvu_image_id)
-            self.qm.deleteImage(scvu_image_id)
+        with self.db.transaction():
+            self.images.deleteTasksForImage(scvu_image_id)
+            self.images.deleteImageAreasForImage(scvu_image_id)
+            self.images.deleteImage(scvu_image_id)
         return {"success": True}

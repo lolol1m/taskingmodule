@@ -13,8 +13,9 @@ logger = logging.getLogger("xbi_tasking_backend.tasking_service")
 
 
 class TaskingService:
-    def __init__(self, query_manager, image_service=None):
-        self.qm = query_manager
+    def __init__(self, tasking_queries, keycloak_queries, image_service=None):
+        self.tasking = tasking_queries
+        self.keycloak = keycloak_queries
         self._image_service = image_service
 
     def get_tasking_summary(self, payload, user=None):
@@ -35,9 +36,9 @@ class TaskingService:
 
         # Get image data based on user role
         if is_ii_user and assignee_keycloak_id:
-            image_datas = self.qm.getTaskingSummaryImageDataForUser(start_date, end_date, assignee_keycloak_id)
+            image_datas = self.tasking.getTaskingSummaryImageDataForUser(start_date, end_date, assignee_keycloak_id)
         else:
-            image_datas = self.qm.getTaskingSummaryImageData(start_date, end_date)
+            image_datas = self.tasking.getTaskingSummaryImageData(start_date, end_date)
 
         if not image_datas:
             return output
@@ -46,9 +47,9 @@ class TaskingService:
 
         # Get area data based on user role
         if is_ii_user and assignee_keycloak_id:
-            area_rows = self.qm.getTaskingSummaryAreaDataForImagesForUser(image_ids, assignee_keycloak_id)
+            area_rows = self.tasking.getTaskingSummaryAreaDataForImagesForUser(image_ids, assignee_keycloak_id)
         else:
-            area_rows = self.qm.getTaskingSummaryAreaDataForImages(image_ids)
+            area_rows = self.tasking.getTaskingSummaryAreaDataForImages(image_ids)
 
         area_map = {}
         for row in area_rows:
@@ -69,13 +70,13 @@ class TaskingService:
 
     def get_tasking_manager(self, payload):
         output = {}
-        images = self.qm.getIncompleteImages(
+        images = self.tasking.getIncompleteImages(
             dateutil.parser.isoparse(payload['Start Date']).strftime(f"%Y-%m-%d"), 
             (dateutil.parser.isoparse(payload['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
         )
         for image in images:
-            areas = self.qm.getTaskingManagerDataForImage(image[0])
-            image_areas = self.qm.getTaskingManagerDataForTask(image[0])
+            areas = self.tasking.getTaskingManagerDataForImage(image[0])
+            image_areas = self.tasking.getTaskingManagerDataForTask(image[0])
 
             output[image[0]] = format_tasking_manager_image(image, image_areas)
 
@@ -88,10 +89,10 @@ class TaskingService:
         for image in payload:
             if 'Priority' not in payload[image]:
                 continue      
-            self.qm.updateTaskingManagerData(image, payload[image]['Priority'])
+            self.tasking.updateTaskingManagerData(image, payload[image]['Priority'])
 
     def assign_task(self, payload):
-        task_status_id = self.qm.getTaskStatusID('Incomplete')
+        task_status_id = self.tasking.getTaskStatusID('Incomplete')
         if task_status_id is None:
             raise ValueError("Task status 'Incomplete' not found in database. Please ensure task_status table is initialized.")
         tasks_processed = 0
@@ -116,13 +117,13 @@ class TaskingService:
                 # UUIDs are typically 36 characters with dashes
                 if len(assignee_keycloak_id) != 36 or assignee_keycloak_id.count('-') != 4:
                     # It's probably a username, try to get the Keycloak user ID
-                    assignee_keycloak_id = self.qm.getKeycloakUserID(assignee_keycloak_id)
+                    assignee_keycloak_id = self.keycloak.getKeycloakUserID(assignee_keycloak_id)
                     if assignee_keycloak_id is None:
                         # Skip if assignee not found in Keycloak
                         continue
                 
                 area_id = task['SCVU Image Area ID']
-                self.qm.assignTask(area_id, assignee_keycloak_id, task_status_id)
+                self.tasking.assignTask(area_id, assignee_keycloak_id, task_status_id)
                 tasks_processed += 1
             except Exception:
                 logger.exception("Error processing task %s", task)
@@ -131,24 +132,24 @@ class TaskingService:
 
     def start_tasks(self, payload):
         for task_id in payload["SCVU Task ID"]:
-            self.qm.startTask(task_id)
+            self.tasking.startTask(task_id)
     
     def complete_tasks(self, payload):
         for task_id in payload["SCVU Task ID"]:
-            self.qm.completeTask(task_id)
+            self.tasking.completeTask(task_id)
     
     def verify_pass(self, payload):
         for task_id in payload["SCVU Task ID"]:
-            self.qm.verifyPass(task_id)
+            self.tasking.verifyPass(task_id)
     
     def verify_fail(self, payload):
         for task_id in payload["SCVU Task ID"]:
-            self.qm.verifyFail(task_id)
+            self.tasking.verifyFail(task_id)
 
     def update_tasking_summary(self, payload):
         for thing in payload:
             if 'Report' in payload[thing]:
-                self.qm.updateTaskingSummaryImage(
+                self.tasking.updateTaskingSummaryImage(
                     thing, 
                     payload[thing]['Report'], 
                     payload[thing]['Image Category'], 
@@ -157,7 +158,7 @@ class TaskingService:
                     payload[thing]['Target Tracing']
                 )
             if 'Remarks' in payload[thing]:
-                self.qm.updateTaskingSummaryTask(
+                self.tasking.updateTaskingSummaryTask(
                     thing,
                     payload[thing]['Remarks']
                 )
@@ -173,6 +174,5 @@ class TaskingService:
 
     def _get_image_service(self):
         if self._image_service is None:
-            from services.image_service import ImageService
-            self._image_service = ImageService(self.qm)
+            raise RuntimeError("ImageService dependency not configured")
         return self._image_service
