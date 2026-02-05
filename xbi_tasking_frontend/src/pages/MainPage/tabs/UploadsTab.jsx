@@ -63,9 +63,12 @@ function UploadsTab({ userRole }) {
 
     try {
       const results = []
-      const total = selectedFiles.length
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i]
+      const csvQueue = selectedFiles.filter((f) => getFileType(f.name) === 'csv')
+      const jsonQueue = selectedFiles.filter((f) => getFileType(f.name) === 'json')
+      const uploadQueue = [...csvQueue, ...jsonQueue]
+      const total = uploadQueue.length
+      for (let i = 0; i < uploadQueue.length; i++) {
+        const file = uploadQueue[i]
         const formData = new FormData()
         formData.append('file', file)
         if (file.name.toLowerCase().endsWith('.csv')) {
@@ -86,8 +89,8 @@ function UploadsTab({ userRole }) {
         setUploadProgress(Math.round(((i + 1) / total) * 100))
       }
 
-      const totals = results
-        .filter((entry) => entry.type === 'json' && entry.result)
+      const jsonResults = results.filter((entry) => entry.type === 'json' && entry.result)
+      const totals = jsonResults
         .reduce(
           (acc, entry) => {
             acc.images += entry.result?.images_inserted || 0
@@ -96,11 +99,31 @@ function UploadsTab({ userRole }) {
           },
           { images: 0, areas: 0 },
         )
-      const meta =
-        totals.images || totals.areas
-          ? `Just now · ${totals.images} images, ${totals.areas} areas`
-          : 'Just now · Upload completed'
-      addNotification({ title: 'Upload completed', meta })
+      const existingCount = jsonResults.reduce((acc, entry) => {
+        const message = entry.result?.message || ''
+        const match = message.match(/(\d+)\s+already existed/i)
+        return acc + (match ? Number(match[1]) : 0)
+      }, 0)
+      const hasWarnings = jsonResults.some((entry) => (entry.result?.errors || []).length > 0)
+
+      let meta = 'Just now · Upload completed'
+      if (jsonResults.length === 0) {
+        meta = 'Just now · Parade state updated'
+      } else {
+        const metaParts = []
+        if (totals.images || totals.areas) {
+          metaParts.push(`${totals.images} images, ${totals.areas} areas`)
+        }
+        if (existingCount) {
+          metaParts.push(`${existingCount} already existed`)
+        }
+        if (!metaParts.length) {
+          metaParts.push('No new data (duplicates skipped)')
+        }
+        meta = `Just now · ${metaParts.join(', ')}`
+      }
+
+      addNotification({ title: hasWarnings ? 'Upload completed with warnings' : 'Upload completed', meta })
       setSelectedFiles([])
       setInputKey((prev) => prev + 1)
     } catch (error) {
