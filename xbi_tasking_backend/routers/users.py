@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Request, UploadFile
 
 from api_utils import error_response, model_to_dict, run_blocking
+from constants import ContentType, MAX_UPLOAD_BYTES
 from schemas import AdminResetPasswordPayload, ChangePasswordPayload, CreateUserPayload, StatusResponse, UsersResponse
 from security import get_current_user, is_admin_user
 
@@ -43,6 +44,15 @@ async def create_user(request: Request, payload: CreateUserPayload, user: dict =
         result = await run_blocking(request.app.state.user_service.create_user, model_to_dict(payload))
         if "error" in result:
             return error_response(400, result["error"], "invalid_user_payload")
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "user_create",
+                user,
+                target=payload.username,
+                details={"role": payload.role},
+                ip_address=request.client.host if request.client else None,
+            )
         request.app.state.notification_service.push(
             "User created",
             f"Just now · {payload.username} ({payload.role})",
@@ -52,6 +62,7 @@ async def create_user(request: Request, payload: CreateUserPayload, user: dict =
     except ValueError as e:
         return error_response(400, str(e), "invalid_user_payload")
     except Exception as e:
+        logger.exception("createUser failed")
         return error_response(500, "Failed to create user", "create_user_failed", {"error": str(e)})
 
 
@@ -67,7 +78,7 @@ async def update_users(request: Request, file: UploadFile, user: dict = Depends(
     if not is_admin_user(user):
         return error_response(403, "Insufficient permissions", "insufficient_permissions")
 
-    if file.content_type not in ("text/csv", "application/vnd.ms-excel"):
+    if file.content_type not in ContentType.CSV:
         logger.warning("updateUsers invalid file type: %s", file.content_type)
         return error_response(400, "Invalid file type. CSV required.", "invalid_file_type")
         
@@ -76,6 +87,9 @@ async def update_users(request: Request, file: UploadFile, user: dict = Depends(
     if not contents:
         logger.warning("updateUsers empty CSV")
         return error_response(400, "Empty CSV file", "empty_csv")
+    if len(contents) > MAX_UPLOAD_BYTES:
+        logger.warning("updateUsers CSV too large")
+        return error_response(413, "CSV file too large", "payload_too_large")
         
 
     try:
@@ -85,10 +99,19 @@ async def update_users(request: Request, file: UploadFile, user: dict = Depends(
 
     try:
         await run_blocking(request.app.state.user_service.update_users, csv_text)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "user_presence_update",
+                user,
+                details={"size_bytes": len(contents)},
+                ip_address=request.client.host if request.client else None,
+            )
         return StatusResponse(status="success", message="updateUser success")
     except ValueError as e:
         return error_response(400, str(e), "invalid_csv")
     except Exception as e:
+        logger.exception("updateUsers failed")
         return error_response(500, "Failed to update users", "update_users_failed", {"error": str(e)})
 
 
@@ -101,6 +124,10 @@ async def change_password(request: Request, payload: ChangePasswordPayload, user
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
 
+    rate_key = f"changePassword:{user.get('sub') or user.get('preferred_username')}"
+    if not request.app.state.rate_limit_service.check(rate_key):
+        return error_response(429, "Too many password change attempts", "rate_limited")
+
     try:
         result = await run_blocking(
             request.app.state.user_service.change_password,
@@ -110,6 +137,14 @@ async def change_password(request: Request, payload: ChangePasswordPayload, user
         )
         if "error" in result:
             return error_response(400, result["error"], "password_change_failed")
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "password_change",
+                user,
+                target=user.get("preferred_username"),
+                ip_address=request.client.host if request.client else None,
+            )
         return StatusResponse(status="success", message="Password changed successfully")
     except ValueError as e:
         return error_response(400, str(e), "password_change_failed")
@@ -131,6 +166,10 @@ async def admin_reset_password(request: Request, payload: AdminResetPasswordPayl
     if not is_admin_user(user):
         return error_response(403, "Insufficient permissions. Only IA users can reset passwords.", "insufficient_permissions")
 
+    rate_key = f"adminResetPassword:{user.get('sub') or user.get('preferred_username')}"
+    if not request.app.state.rate_limit_service.check(rate_key):
+        return error_response(429, "Too many password reset attempts", "rate_limited")
+
     try:
         result = await run_blocking(
             request.app.state.user_service.admin_reset_password,
@@ -139,6 +178,14 @@ async def admin_reset_password(request: Request, payload: AdminResetPasswordPayl
         )
         if "error" in result:
             return error_response(400, result["error"], "password_reset_failed")
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "password_reset",
+                user,
+                target=payload.target_username,
+                ip_address=request.client.host if request.client else None,
+            )
         request.app.state.notification_service.push(
             "Password reset",
             f"Just now · {payload.target_username}",
