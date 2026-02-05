@@ -35,7 +35,7 @@ class ReportService:
         return exploitable_images, unexploitable_images
 
     def get_xbi_report_data(self, payload):
-        exploitable, unexploitable = self.get_xbi_report(payload['Start Date'], payload['End Date'])
+        exploitable, unexploitable = self.get_xbi_report(payload["Start Date"], payload["End Date"])
         exploitable.pop("UNCATEGORISED", None)
         unexploitable.pop("UNCATEGORISED", None)
         output = {}
@@ -44,34 +44,34 @@ class ReportService:
         output["Unexploitable"] = []
         output["Remarks"] = ""
         remarks = ["Img Error", "Failed", "100C", "TOS"]
-        for i in output["Category"]:
-            output["Exploitable"].append(exploitable[i])
-            output["Unexploitable"].append(sum(unexploitable[i]))
-            if sum(unexploitable[i]) == 0:
+        for category in output["Category"]:
+            output["Exploitable"].append(exploitable[category])
+            output["Unexploitable"].append(sum(unexploitable[category]))
+            if sum(unexploitable[category]) == 0:
                 continue
-            output["Remarks"] += i + "\n"
+            output["Remarks"] += category + "\n"
             for j in range(len(remarks)):
-                if unexploitable[i][j] != 0:
-                    output["Remarks"] += remarks[j] + " - " + str(unexploitable[i][j]) + "\n"
+                if unexploitable[category][j] != 0:
+                    output["Remarks"] += remarks[j] + " - " + str(unexploitable[category][j]) + "\n"
         return output
 
     def get_xbi_report_data_for_excel(self, payload):
-        exploitable, unexploitable = self.get_xbi_report(payload['Start Date'], payload['End Date'])
+        exploitable, unexploitable = self.get_xbi_report(payload["Start Date"], payload["End Date"])
         exploitable.pop("UNCATEGORISED", None)
         unexploitable.pop("UNCATEGORISED", None)
         output = {}
         output["Tasking"] = ["Coverage", "Total"]
         remarks = ["Img Error", "Failed", "100C", "TOS"]
         remarks_temp = ""
-        for i in list(exploitable.keys()):
-            output["Exploitable "+i] = [exploitable[i], exploitable[i]]
-        for i in list(exploitable.keys()):
-            output["Unexploitable "+i] = [sum(unexploitable[i]), sum(unexploitable[i])]
-            if sum(unexploitable[i]) == 0:
+        for category in list(exploitable.keys()):
+            output["Exploitable " + category] = [exploitable[category], exploitable[category]]
+        for category in list(exploitable.keys()):
+            output["Unexploitable " + category] = [sum(unexploitable[category]), sum(unexploitable[category])]
+            if sum(unexploitable[category]) == 0:
                 continue
-            remarks_temp += i + "\n"
+            remarks_temp += category + "\n"
             for j in range(len(remarks)):
-                if unexploitable[i][j] != 0:
-                    remarks_temp += remarks[j] + " - " + str(unexploitable[i][j]) + "\n"
-        output["Remarks"] = [remarks_temp,""]
+                if unexploitable[category][j] != 0:
+                    remarks_temp += remarks[j] + " - " + str(unexploitable[category][j]) + "\n"
+        output["Remarks"] = [remarks_temp, ""]
         return self.eg.create_excel(output)

@@ -1,12 +1,13 @@
 import logging
-import dateutil.parser
 from datetime import timedelta
+import dateutil.parser
 from formatters.tasking_formatter import (
     format_tasking_summary_image,
     format_tasking_summary_area,
     format_tasking_manager_image,
     format_tasking_manager_area,
 )
+from constants import AssigneeLabel, TaskStatus
 
 
 logger = logging.getLogger("xbi_tasking_backend.tasking_service")
@@ -20,19 +21,19 @@ class TaskingService:
 
     def get_tasking_summary(self, payload, user=None):
         output = {}
-        start_date = dateutil.parser.isoparse(payload['Start Date']).strftime(f"%Y-%m-%d")
-        end_date = (dateutil.parser.isoparse(payload['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
+        start_date = dateutil.parser.isoparse(payload["Start Date"]).strftime("%Y-%m-%d")
+        end_date = (dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)).strftime("%Y-%m-%d")
 
         # Check if user is a basic II user (only sees their own tasks)
         is_ii_user = False
         assignee_keycloak_id = None
         if user:
-            account_type = user.get('account_type')
-            roles = user.get('roles', []) or []
+            account_type = user.get("account_type")
+            roles = user.get("roles", []) or []
             # Basic II user: has II role but not Senior II or IA
-            is_ii_user = account_type == 'II' or ('II' in roles and account_type not in ('Senior II', 'IA'))
+            is_ii_user = account_type == "II" or ("II" in roles and account_type not in ("Senior II", "IA"))
             if is_ii_user:
-                assignee_keycloak_id = user.get('sub')
+                assignee_keycloak_id = user.get("sub")
 
         # Get image data based on user role
         if is_ii_user and assignee_keycloak_id:
@@ -71,8 +72,8 @@ class TaskingService:
     def get_tasking_manager(self, payload):
         output = {}
         images = self.tasking.getIncompleteImages(
-            dateutil.parser.isoparse(payload['Start Date']).strftime(f"%Y-%m-%d"), 
-            (dateutil.parser.isoparse(payload['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
+            dateutil.parser.isoparse(payload["Start Date"]).strftime("%Y-%m-%d"),
+            (dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)).strftime("%Y-%m-%d")
         )
         for image in images:
             areas = self.tasking.getTaskingManagerDataForImage(image[0])
@@ -86,23 +87,24 @@ class TaskingService:
         return output
 
     def update_tasking_manager(self, payload):
-        for image in payload:
-            if 'Priority' not in payload[image]:
+        for image_id in payload:
+            if "Priority" not in payload[image_id]:
                 continue      
-            self.tasking.updateTaskingManagerData(image, payload[image]['Priority'])
+            self.tasking.updateTaskingManagerData(image_id, payload[image_id]["Priority"])
 
     def assign_task(self, payload):
-        task_status_id = self.tasking.getTaskStatusID('Incomplete')
+        task_status_id = self.tasking.getTaskStatusID(TaskStatus.INCOMPLETE)
         if task_status_id is None:
-            raise ValueError("Task status 'Incomplete' not found in database. Please ensure task_status table is initialized.")
+            raise ValueError(f"Task status '{TaskStatus.INCOMPLETE}' not found in database. Please ensure task_status table is initialized.")
         tasks_processed = 0
-        for task in payload.get("Tasks", []):
+        tasks = payload.get("Tasks", [])
+        for task in tasks:
             try:
                 # Validate required fields
-                if "Assignee" not in task or task["Assignee"] == None or task["Assignee"] == "":
+                if "Assignee" not in task or task["Assignee"] is None or task["Assignee"] == "":
                     continue
                 
-                if "SCVU Image Area ID" not in task or task["SCVU Image Area ID"] == None:
+                if "SCVU Image Area ID" not in task or task["SCVU Image Area ID"] is None:
                     raise ValueError("Missing 'SCVU Image Area ID' in task")
                 
                 # Frontend now sends Keycloak user IDs directly (not usernames)
@@ -110,7 +112,7 @@ class TaskingService:
                 assignee_keycloak_id = task["Assignee"]
                 
                 # If it's "Multiple", skip it
-                if assignee_keycloak_id == "Multiple":
+                if assignee_keycloak_id == AssigneeLabel.MULTIPLE:
                     continue
                 
                 # If it doesn't look like a UUID (Keycloak user ID), try to get the ID from username
@@ -122,7 +124,7 @@ class TaskingService:
                         # Skip if assignee not found in Keycloak
                         continue
                 
-                area_id = task['SCVU Image Area ID']
+                area_id = task["SCVU Image Area ID"]
                 self.tasking.assignTask(area_id, assignee_keycloak_id, task_status_id)
                 tasks_processed += 1
             except Exception:
@@ -147,20 +149,20 @@ class TaskingService:
             self.tasking.verifyFail(task_id)
 
     def update_tasking_summary(self, payload):
-        for thing in payload:
-            if 'Report' in payload[thing]:
+        for image_id, image_data in payload.items():
+            if "Report" in image_data:
                 self.tasking.updateTaskingSummaryImage(
-                    thing, 
-                    payload[thing]['Report'], 
-                    payload[thing]['Image Category'], 
-                    payload[thing]['Image Quality'], 
-                    payload[thing]['Cloud Cover'], 
-                    payload[thing]['Target Tracing']
+                    image_id,
+                    image_data["Report"],
+                    image_data["Image Category"],
+                    image_data["Image Quality"],
+                    image_data["Cloud Cover"],
+                    image_data["Target Tracing"],
                 )
-            if 'Remarks' in payload[thing]:
+            if "Remarks" in image_data:
                 self.tasking.updateTaskingSummaryTask(
-                    thing,
-                    payload[thing]['Remarks']
+                    image_id,
+                    image_data["Remarks"],
                 )
 
     def complete_images(self, payload, vetter_keycloak_id):

@@ -16,14 +16,14 @@ class UserService:
 
     def get_users(self):
         output = {}
-        user_objects = self.keycloak.getUsers()
+        users = self.keycloak.getUsers()
 
-        if not user_objects:
+        if not users:
             output["Users"] = []
             output["Warning"] = "No users available from Keycloak."
             return output
         
-        output["Users"] = user_objects
+        output["Users"] = users
         return output
 
     def create_user(self, payload):
@@ -42,8 +42,8 @@ class UserService:
         return {"success": True, "user": result}
 
     def update_users(self, csv_text):
-        userList = []
-        presentList = []
+        user_list = []
+        present_list = []
         ps_status = ParadeStateStatus
         file = StringIO(csv_text)
         reader = csv.DictReader(file)
@@ -51,23 +51,23 @@ class UserService:
         if "Name" not in fieldnames or "Status" not in fieldnames:
             raise ValueError("CSV must include Name and Status columns")
         for row in reader:
-            name = (row.get('Name') or "").strip()
+            name = (row.get("Name") or "").strip()
             if not name:
                 continue
-            userList.append((name, ))
-            status_value = row.get('Status')
+            user_list.append((name,))
+            status_value = row.get("Status")
             status_enum = ps_status.from_value(status_value) if status_value else None
             if status_enum == ps_status.PRESENT:
-                presentList.append((name,))
+                present_list.append((name,))
             elif status_value:
                 logger.warning("Unknown parade state status: %s", status_value)
         
-        userList = tuple(userList)
-        presentList = tuple(presentList)
+        user_list = tuple(user_list)
+        present_list = tuple(present_list)
         with self.db.transaction():
             self.keycloak.resetRecentUsers()
-            self.keycloak.addUsers(userList)
-            self.keycloak.updateExistingUsers(presentList)
+            self.keycloak.addUsers(user_list)
+            self.keycloak.updateExistingUsers(present_list)
 
     def change_password(self, user, current_password, new_password):
         """

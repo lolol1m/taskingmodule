@@ -1,6 +1,7 @@
 import logging
 import requests
 import main_classes.EnumClasses as EnumClasses
+from constants import AssigneeLabel
 from services.keycloak_service import KeycloakService
 
 
@@ -15,7 +16,7 @@ class KeycloakQueries:
 
     def get_keycloak_username(self, keycloak_user_id):
         if not keycloak_user_id:
-            return 'Unassigned'
+            return AssigneeLabel.UNASSIGNED
         if keycloak_user_id in self._keycloak_user_cache:
             return self._keycloak_user_cache[keycloak_user_id]
         try:

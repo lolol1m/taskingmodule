@@ -1,4 +1,5 @@
 import logging
+from constants import AssigneeLabel, TaskStatus
 
 
 logger = logging.getLogger("xbi_tasking_backend.query_tasking")
@@ -24,7 +25,7 @@ class TaskingQueries:
                 AND ts.name != %s;
                 """        
         
-        result = self.db.executeSelect(query, (keycloak_user_id, 'Completed'))
+        result = self.db.executeSelect(query, (keycloak_user_id, TaskStatus.COMPLETED))
         return result[0][0]
 
     def getActiveTaskCountsForUsers(self, keycloak_user_ids):
@@ -45,7 +46,7 @@ class TaskingQueries:
             AND ts.name != %s
             GROUP BY t.assignee_keycloak_id
         """
-        result = self.db.executeSelect(query, tuple(user_ids) + ('Completed',))
+        result = self.db.executeSelect(query, tuple(user_ids) + (TaskStatus.COMPLETED,))
         counts = {row[0]: row[1] for row in result}
         for user_id in user_ids:
             counts.setdefault(user_id, 0)
@@ -73,7 +74,7 @@ class TaskingQueries:
         Input:      status name
         Output:     status id
         '''
-        query = f"SELECT id FROM task_status WHERE name = %s"
+        query = "SELECT id FROM task_status WHERE name = %s"
         cursor = self.db.executeSelect(query, (status_name, ))
         if len(cursor) == 0:
             return None
@@ -115,7 +116,7 @@ class TaskingQueries:
         Input:      NIL
         Output:     list of tuple, each containing imageareaid, assignee name and remarks
         '''
-        query = f"SELECT image_area.scvu_image_area_id, COALESCE(task.assignee_keycloak_id, 'Unassigned'), task.remarks \
+        query = f"SELECT image_area.scvu_image_area_id, COALESCE(task.assignee_keycloak_id, '{AssigneeLabel.UNASSIGNED}'), task.remarks \
         FROM task \
         JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
         JOIN image ON image.scvu_image_id = image_area.scvu_image_id \
@@ -129,8 +130,8 @@ class TaskingQueries:
 
         formatted = []
         for image_area_id, assignee_keycloak_id, remarks in results:
-            if assignee_keycloak_id == 'Unassigned' or not assignee_keycloak_id:
-                assignee_name = 'Unassigned'
+            if assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not assignee_keycloak_id:
+                assignee_name = AssigneeLabel.UNASSIGNED
             else:
                 assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
             formatted.append((image_area_id, assignee_name, remarks))
@@ -274,7 +275,7 @@ class TaskingQueries:
         formatted_results = []
         for row in results:
             task_id, area_name, task_status, remarks, assignee_keycloak_id, v10, opsv = row
-            username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else 'Unassigned'
+            username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted_results.append((task_id, area_name, task_status, remarks, username, v10, opsv))
 
         return formatted_results
@@ -308,7 +309,7 @@ class TaskingQueries:
         formatted_results = []
         for row in results:
             image_id, task_id, area_name, task_status, remarks, assignee_keycloak_id, v10, opsv = row
-            username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else 'Unassigned'
+            username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted_results.append((image_id, task_id, area_name, task_status, remarks, username, v10, opsv))
         return formatted_results
 
@@ -342,7 +343,7 @@ class TaskingQueries:
         formatted_results = []
         for row in results:
             image_id, task_id, area_name, task_status, remarks, assignee_kc_id, v10, opsv = row
-            username = usernames.get(assignee_kc_id) if assignee_kc_id else 'Unassigned'
+            username = usernames.get(assignee_kc_id) if assignee_kc_id else AssigneeLabel.UNASSIGNED
             formatted_results.append((image_id, task_id, area_name, task_status, remarks, username, v10, opsv))
         return formatted_results
 
@@ -352,9 +353,9 @@ class TaskingQueries:
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='In Progress') \
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.IN_PROGRESS}') \
         WHERE scvu_task_id = %s \
-        AND task_status_id = (SELECT id FROM task_status WHERE name='Incomplete')"
+        AND task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.INCOMPLETE}')"
         self.db.executeUpdate(query, (task_id, ))
 
     def completeTask(self, task_id):
@@ -363,9 +364,9 @@ class TaskingQueries:
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='Verifying') \
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.VERIFYING}') \
         WHERE scvu_task_id = %s \
-        AND task_status_id = (SELECT id FROM task_status WHERE name='In Progress')"
+        AND task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.IN_PROGRESS}')"
         self.db.executeUpdate(query, (task_id, ))
 
     def verifyPass(self, task_id):
@@ -374,9 +375,9 @@ class TaskingQueries:
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='Completed') \
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.COMPLETED}') \
         WHERE scvu_task_id = %s \
-        AND task_status_id = (SELECT id FROM task_status WHERE name='Verifying')"
+        AND task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.VERIFYING}')"
         self.db.executeUpdate(query, (task_id, ))
 
     def verifyFail(self, task_id):
@@ -385,9 +386,9 @@ class TaskingQueries:
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='In Progress') \
+        query = f"UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.IN_PROGRESS}') \
         WHERE scvu_task_id = %s \
-        AND task_status_id = (SELECT id FROM task_status WHERE name='Verifying')"
+        AND task_status_id = (SELECT id FROM task_status WHERE name='{TaskStatus.VERIFYING}')"
         self.db.executeUpdate(query, (task_id, ))
 
     def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing):

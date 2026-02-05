@@ -1,7 +1,8 @@
 import datetime
 import logging
-import dateutil.parser
 from datetime import timedelta
+import dateutil.parser
+from constants import TaskStatus
 from formatters.image_formatter import (
     format_complete_image_area,
     format_complete_image_image,
@@ -22,7 +23,7 @@ class ImageService:
         area_count = 0
         errors = []
         existing_images = []
-        if not payload or 'images' not in payload or not isinstance(payload['images'], list):
+        if not payload or "images" not in payload or not isinstance(payload["images"], list):
             return {
                 "success": False,
                 "error": "Invalid payload: expected 'images' list",
@@ -30,45 +31,47 @@ class ImageService:
                 "areas_inserted": area_count,
             }
         try:
-            for image in payload['images']:
+            for image in payload["images"]:
                 error_msg = None
                 try:
                     with self.db.transaction():
-                        self.images.insertSensor(image['sensorName'])
+                        self.images.insertSensor(image["sensorName"])
                         image_inserted = self.images.insertImage(
-                            image['imgId'],
-                            image['imageFileName'],
-                            image['sensorName'],
-                            dateutil.parser.isoparse(image['uploadDate']),
-                            dateutil.parser.isoparse(image['imageDateTime'])
+                            image["imgId"],
+                            image["imageFileName"],
+                            image["sensorName"],
+                            dateutil.parser.isoparse(image["uploadDate"]),
+                            dateutil.parser.isoparse(image["imageDateTime"]),
                         )
                         if image_inserted:
                             image_count += 1
                         else:
                             existing_images.append({
-                                'image_id': image['imgId'],
-                                'image_file_name': image['imageFileName']
+                                "image_id": image["imgId"],
+                                "image_file_name": image["imageFileName"],
                                 })
                             continue
-                        for area in image['areas']:
+                        for area in image["areas"]:
                             try:
-                                self.images.insertArea(area['areaName'])
+                                self.images.insertArea(area["areaName"])
                                 self.images.insertImageAreaDSTA(
-                                    image['imgId'],
-                                    area['areaName']
+                                    image["imgId"],
+                                    area["areaName"],
                                 )
                                 area_count += 1
 
                                 if auto_assign:
-                                    self.tasking.autoAssign(area['areaName'], image['imgId'])
+                                    self.tasking.autoAssign(area["areaName"], image["imgId"])
                                     
                             except Exception as e:
-                                error_msg = f"Error inserting area {area.get('areaName', 'unknown')} for image {image['imgId']}: {str(e)}"
+                                area_name = area.get("areaName", "unknown")
+                                error_msg = f"Error inserting area {area_name} for image {image['imgId']}: {str(e)}"
                                 errors.append(error_msg)
                                 raise
                 except Exception as e:
                     if not error_msg:
-                        error_msg = f"Error inserting image {image.get('imgId', 'unknown')}: {str(e)}"
+                        image_id = image.get("imgId", "unknown")
+                        error_msg = f"Error inserting image {image_id}: {str(e)}"
                         errors.append(error_msg)
                     logger.warning(error_msg)
             
@@ -127,7 +130,7 @@ class ImageService:
         tasks = self.tasking.getAllTaskStatusForImage(scvu_image_id)
         if not tasks:
             return {"error": f"Cannot complete image {scvu_image_id}: No tasks found"}
-        completed_task_id = self.tasking.getTaskStatusID("Completed")
+        completed_task_id = self.tasking.getTaskStatusID(TaskStatus.COMPLETED)
         incomplete_tasks = []
         for task in tasks:
             if task[1] != completed_task_id:
@@ -148,41 +151,41 @@ class ImageService:
         return format_complete_image_image(image_data, area_data)
 
     def get_complete_image_data(self, payload, user=None):
-        start_date = dateutil.parser.isoparse(payload['Start Date']).strftime(f"%Y-%m-%d")
-        end_date = (dateutil.parser.isoparse(payload['End Date']) + timedelta(days=1)).strftime(f"%Y-%m-%d")
+        start_date = dateutil.parser.isoparse(payload["Start Date"]).strftime("%Y-%m-%d")
+        end_date = (dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)).strftime("%Y-%m-%d")
 
         account_type = None
         roles = []
         if user:
-            account_type = user.get('account_type')
-            roles = user.get('roles', [])
+            account_type = user.get("account_type")
+            roles = user.get("roles", [])
 
-        is_ii_user = account_type == 'II' or ('II' in roles and account_type != 'Senior II' and account_type != 'IA')
+        is_ii_user = account_type == "II" or ("II" in roles and account_type != "Senior II" and account_type != "IA")
         if is_ii_user and user:
-            imageData = self.images.getImageDataForUser(start_date, end_date, user.get('sub'))
+            image_data = self.images.getImageDataForUser(start_date, end_date, user.get("sub"))
         else:
-            imageData = self.images.getImageData(start_date, end_date)
+            image_data = self.images.getImageData(start_date, end_date)
         output = {}
-        if not imageData:
+        if not image_data:
             return output
 
-        image_ids = [image[0] for image in imageData]
+        image_ids = [image[0] for image in image_data]
         area_rows = self.images.getImageAreaDataForImages(image_ids)
         area_map = {}
         for row in area_rows:
             image_id, task_id, area_name, remarks, assignee = row
             area_map.setdefault(image_id, []).append((task_id, area_name, remarks, assignee))
 
-        for image in imageData:
+        for image in image_data:
             image_id = image[0]
-            areaData = area_map.get(image_id, [])
-            output[image_id] = self.format_complete_image_image(image, areaData)
-            for area in areaData:
+            area_data = area_map.get(image_id, [])
+            output[image_id] = self.format_complete_image_image(image, area_data)
+            for area in area_data:
                 output[-area[0]] = self.format_complete_image_area(area, image_id)
         return output               
 
     def delete_image(self, payload):
-        scvu_image_id = payload['SCVU Image ID']
+        scvu_image_id = payload["SCVU Image ID"]
         with self.db.transaction():
             self.images.deleteTasksForImage(scvu_image_id)
             self.images.deleteImageAreasForImage(scvu_image_id)

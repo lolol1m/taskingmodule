@@ -26,12 +26,12 @@ class LookupService:
         output = {}
 
         categories = self.lookup.getCategories()
-        for cat in categories:
-            output[cat[0]] = []
+        for category in categories:
+            output[category[0]] = []
         
         sensors = self.lookup.getSensors()
-        for sensor in sensors:
-            output[sensor[1]].append(sensor[0])
+        for sensor_name, category_name in sensors:
+            output[category_name].append(sensor_name)
 
         return output
     
@@ -46,21 +46,21 @@ class LookupService:
         output = {}
         output["Areas"] = []
         for area in data:
-            areaDict = {
-                'ID' : area[0],
-                'Area Name' : area[1],
-                'OPS V' : area[2],
+            area_dict = {
+                "ID": area[0],
+                "Area Name": area[1],
+                "OPS V": area[2],
             }
 
-            output["Areas"].append(areaDict)
+            output["Areas"].append(area_dict)
         return output
 
     def set_opsv_areas(self, payload):
         self.lookup.setOpsvFalse()
 
-        opsvAreas = []
+        opsv_areas = []
         for area in payload["Areas"]:
-            if area['OPS V'] == True:
-                opsvAreas.append((area['Area Name'],))
+            if area["OPS V"] is True:
+                opsv_areas.append((area["Area Name"],))
         
-        self.lookup.setOpsvAreas(opsvAreas)
+        self.lookup.setOpsvAreas(opsv_areas)

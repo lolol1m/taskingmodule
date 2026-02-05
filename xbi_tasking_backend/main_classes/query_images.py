@@ -1,4 +1,5 @@
 import datetime
+from constants import AssigneeLabel
 
 
 class ImageQueries:
@@ -117,7 +118,7 @@ class ImageQueries:
         formatted = []
         for row in results:
             task_id, area_name, remarks, assignee_keycloak_id = row
-            assignee = self.keycloak.get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else 'Unassigned'
+            assignee = self.keycloak.get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted.append((task_id, area_name, remarks, assignee))
         return formatted
 
@@ -145,7 +146,7 @@ class ImageQueries:
         formatted = []
         for row in results:
             image_id, task_id, area_name, remarks, assignee_keycloak_id = row
-            assignee = self.keycloak.get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else 'Unassigned'
+            assignee = self.keycloak.get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted.append((image_id, task_id, area_name, remarks, assignee))
         return formatted
 
@@ -175,7 +176,7 @@ class ImageQueries:
         for row in results:
             row = list(row)
             vetter_keycloak_id = row[12]
-            row[12] = self.keycloak.get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else 'Unassigned'
+            row[12] = self.keycloak.get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted.append(tuple(row))
         return formatted
 
@@ -213,7 +214,7 @@ class ImageQueries:
         for row in results:
             row = list(row)
             vetter_keycloak_id = row[12]
-            row[12] = self.keycloak.get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else 'Unassigned'
+            row[12] = self.keycloak.get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted.append(tuple(row))
         return formatted
 
