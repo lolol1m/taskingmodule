@@ -331,6 +331,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             <TextField
               value={currentValue ?? ''}
               onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
               onChange={(event) =>
                 setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Remarks', event.target.value, inputData))
               }
@@ -420,6 +421,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             <TextField
               value={currentValue ?? ''}
               onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
               onChange={(event) =>
                 setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
               }
