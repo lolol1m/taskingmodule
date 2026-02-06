@@ -2,10 +2,40 @@ import logging
 import requests
 import main_classes.EnumClasses as EnumClasses
 from constants import AssigneeLabel
+from main_classes.sql_utils import build_in_clause
 from services.keycloak_service import KeycloakService
 
 
 logger = logging.getLogger("xbi_tasking_backend.query_keycloak")
+
+SQL_INSERT_USER_CACHE_DEFAULT = """
+    INSERT INTO user_cache (keycloak_user_id, is_present)
+    VALUES (%s, FALSE)
+    ON CONFLICT (keycloak_user_id) DO NOTHING
+"""
+
+SQL_SELECT_USER_CACHE_PRESENCE = """
+    SELECT keycloak_user_id, is_present, last_updated
+    FROM user_cache
+    WHERE keycloak_user_id IN ({placeholders})
+"""
+
+SQL_SELECT_PRESENT_USER_IDS = """
+    SELECT keycloak_user_id
+    FROM user_cache
+    WHERE keycloak_user_id IN ({placeholders})
+        AND is_present = True
+"""
+
+SQL_RESET_RECENT_USERS = "UPDATE user_cache SET is_present = False, last_updated = NOW()"
+
+SQL_INSERT_USER_CACHE_WITH_TIMESTAMP = """
+    INSERT INTO user_cache (keycloak_user_id, is_present, last_updated)
+    VALUES (%s, FALSE, NOW())
+    ON CONFLICT (keycloak_user_id) DO NOTHING
+"""
+
+SQL_UPDATE_USER_CACHE_PRESENT = "UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
 
 
 class KeycloakQueries:
@@ -127,12 +157,7 @@ class KeycloakQueries:
         self._assign_realm_role(user_id, role_rep)
 
         # Ensure user exists in cache (default to not present)
-        query = """
-            INSERT INTO user_cache (keycloak_user_id, is_present)
-            VALUES (%s, FALSE)
-            ON CONFLICT (keycloak_user_id) DO NOTHING
-        """
-        self.db.executeInsert(query, (user_id,))
+        self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (user_id,))
         return {"id": user_id, "username": username, "role": role_name}
 
     def get_keycloak_admin_token(self):
@@ -170,12 +195,7 @@ class KeycloakQueries:
         Note:       We only store keycloak_user_id and is_present - display names come from Keycloak
         '''
         # Just ensure user exists in cache - we don't store display_name
-        query = """
-            INSERT INTO user_cache (keycloak_user_id, is_present)
-            VALUES (%s, FALSE)
-            ON CONFLICT (keycloak_user_id) DO NOTHING
-        """
-        self.db.executeInsert(query, (keycloak_user_id,))
+        self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (keycloak_user_id,))
 
     def getUsers(self):
         '''
@@ -211,23 +231,14 @@ class KeycloakQueries:
         if not user_map:
             return []
 
-        query = """
-            INSERT INTO user_cache (keycloak_user_id, is_present)
-            VALUES (%s, FALSE)
-            ON CONFLICT (keycloak_user_id) DO NOTHING
-        """
         user_id_tuples = [(entry["id"],) for entry in user_map.values()]
-        self.db.executeInsertMany(query, user_id_tuples)
+        self.db.executeInsertMany(SQL_INSERT_USER_CACHE_DEFAULT, user_id_tuples)
 
         # Fetch presence for all users
         user_ids = [entry["id"] for entry in user_map.values()]
-        placeholders = ','.join(['%s'] * len(user_ids))
-        query = f"""
-            SELECT keycloak_user_id, is_present, last_updated
-            FROM user_cache
-            WHERE keycloak_user_id IN ({placeholders})
-        """
-        result = self.db.executeSelect(query, tuple(user_ids))
+        placeholders, values = build_in_clause(user_ids)
+        query = SQL_SELECT_USER_CACHE_PRESENCE.format(placeholders=placeholders)
+        result = self.db.executeSelect(query, values)
         presence_map = {row[0]: {"is_present": row[1], "last_updated": row[2]} for row in result}
 
         output = []
@@ -268,14 +279,9 @@ class KeycloakQueries:
         
         # Filter by is_present from cache
         if keycloak_ids:
-            placeholders = ','.join(['%s'] * len(keycloak_ids))
-            query = f"""
-                SELECT keycloak_user_id 
-                FROM user_cache 
-                WHERE keycloak_user_id IN ({placeholders}) 
-                AND is_present = True
-            """
-            result = self.db.executeSelect(query, tuple(keycloak_ids))
+            placeholders, values = build_in_clause(keycloak_ids)
+            query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
+            result = self.db.executeSelect(query, values)
             return set(row[0] for row in result)
         
         return set()
@@ -286,8 +292,7 @@ class KeycloakQueries:
         Input: NIL
         Output: NIL
         '''
-        query = "UPDATE user_cache SET is_present = False, last_updated = NOW()"
-        self.db.executeUpdate(query)
+        self.db.executeUpdate(SQL_RESET_RECENT_USERS)
 
     #TODO: figure out how the new user add system is going to work and change this accordingly
     def addUsers(self, user_list):
@@ -305,12 +310,7 @@ class KeycloakQueries:
                 continue
             user_id_tuples.append((user_id,))
             
-        query = """
-            INSERT INTO user_cache (keycloak_user_id, is_present, last_updated)
-            VALUES (%s, FALSE, NOW())
-            ON CONFLICT (keycloak_user_id) DO NOTHING
-        """
-        self.db.executeInsertMany(query, user_id_tuples)
+        self.db.executeInsertMany(SQL_INSERT_USER_CACHE_WITH_TIMESTAMP, user_id_tuples)
     
     #TODO: figure out how the new user add system is going to work and change this accordingly
     def updateExistingUsers(self, user_list):
@@ -327,5 +327,4 @@ class KeycloakQueries:
                 continue
             user_id_tuples.append((user_id,))
 
-        query = "UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
-        self.db.executeUpdateMany(query, user_id_tuples)
+        self.db.executeUpdateMany(SQL_UPDATE_USER_CACHE_PRESENT, user_id_tuples)

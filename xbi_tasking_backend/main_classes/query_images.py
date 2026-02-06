@@ -1,5 +1,111 @@
 import datetime
 from constants import AssigneeLabel
+from main_classes.sql_utils import build_in_clause
+
+
+SQL_INSERT_SENSOR = "INSERT INTO sensor (name) VALUES (%s) ON CONFLICT (name) DO NOTHING"
+
+SQL_INSERT_IMAGE = (
+    "INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) "
+    "VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) "
+    "ON CONFLICT (image_id) DO NOTHING"
+)
+
+SQL_INSERT_AREA = (
+    "INSERT INTO area (area_name) "
+    "VALUES (%s) "
+    "ON CONFLICT (area_name) DO NOTHING"
+)
+
+SQL_INSERT_IMAGE_AREA_DSTA = (
+    "INSERT INTO image_area (scvu_image_id, scvu_area_id) "
+    "VALUES ((SELECT scvu_image_id FROM image WHERE image_id = %s), (SELECT scvu_area_id FROM area WHERE area_name = %s)) "
+    "ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
+)
+
+SQL_INSERT_TTG_IMAGE_RETURNING_ID = (
+    "INSERT INTO image (image_file_name, sensor_id, upload_date, image_datetime, ew_status_id) "
+    "VALUES (%s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'ttg done')) "
+    "RETURNING scvu_image_id"
+)
+
+SQL_INSERT_IMAGE_AREA_TTG = (
+    "INSERT INTO image_area (scvu_image_id, scvu_area_id) "
+    "VALUES (%s, (SELECT scvu_area_id FROM area WHERE area_name = %s)) "
+    "ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
+)
+
+SQL_COMPLETE_IMAGE = "UPDATE image SET completed_date = %s, vetter_keycloak_id = %s WHERE scvu_image_id = %s"
+SQL_UNCOMPLETE_IMAGE = "UPDATE image SET completed_date = null WHERE scvu_image_id = %s"
+SQL_GET_IMAGE_COMPLETE_DATE = "SELECT completed_date FROM image WHERE scvu_image_id = %s"
+
+SQL_GET_IMAGE_AREA_DATA = (
+    "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id "
+    "FROM task "
+    "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
+    "JOIN area ON image_area.scvu_area_id = area.scvu_area_id "
+    "JOIN image ON image_area.scvu_image_id = image.scvu_image_id "
+    "WHERE image.scvu_image_id = %s "
+    "ORDER BY area.area_name"
+)
+
+SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES = """
+    SELECT image.scvu_image_id, task.scvu_task_id, area.area_name,
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id
+    FROM task
+    JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
+    JOIN area ON image_area.scvu_area_id = area.scvu_area_id
+    JOIN image ON image_area.scvu_image_id = image.scvu_image_id
+    WHERE image.scvu_image_id IN ({placeholders})
+    ORDER BY image.scvu_image_id, area.area_name
+"""
+
+SQL_GET_IMAGE_DATA = (
+    "SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, "
+    "COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, "
+    "COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, "
+    "COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id "
+    "FROM image "
+    "LEFT JOIN sensor ON sensor.id = image.sensor_id "
+    "LEFT JOIN ew_status ON ew_status.id = image.ew_status_id "
+    "LEFT JOIN report ON report.id = image.report_id "
+    "LEFT JOIN priority ON priority.id = image.priority_id "
+    "LEFT JOIN image_category ON image_category.id = image.image_category_id "
+    "LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id "
+    "WHERE image.completed_date IS NOT NULL "
+    "AND ((image.completed_date >= %s AND image.completed_date < %s) "
+    "OR (image.upload_date >= %s AND image.upload_date < %s))"
+)
+
+SQL_GET_IMAGE_DATA_FOR_USER = """
+    SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime,
+        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
+        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality,
+        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id
+    FROM image
+    LEFT JOIN sensor ON sensor.id = image.sensor_id
+    LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
+    LEFT JOIN report ON report.id = image.report_id
+    LEFT JOIN priority ON priority.id = image.priority_id
+    LEFT JOIN image_category ON image_category.id = image.image_category_id
+    LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id
+    WHERE image.completed_date IS NOT NULL
+        AND ((image.completed_date >= %s AND image.completed_date < %s)
+             OR (image.upload_date >= %s AND image.upload_date < %s))
+        AND EXISTS (
+            SELECT 1
+            FROM task t
+            JOIN image_area ia ON ia.scvu_image_area_id = t.scvu_image_area_id
+            WHERE ia.scvu_image_id = image.scvu_image_id
+                AND t.assignee_keycloak_id = %s
+        )
+"""
+
+SQL_DELETE_TASKS_FOR_IMAGE = (
+    "DELETE FROM task WHERE scvu_image_area_id IN (SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s)"
+)
+SQL_DELETE_IMAGE_AREAS_FOR_IMAGE = "DELETE FROM image_area WHERE scvu_image_id = %s"
+SQL_DELETE_IMAGE = "DELETE FROM image WHERE scvu_image_id = %s"
 
 
 class ImageQueries:
@@ -13,8 +119,7 @@ class ImageQueries:
         Input:      sensor_name
         Output:     NIL
         '''
-        query = f"INSERT INTO sensor (name) VALUES (%s) ON CONFLICT (name) DO NOTHING"
-        self.db.executeInsert(query, (sensor_name,))
+        self.db.executeInsert(SQL_INSERT_SENSOR, (sensor_name,))
 
     def insertImage(self, image_id, image_file_name, sensor_name, upload_date, image_datetime):
         '''
@@ -23,10 +128,10 @@ class ImageQueries:
         Output:     NIL
         '''
         # Set default values for required foreign keys (0 = null in lookup tables)
-        query = f"INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) \
-        VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) \
-        ON CONFLICT (image_id) DO NOTHING"
-        rows = self.db.executeInsert(query, (image_id, image_file_name, sensor_name, upload_date, image_datetime))
+        rows = self.db.executeInsert(
+            SQL_INSERT_IMAGE,
+            (image_id, image_file_name, sensor_name, upload_date, image_datetime),
+        )
 
         return rows > 0
 
@@ -36,10 +141,7 @@ class ImageQueries:
         Input:      area_name
         Output:     NIL
         '''
-        query = f"INSERT INTO area (area_name) \
-        VALUES (%s) \
-        ON CONFLICT (area_name) DO NOTHING"
-        self.db.executeInsert(query, (area_name, ))
+        self.db.executeInsert(SQL_INSERT_AREA, (area_name,))
 
     def insertImageAreaDSTA(self, image_id, area_name):
         '''
@@ -47,10 +149,7 @@ class ImageQueries:
         Input:      image_id, area_name
         Output:     NIL
         '''
-        query = f"INSERT INTO image_area (scvu_image_id, scvu_area_id) \
-        VALUES ((SELECT scvu_image_id FROM image WHERE image_id = %s), (SELECT scvu_area_id FROM area WHERE area_name = %s)) \
-        ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
-        self.db.executeInsert(query, (image_id, area_name))
+        self.db.executeInsert(SQL_INSERT_IMAGE_AREA_DSTA, (image_id, area_name))
 
     def insertTTGImageReturnsId(self, image_file_name, sensor_name, upload_date, image_datetime):
         '''
@@ -58,10 +157,10 @@ class ImageQueries:
         Input:      image_file_name, sensor_name, upload_date, image_datetime
         Output:     scvu_image_id of the inserted image
         '''
-        query = f"INSERT INTO image (image_file_name, sensor_id, upload_date, image_datetime, ew_status_id) \
-        VALUES (%s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'ttg done')) \
-        RETURNING scvu_image_id"
-        return self.db.executeInsertReturningID(query, (image_file_name, sensor_name, upload_date, image_datetime))
+        return self.db.executeInsertReturningID(
+            SQL_INSERT_TTG_IMAGE_RETURNING_ID,
+            (image_file_name, sensor_name, upload_date, image_datetime),
+        )
 
     def insertImageAreaTTG(self, scvu_image_id, area_name):
         '''
@@ -69,10 +168,7 @@ class ImageQueries:
         Input:      image_id, area_name
         Output:     NIL
         '''
-        query = f"INSERT INTO image_area (scvu_image_id, scvu_area_id) \
-        VALUES (%s, (SELECT scvu_area_id FROM area WHERE area_name = %s)) \
-        ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
-        self.db.executeInsert(query, (scvu_image_id, area_name))
+        self.db.executeInsert(SQL_INSERT_IMAGE_AREA_TTG, (scvu_image_id, area_name))
 
     def completeImage(self, scvu_image_id, vetter_keycloak_id, current_datetime):
         '''
@@ -80,8 +176,10 @@ class ImageQueries:
         Input:      scvu image id, vetter_keycloak_id (Keycloak user ID/sub), current_datetime
         Output:     NIL
         '''
-        query = f"UPDATE image SET completed_date = %s, vetter_keycloak_id = %s WHERE scvu_image_id = %s"
-        self.db.executeUpdate(query, (current_datetime, vetter_keycloak_id, scvu_image_id))
+        self.db.executeUpdate(
+            SQL_COMPLETE_IMAGE,
+            (current_datetime, vetter_keycloak_id, scvu_image_id),
+        )
 
     def uncompleteImage(self, scvu_image_id):
         '''
@@ -89,8 +187,7 @@ class ImageQueries:
         Input:      scvu image id
         Output:     NIL
         '''
-        query = f"UPDATE image SET completed_date = null WHERE scvu_image_id = %s"
-        self.db.executeUpdate(query, (scvu_image_id, ))
+        self.db.executeUpdate(SQL_UNCOMPLETE_IMAGE, (scvu_image_id,))
 
     def getImageCompleteDate(self, scvu_image_id):
         '''
@@ -98,8 +195,7 @@ class ImageQueries:
         Input:      scvu image id
         Output:     nested list with image completed date
         '''
-        query = f"SELECT completed_date FROM image WHERE scvu_image_id = %s"
-        return self.db.executeSelect(query, (scvu_image_id, ))
+        return self.db.executeSelect(SQL_GET_IMAGE_COMPLETE_DATE, (scvu_image_id,))
 
     def getImageAreaData(self, scvu_image_id):
         '''
@@ -107,14 +203,7 @@ class ImageQueries:
         Input: scvu_image_id
         Output: scvu_task_id, area name, remarks, assignee name
         '''
-        imageAreaQuery = f"SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id \
-        FROM task \
-        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id \
-        JOIN area ON image_area.scvu_area_id = area.scvu_area_id \
-        JOIN image ON image_area.scvu_image_id = image.scvu_image_id \
-        WHERE image.scvu_image_id = %s \
-        ORDER BY area.area_name"
-        results = self.db.executeSelect(imageAreaQuery, (scvu_image_id, ))
+        results = self.db.executeSelect(SQL_GET_IMAGE_AREA_DATA, (scvu_image_id,))
         formatted = []
         for row in results:
             task_id, area_name, remarks, assignee_keycloak_id = row
@@ -131,18 +220,9 @@ class ImageQueries:
         if not scvu_image_ids:
             return []
 
-        placeholders = ','.join(['%s'] * len(scvu_image_ids))
-        imageAreaQuery = f"""
-        SELECT image.scvu_image_id, task.scvu_task_id, area.area_name,
-               COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id
-        FROM task
-        JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
-        JOIN area ON image_area.scvu_area_id = area.scvu_area_id
-        JOIN image ON image_area.scvu_image_id = image.scvu_image_id
-        WHERE image.scvu_image_id IN ({placeholders})
-        ORDER BY image.scvu_image_id, area.area_name
-        """
-        results = self.db.executeSelect(imageAreaQuery, tuple(scvu_image_ids))
+        placeholders, values = build_in_clause(scvu_image_ids)
+        imageAreaQuery = SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES.format(placeholders=placeholders)
+        results = self.db.executeSelect(imageAreaQuery, values)
         formatted = []
         for row in results:
             image_id, task_id, area_name, remarks, assignee_keycloak_id = row
@@ -156,22 +236,10 @@ class ImageQueries:
         Input: start_date, end_date
         Output: scvu image id, sensor name, image file name, image id, image upload date, image date time, report name, priority name, image category name, image quality, cloud cover, ew status
         '''
-        imageQuery = f"SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, \
-        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, \
-        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, \
-        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id \
-        FROM image \
-        LEFT JOIN sensor ON sensor.id = image.sensor_id \
-        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id \
-        LEFT JOIN report ON report.id = image.report_id \
-        LEFT JOIN priority ON priority.id = image.priority_id \
-        LEFT JOIN image_category ON image_category.id = image.image_category_id \
-        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id \
-        WHERE image.completed_date IS NOT NULL \
-        AND ((image.completed_date >= %s AND image.completed_date < %s) \
-             OR (image.upload_date >= %s AND image.upload_date < %s))"
-
-        results = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date))
+        results = self.db.executeSelect(
+            SQL_GET_IMAGE_DATA,
+            (start_date, end_date, start_date, end_date),
+        )
         formatted = []
         for row in results:
             row = list(row)
@@ -186,30 +254,10 @@ class ImageQueries:
         Input: start_date, end_date, assignee_keycloak_id (Keycloak user ID/sub)
         Output: same shape as getImageData
         '''
-        imageQuery = f"""
-        SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime,
-        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
-        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality,
-        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id
-        FROM image
-        LEFT JOIN sensor ON sensor.id = image.sensor_id
-        LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
-        LEFT JOIN report ON report.id = image.report_id
-        LEFT JOIN priority ON priority.id = image.priority_id
-        LEFT JOIN image_category ON image_category.id = image.image_category_id
-        LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id
-        WHERE image.completed_date IS NOT NULL
-        AND ((image.completed_date >= %s AND image.completed_date < %s)
-             OR (image.upload_date >= %s AND image.upload_date < %s))
-        AND EXISTS (
-            SELECT 1
-            FROM task t
-            JOIN image_area ia ON ia.scvu_image_area_id = t.scvu_image_area_id
-            WHERE ia.scvu_image_id = image.scvu_image_id
-            AND t.assignee_keycloak_id = %s
+        results = self.db.executeSelect(
+            SQL_GET_IMAGE_DATA_FOR_USER,
+            (start_date, end_date, start_date, end_date, assignee_keycloak_id),
         )
-        """
-        results = self.db.executeSelect(imageQuery, (start_date, end_date, start_date, end_date, assignee_keycloak_id))
         formatted = []
         for row in results:
             row = list(row)
@@ -224,8 +272,7 @@ class ImageQueries:
         Input: scvu_image_id
         Output: NIL
         '''
-        query = f"DELETE FROM task WHERE scvu_image_area_id IN (SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s)"
-        self.db.executeDelete(query, (scvu_image_id, ))
+        self.db.executeDelete(SQL_DELETE_TASKS_FOR_IMAGE, (scvu_image_id,))
 
     def deleteImageAreasForImage(self, scvu_image_id):
         '''
@@ -233,8 +280,7 @@ class ImageQueries:
         Input: scvu_image_id
         Output: NIL
         '''
-        query = f"DELETE FROM image_area WHERE scvu_image_id = %s"
-        self.db.executeDelete(query, (scvu_image_id, ))
+        self.db.executeDelete(SQL_DELETE_IMAGE_AREAS_FOR_IMAGE, (scvu_image_id,))
 
     def deleteImage(self, scvu_image_id):
         '''
@@ -242,5 +288,4 @@ class ImageQueries:
         Input: scvu_image_id
         Output: NIL
         '''
-        query = f"DELETE FROM image WHERE scvu_image_id = %s"
-        self.db.executeDelete(query, (scvu_image_id, ))
+        self.db.executeDelete(SQL_DELETE_IMAGE, (scvu_image_id,))
