@@ -1,3 +1,15 @@
+SQL_GET_PRIORITY = "SELECT name FROM priority WHERE name IS NOT NULL"
+SQL_GET_CLOUD_COVER = "SELECT name FROM cloud_cover WHERE name IS NOT NULL"
+SQL_GET_IMAGE_CATEGORY = "SELECT name FROM image_category WHERE name IS NOT NULL"
+SQL_GET_REPORT = "SELECT name FROM report WHERE name IS NOT NULL"
+SQL_GET_SENSORS = "SELECT sensor.name, sensor_category.name FROM sensor, sensor_category WHERE sensor.category_id = sensor_category.id"
+SQL_GET_CATEGORIES = "SELECT sensor_category.name FROM sensor_category"
+SQL_GET_AREAS = "SELECT area.scvu_area_id, area.area_name, area.opsv FROM area ORDER BY area_name ASC"
+SQL_SET_OPSV_FALSE = "UPDATE area SET opsv = False"
+SQL_SET_OPSV_AREAS = "UPDATE area SET opsv = True WHERE area_name = %s"
+SQL_UPDATE_SENSOR_CATEGORY = "UPDATE sensor SET category_id = (SELECT id FROM sensor_category WHERE name = %s) WHERE name = %s"
+
+
 class LookupQueries:
     def __init__(self, db):
         self.db = db
@@ -8,8 +20,7 @@ class LookupQueries:
         Input:      None
         Output:     nested list of all the priorities
         '''
-        query = "SELECT name FROM priority WHERE name IS NOT NULL"
-        return self.db.executeSelect(query)
+        return self.db.executeSelect(SQL_GET_PRIORITY)
 
     def getCloudCover(self):
         '''
@@ -17,8 +28,7 @@ class LookupQueries:
         Input:      None
         Output:     nested list of all the cloud cover
         '''
-        query = "SELECT name FROM cloud_cover WHERE name IS NOT NULL"
-        return self.db.executeSelect(query)
+        return self.db.executeSelect(SQL_GET_CLOUD_COVER)
 
     def getImageCategory(self):
         '''
@@ -26,8 +36,7 @@ class LookupQueries:
         Input:      None
         Output:     nested list of all the image category
         '''
-        query = "SELECT name FROM image_category WHERE name IS NOT NULL"
-        return self.db.executeSelect(query)
+        return self.db.executeSelect(SQL_GET_IMAGE_CATEGORY)
 
     def getReport(self):
         '''
@@ -35,8 +44,7 @@ class LookupQueries:
         Input:      None
         Output:     nested list of all the report
         '''
-        query = "SELECT name FROM report WHERE name IS NOT NULL"
-        return self.db.executeSelect(query)
+        return self.db.executeSelect(SQL_GET_REPORT)
 
     def getSensors(self):
         '''
@@ -44,8 +52,7 @@ class LookupQueries:
         Input: None
         Output: sensor name, sensor_category_name in nested list
         '''
-        query = f"SELECT sensor.name, sensor_category.name FROM sensor, sensor_category WHERE sensor.category_id = sensor_category.id"
-        cursor = self.db.executeSelect(query)
+        cursor = self.db.executeSelect(SQL_GET_SENSORS)
         return cursor
 
     def getCategories(self):
@@ -54,8 +61,7 @@ class LookupQueries:
         Input: None
         Output: sensor category names in nested list
         '''
-        query = f"SELECT sensor_category.name FROM sensor_category"
-        cursor = self.db.executeSelect(query)
+        cursor = self.db.executeSelect(SQL_GET_CATEGORIES)
         return cursor
 
     def getAreas(self):
@@ -64,8 +70,7 @@ class LookupQueries:
         Input: NIL
         Output: Query results of all the areas
         '''
-        query = f"SELECT area.scvu_area_id, area.area_name, area.opsv FROM area ORDER BY area_name ASC"
-        cursor = self.db.executeSelect(query)
+        cursor = self.db.executeSelect(SQL_GET_AREAS)
         return cursor
 
     def setOpsvFalse(self):
@@ -74,8 +79,7 @@ class LookupQueries:
         Input: NIL
         Outpu: NIL
         '''
-        query = f"UPDATE area SET opsv = False"
-        self.db.executeUpdate(query)
+        self.db.executeUpdate(SQL_SET_OPSV_FALSE)
 
     def setOpsvAreas(self, area_list):
         '''
@@ -83,8 +87,7 @@ class LookupQueries:
         Input: List of areas
         Output: NIL
         '''
-        query = f"UPDATE area SET opsv = True WHERE area_name = %s"
-        self.db.executeUpdateMany(query, area_list)
+        self.db.executeUpdateMany(SQL_SET_OPSV_AREAS, area_list)
 
     def updateSensorCategory(self, category_sensor_list):
         '''
@@ -92,5 +95,4 @@ class LookupQueries:
         Input: category_sensor_list is a nested list with category sensor
         Output: NIL
         '''
-        query = f"UPDATE sensor SET category_id = (SELECT id FROM sensor_category WHERE name = %s) WHERE name = %s"
-        self.db.executeUpdateMany(query, category_sensor_list)
+        self.db.executeUpdateMany(SQL_UPDATE_SENSOR_CATEGORY, category_sensor_list)
