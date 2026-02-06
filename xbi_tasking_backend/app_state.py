@@ -8,11 +8,13 @@ from main_classes.query_reports import ReportQueries
 from main_classes.query_tasking import TaskingQueries
 from services.keycloak_service import KeycloakService
 from services.notification_service import NotificationService
+from services.audit_service import AuditService
 from services.tasking_service import TaskingService
 from services.image_service import ImageService
 from services.lookup_service import LookupService
 from services.user_service import UserService
 from services.report_service import ReportService
+from services.rate_limit_service import RateLimitService
 
 
 def init_app_state(app, config):
@@ -32,3 +34,5 @@ def init_app_state(app, config):
     app.state.report_service = ReportService(report_queries, lookup_queries, eg)
     app.state.user_service = UserService(db, keycloak_queries, KeycloakClient())
     app.state.notification_service = NotificationService()
+    app.state.audit_service = AuditService()
+    app.state.rate_limit_service = RateLimitService()

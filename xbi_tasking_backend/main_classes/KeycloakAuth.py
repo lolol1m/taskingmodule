@@ -216,13 +216,7 @@ class KeycloakAuth:
                         logger.info("Token introspection returned active=False")
                         return None
                 else:
-                    logger.warning(
-                        "Keycloak introspection failed status=%s text=%s",
-                        response.status_code,
-                        response.text,
-                    )
-                    logger.debug("Introspection URL: %s", introspection_url)
-                    logger.debug("Client ID: %s", self.client_id)
+                    logger.warning("Keycloak introspection failed status=%s", response.status_code)
                     return None
                     
         except Exception as e:

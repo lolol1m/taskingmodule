@@ -40,11 +40,7 @@ class Database():
                 self._create_database(db_name)
                 return ThreadedConnectionPool(1, int(os.getenv("DB_POOL_MAX", "10")), **conn_kwargs)
             logger.error("Database connection failed: %s", e)
-            logger.error("Host: %s", self._config.getIPAddress())
-            logger.error("Port: %s", self._config.getPort())
-            logger.error("Database: %s", db_name)
-            logger.error("User: %s", self._config.getUser())
-            logger.error("Please check: PostgreSQL service and credentials")
+            logger.error("Please check: PostgreSQL service and configuration")
             raise
 
     def _create_database(self, db_name):
@@ -65,10 +61,6 @@ class Database():
             logger.info("Created database '%s'", db_name)
         except Exception as create_error:
             logger.error("Failed to create database: %s", create_error)
-            logger.error("Host: %s", self._config.getIPAddress())
-            logger.error("Port: %s", self._config.getPort())
-            logger.error("Database: %s", db_name)
-            logger.error("User: %s", self._config.getUser())
             raise
 
     @contextmanager

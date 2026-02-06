@@ -53,6 +53,18 @@ else:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+
+raw_methods = os.getenv("CORS_ALLOW_METHODS")
+if raw_methods:
+    allowed_methods = [method.strip().upper() for method in raw_methods.split(",") if method.strip()]
+else:
+    allowed_methods = ["GET", "POST"]
+
+raw_headers = os.getenv("CORS_ALLOW_HEADERS")
+if raw_headers:
+    allowed_headers = [header.strip() for header in raw_headers.split(",") if header.strip()]
+else:
+    allowed_headers = ["Authorization", "Content-Type"]
 from routers import auth, images, lookup, notifications, reports, tasking, users
 
 @app.exception_handler(RequestValidationError)
@@ -111,8 +123,24 @@ async def keycloak_auth_middleware(request: Request, call_next):
     
     auth_header = request.headers.get("Authorization")
     
+    def _rate_limit_auth_failure(reason: str):
+        rate_limit_service = getattr(request.app.state, "rate_limit_service", None)
+        client_host = request.client.host if request.client else "unknown"
+        if rate_limit_service:
+            rate_key = f"auth_fail:{client_host}"
+            if not rate_limit_service.check(rate_key):
+                logger.warning("Auth failure rate limit exceeded for %s", client_host)
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many authentication attempts"},
+                )
+        logger.warning("Auth failure (%s) for %s from %s", reason, request.url.path, client_host)
+        return None
+
     if not auth_header or not auth_header.startswith("Bearer "):
-        logger.warning("Missing or invalid Authorization header for %s", request.url.path)
+        rate_limit_response = _rate_limit_auth_failure("missing_or_invalid_header")
+        if rate_limit_response:
+            return rate_limit_response
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
@@ -122,7 +150,9 @@ async def keycloak_auth_middleware(request: Request, call_next):
     
     token = auth_header.split(" ")[1]
     if not token:
-        logger.warning("Empty token in Authorization header for %s", request.url.path)
+        rate_limit_response = _rate_limit_auth_failure("empty_token")
+        if rate_limit_response:
+            return rate_limit_response
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
@@ -134,7 +164,9 @@ async def keycloak_auth_middleware(request: Request, call_next):
         token_info = await keycloak_auth.verify_token(token)
         
         if not token_info:
-            logger.warning("Token validation failed for %s", request.url.path)
+            rate_limit_response = _rate_limit_auth_failure("invalid_token")
+            if rate_limit_response:
+                return rate_limit_response
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=401,
@@ -178,8 +210,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=allowed_methods,
+    allow_headers=allowed_headers
 )
 
 @app.get("/docs", include_in_schema=False)

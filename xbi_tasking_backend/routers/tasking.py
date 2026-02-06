@@ -76,7 +76,7 @@ async def get_tasking_summary_data(request: Request, payload: DateRangePayload, 
 
 
 @router.post("/getTaskingManagerData")
-async def get_tasking_manager_data(request: Request, payload: DateRangePayload) -> KeyValueMapResponse:
+async def get_tasking_manager_data(request: Request, payload: DateRangePayload, user: dict = Depends(get_current_user)) -> KeyValueMapResponse:
     '''
     Function: Gets tasking manager data (incomplete images) from db between date range
     
@@ -144,11 +144,15 @@ async def get_tasking_manager_data(request: Request, payload: DateRangePayload) 
         }
         
     '''
-    return await run_blocking(request.app.state.tasking_service.get_tasking_manager, model_to_dict(payload))
+    try:
+        return await run_blocking(request.app.state.tasking_service.get_tasking_manager, model_to_dict(payload))
+    except Exception:
+        logger.exception("getTaskingManagerData failed")
+        return error_response(500, "Tasking manager failed", "tasking_manager_failed")
 
 
 @router.post("/updateTaskingManagerData")
-async def update_tasking_manager_data(request: Request, payload: UpdateTaskingManagerPayload) -> StatusResponse:
+async def update_tasking_manager_data(request: Request, payload: UpdateTaskingManagerPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Updates the priority of Image
     
@@ -170,10 +174,24 @@ async def update_tasking_manager_data(request: Request, payload: UpdateTaskingMa
             ...
         }
     '''
-    result = await run_blocking(request.app.state.tasking_service.update_tasking_manager, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Tasking manager updated")
-    return result
+    try:
+        if not is_admin_user(user):
+            return error_response(403, "Insufficient permissions", "insufficient_permissions")
+        result = await run_blocking(request.app.state.tasking_service.update_tasking_manager, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "tasking_manager_update",
+                    user,
+                    details={"image_count": len(model_to_dict(payload))},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasking manager updated")
+        return result
+    except Exception:
+        logger.exception("updateTaskingManagerData failed")
+        return error_response(500, "Failed to update tasking manager", "update_tasking_manager_failed")
 
 
 @router.post("/assignTask")
@@ -212,6 +230,14 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
             return error_response(400, "Tasks list is required", "missing_tasks")
         task_count = len(tasks)
         await run_blocking(request.app.state.tasking_service.assign_task, data)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_assign",
+                user,
+                details={"task_count": task_count},
+                ip_address=request.client.host if request.client else None,
+            )
         return {"status": "success", "message": "Tasks assigned successfully", "tasks_processed": task_count}
     except Exception:
         logger.exception("assignTask failed")
@@ -219,7 +245,7 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
 
 
 @router.post("/startTasks")
-async def start_tasks(request: Request, payload: TaskIdsPayload) -> StatusResponse:
+async def start_tasks(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Starts the Tasks by setting task status to In Progress
     
@@ -235,14 +261,26 @@ async def start_tasks(request: Request, payload: TaskIdsPayload) -> StatusRespon
             'SCVU Task ID': [1]
         }
     '''
-    result = await run_blocking(request.app.state.tasking_service.start_tasks, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Tasks started")
-    return result
+    try:
+        result = await run_blocking(request.app.state.tasking_service.start_tasks, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "task_start",
+                    user,
+                    details={"task_count": len(payload.task_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasks started")
+        return result
+    except Exception:
+        logger.exception("startTasks failed")
+        return error_response(500, "Failed to start tasks", "start_tasks_failed")
 
 
 @router.post("/completeTasks")
-async def complete_tasks(request: Request, payload: TaskIdsPayload) -> StatusResponse:
+async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Completes the Tasks for user by setting task status to Verifying
     
@@ -258,14 +296,26 @@ async def complete_tasks(request: Request, payload: TaskIdsPayload) -> StatusRes
             'SCVU Task ID': [1]
         }
     '''
-    result = await run_blocking(request.app.state.tasking_service.complete_tasks, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Tasks completed")
-    return result
+    try:
+        result = await run_blocking(request.app.state.tasking_service.complete_tasks, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "task_complete",
+                    user,
+                    details={"task_count": len(payload.task_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasks completed")
+        return result
+    except Exception:
+        logger.exception("completeTasks failed")
+        return error_response(500, "Failed to complete tasks", "complete_tasks_failed")
     
 
 @router.post("/verifyPass")
-async def verify_pass(request: Request, payload: TaskIdsPayload) -> StatusResponse:
+async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Verifies the Tasks as passed and sets task status to Complete
     
@@ -281,14 +331,26 @@ async def verify_pass(request: Request, payload: TaskIdsPayload) -> StatusRespon
             'SCVU Task ID': [1]
         }
     '''
-    result = await run_blocking(request.app.state.tasking_service.verify_pass, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Tasks verified")
-    return result
+    try:
+        result = await run_blocking(request.app.state.tasking_service.verify_pass, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "task_verify_pass",
+                    user,
+                    details={"task_count": len(payload.task_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasks verified")
+        return result
+    except Exception:
+        logger.exception("verifyPass failed")
+        return error_response(500, "Failed to verify tasks", "verify_pass_failed")
 
 
 @router.post("/verifyFail")
-async def verify_fail(request: Request, payload: TaskIdsPayload) -> StatusResponse:
+async def verify_fail(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Verifies the Tasks as Failed and resets task status to In Progress
     
@@ -304,10 +366,22 @@ async def verify_fail(request: Request, payload: TaskIdsPayload) -> StatusRespon
             'SCVU Task ID': [1]
         }
     '''
-    result = await run_blocking(request.app.state.tasking_service.verify_fail, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Tasks updated")
-    return result
+    try:
+        result = await run_blocking(request.app.state.tasking_service.verify_fail, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "task_verify_fail",
+                    user,
+                    details={"task_count": len(payload.task_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasks updated")
+        return result
+    except Exception:
+        logger.exception("verifyFail failed")
+        return error_response(500, "Failed to verify tasks", "verify_fail_failed")
 
 
 @router.post("/completeImages")
@@ -327,17 +401,29 @@ async def complete_images(request: Request, payload: ImageIdsPayload, user: dict
             'SCVU Image ID': [1]
         }
     '''
-    data = model_to_dict(payload)
-    # Get Keycloak user ID from JWT token (sub claim)
-    vetter_keycloak_id = user.get("sub")
-    result = await run_blocking(request.app.state.tasking_service.complete_images, data, vetter_keycloak_id)
-    if result is None:
-        return StatusResponse(status="success", message="Images completed")
-    return result
+    try:
+        data = model_to_dict(payload)
+        # Get Keycloak user ID from JWT token (sub claim)
+        vetter_keycloak_id = user.get("sub")
+        result = await run_blocking(request.app.state.tasking_service.complete_images, data, vetter_keycloak_id)
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "image_complete",
+                    user,
+                    details={"image_count": len(payload.image_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Images completed")
+        return result
+    except Exception:
+        logger.exception("completeImages failed")
+        return error_response(500, "Failed to complete images", "complete_images_failed")
 
 
 @router.post("/uncompleteImages")
-async def uncomplete_images(request: Request, payload: ImageIdsPayload) -> StatusResponse:
+async def uncomplete_images(request: Request, payload: ImageIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Sets the completed date of images to None
     
@@ -352,10 +438,24 @@ async def uncomplete_images(request: Request, payload: ImageIdsPayload) -> Statu
             'SCVU Image ID': [1]
         }
     '''
-    result = await run_blocking(request.app.state.tasking_service.uncomplete_images, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Images uncompleted")
-    return result
+    try:
+        if not is_admin_user(user):
+            return error_response(403, "Insufficient permissions", "insufficient_permissions")
+        result = await run_blocking(request.app.state.tasking_service.uncomplete_images, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "image_uncomplete",
+                    user,
+                    details={"image_count": len(payload.image_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Images uncompleted")
+        return result
+    except Exception:
+        logger.exception("uncompleteImages failed")
+        return error_response(500, "Failed to uncomplete images", "uncomplete_images_failed")
 
 
 @router.post("/getCompleteImageData")
@@ -407,11 +507,15 @@ async def get_complete_image_data(request: Request, payload: DateRangePayload, u
     
     '''
 
-    return await run_blocking(request.app.state.tasking_service.get_complete_image_data, model_to_dict(payload), user)
+    try:
+        return await run_blocking(request.app.state.tasking_service.get_complete_image_data, model_to_dict(payload), user)
+    except Exception:
+        logger.exception("getCompleteImageData failed")
+        return error_response(500, "Failed to get completed image data", "get_complete_image_data_failed")
 
 
 @router.post("/updateTaskingSummaryData")
-async def update_tasking_summary_data(request: Request, payload: UpdateTaskingSummaryPayload) -> StatusResponse:
+async def update_tasking_summary_data(request: Request, payload: UpdateTaskingSummaryPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
     Function: Updates the report, image category, image quality, cloud cover & target tracing of image
     
@@ -442,7 +546,21 @@ async def update_tasking_summary_data(request: Request, payload: UpdateTaskingSu
         }
         
     '''
-    result = await run_blocking(request.app.state.tasking_service.update_tasking_summary, model_to_dict(payload))
-    if result is None:
-        return StatusResponse(status="success", message="Tasking summary updated")
-    return result
+    try:
+        if not is_admin_user(user):
+            return error_response(403, "Insufficient permissions", "insufficient_permissions")
+        result = await run_blocking(request.app.state.tasking_service.update_tasking_summary, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "tasking_summary_update",
+                    user,
+                    details={"image_count": len(model_to_dict(payload))},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasking summary updated")
+        return result
+    except Exception:
+        logger.exception("updateTaskingSummaryData failed")
+        return error_response(500, "Failed to update tasking summary", "update_tasking_summary_failed")
