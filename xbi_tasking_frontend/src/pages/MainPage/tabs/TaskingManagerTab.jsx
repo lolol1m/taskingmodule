@@ -12,9 +12,23 @@ import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
+const MAX_DATE_RANGE_DAYS = 90
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
+
+const isDateRangeTooLarge = (range, maxDays) => {
+  if (!range) return false
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return false
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return false
+  const diffMs = endDate - startDate
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+  return diffDays > maxDays
+}
 
 
 const normalizeImageName = (value) => {
@@ -218,6 +232,15 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     try {
       setLoading(true)
       setError(null)
+      if (isDateRangeTooLarge(dateRange, MAX_DATE_RANGE_DAYS)) {
+        const message = `Date range cannot exceed ${MAX_DATE_RANGE_DAYS} days.`
+        setError(message)
+        addNotification({
+          title: 'Date range too large',
+          meta: `Just now · ${message}`,
+        })
+        return
+      }
      
       var response = await api.postTaskingManagerData(dateRange)
       
