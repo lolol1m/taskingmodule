@@ -20,6 +20,12 @@ def can_upload_parade_state(user: dict) -> bool:
     return account_type in ("Senior II", "IA") or "Senior II" in roles or "IA" in roles
 
 
+def can_assign_tasks(user: dict) -> bool:
+    roles = user.get("roles", []) or []
+    account_type = user.get("account_type")
+    return account_type in ("Senior II", "IA") or "Senior II" in roles or "IA" in roles
+
+
 def is_basic_ii_user(user: dict) -> bool:
     """Returns True if user is a basic II user (not Senior II or IA)"""
     account_type = user.get("account_type")

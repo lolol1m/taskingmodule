@@ -13,7 +13,7 @@ from schemas import (
     UpdateTaskingManagerPayload,
     UpdateTaskingSummaryPayload,
 )
-from security import get_current_user, is_admin_user
+from security import can_assign_tasks, get_current_user, is_admin_user
 
 
 logger = logging.getLogger("xbi_tasking_backend.tasking")
@@ -179,7 +179,7 @@ async def update_tasking_manager_data(request: Request, payload: UpdateTaskingMa
         }
     '''
     try:
-        if not is_admin_user(user):
+        if not can_assign_tasks(user):
             return error_response(403, "Insufficient permissions", "insufficient_permissions")
         result = await run_blocking(request.app.state.tasking_service.update_tasking_manager, model_to_dict(payload))
         if result is None:
