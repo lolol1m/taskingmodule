@@ -28,8 +28,8 @@ function UploadsTab({ userRole }) {
   const { addNotification } = useNotifications()
   const inputRef = useRef(null)
 
-  // Only IA can upload parade state CSV
-  const canUploadCSV = userRole === 'IA'
+  // Senior II and IA can upload parade state CSV
+  const canUploadCSV = userRole === 'IA' || userRole === 'Senior II'
 
   const handleFiles = (fileList) => {
     let files = Array.from(fileList || [])

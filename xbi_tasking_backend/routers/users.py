@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request, UploadFile
 from api_utils import error_response, model_to_dict, run_blocking
 from constants import ContentType, MAX_UPLOAD_BYTES
 from schemas import AdminResetPasswordPayload, ChangePasswordPayload, CreateUserPayload, StatusResponse, UsersResponse
-from security import get_current_user, is_admin_user
+from security import can_upload_parade_state, get_current_user, is_admin_user
 
 
 logger = logging.getLogger("xbi_tasking_backend.users")
@@ -37,7 +37,7 @@ async def create_user(request: Request, payload: CreateUserPayload, user: dict =
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
 
-    if not is_admin_user(user):
+    if not can_upload_parade_state(user):
         return error_response(403, "Insufficient permissions", "insufficient_permissions")
 
     try:
