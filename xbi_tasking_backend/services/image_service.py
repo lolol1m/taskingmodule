@@ -18,7 +18,7 @@ class ImageService:
         self.images = image_queries
         self.tasking = tasking_queries
 
-    def insert_dsta_data(self, payload, auto_assign = True):
+    def insert_dsta_data(self, payload, auto_assign=True):
         image_count = 0
         area_count = 0
         errors = []

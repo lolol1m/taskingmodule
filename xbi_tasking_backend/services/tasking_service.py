@@ -71,10 +71,14 @@ class TaskingService:
 
     def get_tasking_manager(self, payload):
         output = {}
-        images = self.tasking.getIncompleteImages(
-            dateutil.parser.isoparse(payload["Start Date"]).strftime("%Y-%m-%d"),
-            (dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)).strftime("%Y-%m-%d")
-        )
+        start_raw = payload["Start Date"]
+        end_raw = payload["End Date"]
+        start_dt = dateutil.parser.isoparse(start_raw)
+        end_dt = dateutil.parser.isoparse(end_raw)
+        if "T" not in end_raw:
+            end_dt = end_dt + timedelta(days=1)
+
+        images = self.tasking.getIncompleteImages(start_dt, end_dt)
         for image in images:
             areas = self.tasking.getTaskingManagerDataForImage(image[0])
             image_areas = self.tasking.getTaskingManagerDataForTask(image[0])

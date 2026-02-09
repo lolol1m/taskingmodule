@@ -1,5 +1,6 @@
 from main_classes.QueryManager import QueryManager
 from main_classes.ExcelGenerator import ExcelGenerator
+from main_classes.KeycloakClient import KeycloakClient
 from services.tasking_service import TaskingService
 from services.image_service import ImageService
 from services.lookup_service import LookupService
@@ -13,11 +14,12 @@ class MainController():
     def __init__(self, config=None):
         self.qm = QueryManager(config=config)
         self.eg = ExcelGenerator()
-        self.image_service = ImageService(self.qm)
-        self.tasking_service = TaskingService(self.qm, image_service=self.image_service)
-        self.lookup_service = LookupService(self.qm)
-        self.user_service = UserService(self.qm)
-        self.report_service = ReportService(self.qm, self.eg)
+
+        self.image_service = ImageService(self.qm.db, self.qm._images, self.qm._tasking)
+        self.tasking_service = TaskingService(self.qm._tasking, self.qm._keycloak, image_service=self.image_service)
+        self.lookup_service = LookupService(self.qm._lookup)
+        self.user_service = UserService(self.qm.db, self.qm._keycloak, KeycloakClient())
+        self.report_service = ReportService(self.qm._reports, self.qm._lookup, self.eg)
     
     def insertDSTAData(self, json, auto_assign = True):
         return self.image_service.insert_dsta_data(json, auto_assign)
