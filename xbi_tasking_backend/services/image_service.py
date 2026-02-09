@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 from datetime import timedelta
 import dateutil.parser
 from constants import TaskStatus
@@ -10,6 +11,33 @@ from formatters.image_formatter import (
 
 
 logger = logging.getLogger("xbi_tasking_backend.image_service")
+
+def _get_limit_offset(payload):
+    limit = payload.get("Limit")
+    offset = payload.get("Offset", 0)
+    if limit is None:
+        limit = int(os.getenv("MAX_QUERY_LIMIT", "1000"))
+    try:
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError):
+        limit = int(os.getenv("MAX_QUERY_LIMIT", "1000"))
+    try:
+        offset = int(offset) if offset is not None else 0
+    except (TypeError, ValueError):
+        offset = 0
+    if limit is not None and limit <= 0:
+        limit = None
+    if offset < 0:
+        offset = 0
+    return limit, offset
+
+
+def _validate_date_range(start_dt, end_dt):
+    max_days = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
+    if end_dt < start_dt:
+        raise ValueError("End Date must be after Start Date")
+    if (end_dt - start_dt).days > max_days:
+        raise ValueError(f"Date range cannot exceed {max_days} days")
 
 
 class ImageService:
@@ -151,8 +179,12 @@ class ImageService:
         return format_complete_image_image(image_data, area_data)
 
     def get_complete_image_data(self, payload, user=None):
-        start_date = dateutil.parser.isoparse(payload["Start Date"]).strftime("%Y-%m-%d")
-        end_date = (dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)).strftime("%Y-%m-%d")
+        start_dt = dateutil.parser.isoparse(payload["Start Date"])
+        end_dt = dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)
+        _validate_date_range(start_dt, end_dt)
+        start_date = start_dt.strftime("%Y-%m-%d")
+        end_date = end_dt.strftime("%Y-%m-%d")
+        limit, offset = _get_limit_offset(payload)
 
         account_type = None
         roles = []
@@ -162,9 +194,15 @@ class ImageService:
 
         is_ii_user = account_type == "II" or ("II" in roles and account_type != "Senior II" and account_type != "IA")
         if is_ii_user and user:
-            image_data = self.images.getImageDataForUser(start_date, end_date, user.get("sub"))
+            image_data = self.images.getImageDataForUser(
+                start_date,
+                end_date,
+                user.get("sub"),
+                limit=limit,
+                offset=offset,
+            )
         else:
-            image_data = self.images.getImageData(start_date, end_date)
+            image_data = self.images.getImageData(start_date, end_date, limit=limit, offset=offset)
         output = {}
         if not image_data:
             return output

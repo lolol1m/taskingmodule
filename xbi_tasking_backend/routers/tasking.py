@@ -70,6 +70,8 @@ async def get_tasking_summary_data(request: Request, payload: DateRangePayload, 
     '''
     try:
         return await run_blocking(request.app.state.tasking_service.get_tasking_summary, model_to_dict(payload), user)
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_date_range")
     except Exception:
         logger.exception("getTaskingSummaryData failed")
         return error_response(500, "Tasking summary failed", "tasking_summary_failed")
@@ -146,6 +148,8 @@ async def get_tasking_manager_data(request: Request, payload: DateRangePayload, 
     '''
     try:
         return await run_blocking(request.app.state.tasking_service.get_tasking_manager, model_to_dict(payload))
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_date_range")
     except Exception:
         logger.exception("getTaskingManagerData failed")
         return error_response(500, "Tasking manager failed", "tasking_manager_failed")
@@ -508,7 +512,13 @@ async def get_complete_image_data(request: Request, payload: DateRangePayload, u
     '''
 
     try:
-        return await run_blocking(request.app.state.tasking_service.get_complete_image_data, model_to_dict(payload), user)
+        return await run_blocking(
+            request.app.state.tasking_service.get_complete_image_data,
+            model_to_dict(payload),
+            user,
+        )
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_date_range")
     except Exception:
         logger.exception("getCompleteImageData failed")
         return error_response(500, "Failed to get completed image data", "get_complete_image_data_failed")

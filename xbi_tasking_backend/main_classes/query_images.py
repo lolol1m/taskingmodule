@@ -204,10 +204,15 @@ class ImageQueries:
         Output: scvu_task_id, area name, remarks, assignee name
         '''
         results = self.db.executeSelect(SQL_GET_IMAGE_AREA_DATA, (scvu_image_id,))
+        assignee_ids = [row[3] for row in results if row[3]]
+        usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
         for row in results:
             task_id, area_name, remarks, assignee_keycloak_id = row
-            assignee = self.keycloak.get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
+            if assignee_keycloak_id:
+                assignee = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
+            else:
+                assignee = AssigneeLabel.UNASSIGNED
             formatted.append((task_id, area_name, remarks, assignee))
         return formatted
 
@@ -223,46 +228,65 @@ class ImageQueries:
         placeholders, values = build_in_clause(scvu_image_ids)
         imageAreaQuery = SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES.format(placeholders=placeholders)
         results = self.db.executeSelect(imageAreaQuery, values)
+        assignee_ids = [row[4] for row in results if row[4]]
+        usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
         for row in results:
             image_id, task_id, area_name, remarks, assignee_keycloak_id = row
-            assignee = self.keycloak.get_keycloak_username(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
+            if assignee_keycloak_id:
+                assignee = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
+            else:
+                assignee = AssigneeLabel.UNASSIGNED
             formatted.append((image_id, task_id, area_name, remarks, assignee))
         return formatted
 
-    def getImageData(self, start_date, end_date):
+    def getImageData(self, start_date, end_date, limit=None, offset=None):
         '''
         Function: Gets image data for completed images
         Input: start_date, end_date
         Output: scvu image id, sensor name, image file name, image id, image upload date, image date time, report name, priority name, image category name, image quality, cloud cover, ew status
         '''
-        results = self.db.executeSelect(
-            SQL_GET_IMAGE_DATA,
-            (start_date, end_date, start_date, end_date),
-        )
+        query = SQL_GET_IMAGE_DATA
+        values = (start_date, end_date, start_date, end_date)
+        if limit is not None:
+            query = f"{query} LIMIT %s OFFSET %s"
+            values = values + (limit, offset or 0)
+        results = self.db.executeSelect(query, values)
+        vetter_ids = [row[12] for row in results if row[12]]
+        usernames = self.keycloak.get_keycloak_usernames_bulk(vetter_ids)
         formatted = []
         for row in results:
             row = list(row)
             vetter_keycloak_id = row[12]
-            row[12] = self.keycloak.get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else AssigneeLabel.UNASSIGNED
+            if vetter_keycloak_id:
+                row[12] = usernames.get(vetter_keycloak_id, vetter_keycloak_id)
+            else:
+                row[12] = AssigneeLabel.UNASSIGNED
             formatted.append(tuple(row))
         return formatted
 
-    def getImageDataForUser(self, start_date, end_date, assignee_keycloak_id):
+    def getImageDataForUser(self, start_date, end_date, assignee_keycloak_id, limit=None, offset=None):
         '''
         Function: Gets completed image data filtered by assignee for completed images
         Input: start_date, end_date, assignee_keycloak_id (Keycloak user ID/sub)
         Output: same shape as getImageData
         '''
-        results = self.db.executeSelect(
-            SQL_GET_IMAGE_DATA_FOR_USER,
-            (start_date, end_date, start_date, end_date, assignee_keycloak_id),
-        )
+        query = SQL_GET_IMAGE_DATA_FOR_USER
+        values = (start_date, end_date, start_date, end_date, assignee_keycloak_id)
+        if limit is not None:
+            query = f"{query} LIMIT %s OFFSET %s"
+            values = values + (limit, offset or 0)
+        results = self.db.executeSelect(query, values)
+        vetter_ids = [row[12] for row in results if row[12]]
+        usernames = self.keycloak.get_keycloak_usernames_bulk(vetter_ids)
         formatted = []
         for row in results:
             row = list(row)
             vetter_keycloak_id = row[12]
-            row[12] = self.keycloak.get_keycloak_username(vetter_keycloak_id) if vetter_keycloak_id else AssigneeLabel.UNASSIGNED
+            if vetter_keycloak_id:
+                row[12] = usernames.get(vetter_keycloak_id, vetter_keycloak_id)
+            else:
+                row[12] = AssigneeLabel.UNASSIGNED
             formatted.append(tuple(row))
         return formatted
 

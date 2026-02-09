@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import timedelta
 import dateutil.parser
 from formatters.tasking_formatter import (
@@ -13,6 +14,34 @@ from constants import AssigneeLabel, TaskStatus
 logger = logging.getLogger("xbi_tasking_backend.tasking_service")
 
 
+def _get_limit_offset(payload):
+    limit = payload.get("Limit")
+    offset = payload.get("Offset", 0)
+    if limit is None:
+        limit = int(os.getenv("MAX_QUERY_LIMIT", "1000"))
+    try:
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError):
+        limit = int(os.getenv("MAX_QUERY_LIMIT", "1000"))
+    try:
+        offset = int(offset) if offset is not None else 0
+    except (TypeError, ValueError):
+        offset = 0
+    if limit is not None and limit <= 0:
+        limit = None
+    if offset < 0:
+        offset = 0
+    return limit, offset
+
+
+def _validate_date_range(start_dt, end_dt):
+    max_days = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
+    if end_dt < start_dt:
+        raise ValueError("End Date must be after Start Date")
+    if (end_dt - start_dt).days > max_days:
+        raise ValueError(f"Date range cannot exceed {max_days} days")
+
+
 class TaskingService:
     def __init__(self, tasking_queries, keycloak_queries, image_service=None):
         self.tasking = tasking_queries
@@ -21,8 +50,12 @@ class TaskingService:
 
     def get_tasking_summary(self, payload, user=None):
         output = {}
-        start_date = dateutil.parser.isoparse(payload["Start Date"]).strftime("%Y-%m-%d")
-        end_date = (dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)).strftime("%Y-%m-%d")
+        start_dt = dateutil.parser.isoparse(payload["Start Date"])
+        end_dt = dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)
+        _validate_date_range(start_dt, end_dt)
+        start_date = start_dt.strftime("%Y-%m-%d")
+        end_date = end_dt.strftime("%Y-%m-%d")
+        limit, offset = _get_limit_offset(payload)
 
         # Check if user is a basic II user (only sees their own tasks)
         is_ii_user = False
@@ -37,9 +70,20 @@ class TaskingService:
 
         # Get image data based on user role
         if is_ii_user and assignee_keycloak_id:
-            image_datas = self.tasking.getTaskingSummaryImageDataForUser(start_date, end_date, assignee_keycloak_id)
+            image_datas = self.tasking.getTaskingSummaryImageDataForUser(
+                start_date,
+                end_date,
+                assignee_keycloak_id,
+                limit=limit,
+                offset=offset,
+            )
         else:
-            image_datas = self.tasking.getTaskingSummaryImageData(start_date, end_date)
+            image_datas = self.tasking.getTaskingSummaryImageData(
+                start_date,
+                end_date,
+                limit=limit,
+                offset=offset,
+            )
 
         if not image_datas:
             return output
@@ -77,11 +121,28 @@ class TaskingService:
         end_dt = dateutil.parser.isoparse(end_raw)
         if "T" not in end_raw:
             end_dt = end_dt + timedelta(days=1)
+        _validate_date_range(start_dt, end_dt)
+        limit, offset = _get_limit_offset(payload)
 
-        images = self.tasking.getIncompleteImages(start_dt, end_dt)
+        images = self.tasking.getIncompleteImages(start_dt, end_dt, limit=limit, offset=offset)
+        if not images:
+            return output
+
+        image_ids = [image[0] for image in images]
+        area_rows = self.tasking.getTaskingManagerDataForImages(image_ids)
+        task_rows = self.tasking.getTaskingManagerDataForTasks(image_ids)
+
+        areas_by_image = {}
+        for image_id, image_area_id, area_name in area_rows:
+            areas_by_image.setdefault(image_id, []).append((image_area_id, area_name))
+
+        tasks_by_image = {}
+        for image_id, image_area_id, assignee_name, remarks in task_rows:
+            tasks_by_image.setdefault(image_id, []).append((image_area_id, assignee_name, remarks))
+
         for image in images:
-            areas = self.tasking.getTaskingManagerDataForImage(image[0])
-            image_areas = self.tasking.getTaskingManagerDataForTask(image[0])
+            areas = areas_by_image.get(image[0], [])
+            image_areas = tasks_by_image.get(image[0], [])
 
             output[image[0]] = format_tasking_manager_image(image, image_areas)
 

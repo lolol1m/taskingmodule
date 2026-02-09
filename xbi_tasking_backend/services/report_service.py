@@ -1,5 +1,34 @@
+import os
 import dateutil.parser
 from datetime import timedelta
+
+
+def _get_limit_offset(payload):
+    limit = payload.get("Limit")
+    offset = payload.get("Offset", 0)
+    if limit is None:
+        limit = int(os.getenv("MAX_QUERY_LIMIT", "1000"))
+    try:
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError):
+        limit = int(os.getenv("MAX_QUERY_LIMIT", "1000"))
+    try:
+        offset = int(offset) if offset is not None else 0
+    except (TypeError, ValueError):
+        offset = 0
+    if limit is not None and limit <= 0:
+        limit = None
+    if offset < 0:
+        offset = 0
+    return limit, offset
+
+
+def _validate_date_range(start_dt, end_dt):
+    max_days = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
+    if end_dt < start_dt:
+        raise ValueError("End Date must be after Start Date")
+    if (end_dt - start_dt).days > max_days:
+        raise ValueError(f"Date range cannot exceed {max_days} days")
 
 
 class ReportService:
@@ -8,10 +37,15 @@ class ReportService:
         self.lookup = lookup_queries
         self.eg = excel_generator
 
-    def get_xbi_report(self, start_date, end_date):
+    def get_xbi_report(self, start_date, end_date, limit=None, offset=None):
+        start_dt = dateutil.parser.isoparse(start_date)
+        end_dt = dateutil.parser.isoparse(end_date) + timedelta(days=1)
+        _validate_date_range(start_dt, end_dt)
         image_datas = self.reports.getXBIReportImage(
-            dateutil.parser.isoparse(start_date).strftime(f"%Y-%m-%d"), 
-            (dateutil.parser.isoparse(end_date) + timedelta(days=1)).strftime(f"%Y-%m-%d")
+            start_dt.strftime("%Y-%m-%d"),
+            end_dt.strftime("%Y-%m-%d"),
+            limit=limit,
+            offset=offset,
         )
         exploitable_images = {}
         unexploitable_images = {}
@@ -35,7 +69,13 @@ class ReportService:
         return exploitable_images, unexploitable_images
 
     def get_xbi_report_data(self, payload):
-        exploitable, unexploitable = self.get_xbi_report(payload["Start Date"], payload["End Date"])
+        limit, offset = _get_limit_offset(payload)
+        exploitable, unexploitable = self.get_xbi_report(
+            payload["Start Date"],
+            payload["End Date"],
+            limit=limit,
+            offset=offset,
+        )
         exploitable.pop("UNCATEGORISED", None)
         unexploitable.pop("UNCATEGORISED", None)
         output = {}
@@ -56,7 +96,13 @@ class ReportService:
         return output
 
     def get_xbi_report_data_for_excel(self, payload):
-        exploitable, unexploitable = self.get_xbi_report(payload["Start Date"], payload["End Date"])
+        limit, offset = _get_limit_offset(payload)
+        exploitable, unexploitable = self.get_xbi_report(
+            payload["Start Date"],
+            payload["End Date"],
+            limit=limit,
+            offset=offset,
+        )
         exploitable.pop("UNCATEGORISED", None)
         unexploitable.pop("UNCATEGORISED", None)
         output = {}

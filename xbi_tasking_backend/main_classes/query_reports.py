@@ -13,11 +13,16 @@ class ReportQueries:
     def __init__(self, db):
         self.db = db
 
-    def getXBIReportImage(self, start_date, end_date):
+    def getXBIReportImage(self, start_date, end_date, limit=None, offset=None):
         '''
         Function: Gets image data for xbi
         Input: start_date, end_date
         Output: sensor name, category name, report name
         '''
-        cursor = self.db.executeSelect(SQL_GET_XBI_REPORT_IMAGE, (start_date, end_date))
+        query = SQL_GET_XBI_REPORT_IMAGE
+        values = (start_date, end_date)
+        if limit is not None:
+            query = f"{query} LIMIT %s OFFSET %s"
+            values = values + (limit, offset or 0)
+        cursor = self.db.executeSelect(query, values)
         return cursor

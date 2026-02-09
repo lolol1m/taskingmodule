@@ -1,4 +1,5 @@
 import logging
+import os
 import requests
 import main_classes.EnumClasses as EnumClasses
 from constants import AssigneeLabel
@@ -77,6 +78,18 @@ class KeycloakQueries:
             token = self.get_keycloak_admin_token()
         except (ValueError, requests.exceptions.RequestException) as e:
             logger.warning("Could not get Keycloak admin token for bulk lookup: %s", e)
+            return resolved
+
+        small_batch_threshold = int(os.getenv("KEYCLOAK_BULK_THRESHOLD", "10"))
+        if len(missing) <= small_batch_threshold:
+            for user_id in missing:
+                try:
+                    user_data = self.kc.get_user_by_id(token, user_id)
+                    username = user_data.get("username", user_id)
+                    resolved[user_id] = username
+                    self._keycloak_user_cache[user_id] = username
+                except requests.exceptions.RequestException as e:
+                    logger.warning("Could not resolve Keycloak user %s: %s", user_id, e)
             return resolved
 
         role_enum = EnumClasses.Role

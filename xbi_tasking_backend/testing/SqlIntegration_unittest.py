@@ -159,6 +159,40 @@ class SqlIntegration_unittest(unittest.TestCase):
         self.assertEqual(len(results), 1, "should return only rows for requested image ids")
         self.assertEqual(results[0][0], scvu_image_id1, "should return correct image id")
 
+    def test_tasking_manager_bulk_queries(self):
+        scvu_image_id1, image_area_id1 = self._insert_image_with_area(300, "area-m1")
+        scvu_image_id2, image_area_id2 = self._insert_image_with_area(301, "area-m2")
+
+        self.db.executeInsert(
+            "INSERT INTO task(assignee_keycloak_id, task_status_id, scvu_image_area_id) VALUES (%s, %s, %s)",
+            ("kc-user-1", 1, image_area_id1),
+        )
+        self.db.executeInsert(
+            "INSERT INTO task(assignee_keycloak_id, task_status_id, scvu_image_area_id) VALUES (%s, %s, %s)",
+            ("kc-user-1", 1, image_area_id2),
+        )
+
+        areas = self.tasking.getTaskingManagerDataForImages([scvu_image_id1, scvu_image_id2])
+        tasks = self.tasking.getTaskingManagerDataForTasks([scvu_image_id1, scvu_image_id2])
+
+        area_image_ids = {row[0] for row in areas}
+        task_image_ids = {row[0] for row in tasks}
+        self.assertEqual(area_image_ids, {scvu_image_id1, scvu_image_id2}, "bulk areas should include both images")
+        self.assertEqual(task_image_ids, {scvu_image_id1, scvu_image_id2}, "bulk tasks should include both images")
+
+    def test_get_incomplete_images_limit_offset(self):
+        self._insert_image_with_area(400, "area-l1")
+        self._insert_image_with_area(401, "area-l2")
+        self._insert_image_with_area(402, "area-l3")
+
+        results = self.tasking.getIncompleteImages(
+            "2023-02-01",
+            "2023-03-01",
+            limit=1,
+            offset=1,
+        )
+        self.assertEqual(len(results), 1, "limit/offset should bound results")
+
     def test_keycloak_get_users_with_presence(self):
         self.db.executeInsert(
             "INSERT INTO user_cache (keycloak_user_id, is_present) VALUES (%s, %s) ON CONFLICT (keycloak_user_id) DO NOTHING",

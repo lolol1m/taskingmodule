@@ -50,6 +50,13 @@ SQL_GET_TASKING_MANAGER_IMAGE = (
     "WHERE image_area.scvu_image_id = %s"
 )
 
+SQL_GET_TASKING_MANAGER_IMAGE_FOR_IMAGES = """
+    SELECT image_area.scvu_image_id, image_area.scvu_image_area_id, area.area_name
+    FROM image_area
+    JOIN area ON area.scvu_area_id = image_area.scvu_area_id
+    WHERE image_area.scvu_image_id IN ({placeholders})
+"""
+
 SQL_GET_TASKING_MANAGER_TASK = (
     "SELECT image_area.scvu_image_area_id, COALESCE(task.assignee_keycloak_id, %s), task.remarks "
     "FROM task "
@@ -57,6 +64,15 @@ SQL_GET_TASKING_MANAGER_TASK = (
     "JOIN image ON image.scvu_image_id = image_area.scvu_image_id "
     "WHERE image_area.scvu_image_id = %s"
 )
+
+SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES = """
+    SELECT image_area.scvu_image_id, image_area.scvu_image_area_id,
+        COALESCE(task.assignee_keycloak_id, %s), task.remarks
+    FROM task
+    JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
+    JOIN image ON image.scvu_image_id = image_area.scvu_image_id
+    WHERE image_area.scvu_image_id IN ({placeholders})
+"""
 
 SQL_UPDATE_TASKING_MANAGER_PRIORITY = (
     "UPDATE image SET priority_id = (SELECT id FROM priority WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)) "
@@ -228,14 +244,19 @@ class TaskingQueries:
             return None
         return cursor[0][0]
 
-    def getIncompleteImages(self, start_date, end_date):
+    def getIncompleteImages(self, start_date, end_date, limit=None, offset=None):
         '''
         Function:   Gets data for incomplete images from db
         Input:      start_date, end_date (date strings in YYYY-MM-DD format)
         Output:     list of tuple, each containing scvu_image_id, sensor.name, image_file_name, image_id, upload_date, image_datetime, priority.name
         Note:       Returns images that are incomplete (no completed_date) and have upload_date within the specified date range
         '''
-        cursor = self.db.executeSelect(SQL_GET_INCOMPLETE_IMAGES, (start_date, end_date))
+        query = SQL_GET_INCOMPLETE_IMAGES
+        values = (start_date, end_date)
+        if limit is not None:
+            query = f"{query} LIMIT %s OFFSET %s"
+            values = values + (limit, offset or 0)
+        cursor = self.db.executeSelect(query, values)
         return cursor
 
     def getTaskingManagerDataForImage(self, scvu_image_id):
@@ -246,6 +267,18 @@ class TaskingQueries:
         '''
         cursor = self.db.executeSelect(SQL_GET_TASKING_MANAGER_IMAGE, (scvu_image_id,))
         return cursor
+
+    def getTaskingManagerDataForImages(self, scvu_image_ids):
+        '''
+        Function:   Gets tasking manager area data for multiple images
+        Input:      iterable of scvu_image_id
+        Output:     list of tuples: scvu_image_id, scvu_image_area_id, area_name
+        '''
+        if not scvu_image_ids:
+            return []
+        placeholders, values = build_in_clause(scvu_image_ids)
+        query = SQL_GET_TASKING_MANAGER_IMAGE_FOR_IMAGES.format(placeholders=placeholders)
+        return self.db.executeSelect(query, values)
 
     def getTaskingManagerDataForTask(self, scvu_image_id):
         '''
@@ -270,6 +303,30 @@ class TaskingQueries:
             else:
                 assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
             formatted.append((image_area_id, assignee_name, remarks))
+        return formatted
+
+    def getTaskingManagerDataForTasks(self, scvu_image_ids):
+        '''
+        Function:   Gets tasking manager task data for multiple images
+        Input:      iterable of scvu_image_id
+        Output:     list of tuples: scvu_image_id, scvu_image_area_id, assignee_name, remarks
+        '''
+        if not scvu_image_ids:
+            return []
+        placeholders, values = build_in_clause(scvu_image_ids)
+        query = SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES.format(placeholders=placeholders)
+        results = self.db.executeSelect(query, (AssigneeLabel.UNASSIGNED,) + values)
+        if not results:
+            return results
+        assignee_ids = [row[2] for row in results if row[2] and row[2] != AssigneeLabel.UNASSIGNED]
+        usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
+        formatted = []
+        for scvu_image_id, image_area_id, assignee_keycloak_id, remarks in results:
+            if assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not assignee_keycloak_id:
+                assignee_name = AssigneeLabel.UNASSIGNED
+            else:
+                assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
+            formatted.append((scvu_image_id, image_area_id, assignee_name, remarks))
         return formatted
 
     def updateTaskingManagerData(self, scvu_image_id, priority_name):
@@ -329,24 +386,31 @@ class TaskingQueries:
         self.assignTask(scvu_image_area_id, assignee_keycloak_id, 1)
         return "assigned"
 
-    def getTaskingSummaryImageData(self, start_date, end_date):
+    def getTaskingSummaryImageData(self, start_date, end_date, limit=None, offset=None):
         '''
         Function:   Gets data for tasking summary
         Input:      NIL
         Output:     nested list with id, sensor_name, image_file_name, image_id, upload_date, image_datetime, report, priority, image_category, quality, cloud_cover, ew_status, target_tracing
         '''
-        return self.db.executeSelect(SQL_GET_TASKING_SUMMARY_IMAGE, (start_date, end_date))
+        query = SQL_GET_TASKING_SUMMARY_IMAGE
+        values = (start_date, end_date)
+        if limit is not None:
+            query = f"{query} LIMIT %s OFFSET %s"
+            values = values + (limit, offset or 0)
+        return self.db.executeSelect(query, values)
 
-    def getTaskingSummaryImageDataForUser(self, start_date, end_date, assignee_keycloak_id):
+    def getTaskingSummaryImageDataForUser(self, start_date, end_date, assignee_keycloak_id, limit=None, offset=None):
         '''
         Function:   Gets data for tasking summary filtered by assignee (for II users)
         Input:      start_date, end_date, assignee_keycloak_id
         Output:     nested list with id, sensor_name, image_file_name, image_id, upload_date, image_datetime, report, priority, image_category, quality, cloud_cover, ew_status, target_tracing
         '''
-        return self.db.executeSelect(
-            SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER,
-            (start_date, end_date, assignee_keycloak_id),
-        )
+        query = SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER
+        values = (start_date, end_date, assignee_keycloak_id)
+        if limit is not None:
+            query = f"{query} LIMIT %s OFFSET %s"
+            values = values + (limit, offset or 0)
+        return self.db.executeSelect(query, values)
 
     def getTaskingSummaryAreaData(self, image_id):
         '''
