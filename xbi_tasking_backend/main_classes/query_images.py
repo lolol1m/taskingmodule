@@ -8,7 +8,7 @@ SQL_INSERT_SENSOR = "INSERT INTO sensor (name) VALUES (%s) ON CONFLICT (name) DO
 SQL_INSERT_IMAGE = (
     "INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) "
     "VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) "
-    "ON CONFLICT (image_id) DO NOTHING"
+    "ON CONFLICT (image_id, image_file_name) DO NOTHING"
 )
 
 SQL_INSERT_AREA = (
@@ -38,6 +38,7 @@ SQL_INSERT_IMAGE_AREA_TTG = (
 SQL_COMPLETE_IMAGE = "UPDATE image SET completed_date = %s, vetter_keycloak_id = %s WHERE scvu_image_id = %s"
 SQL_UNCOMPLETE_IMAGE = "UPDATE image SET completed_date = null WHERE scvu_image_id = %s"
 SQL_GET_IMAGE_COMPLETE_DATE = "SELECT completed_date FROM image WHERE scvu_image_id = %s"
+SQL_GET_IMAGE_BY_ID_AND_NAME = "SELECT image_id, image_file_name FROM image WHERE image_id = %s AND image_file_name = %s"
 
 SQL_GET_IMAGE_AREA_DATA = (
     "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id "
@@ -196,6 +197,14 @@ class ImageQueries:
         Output:     nested list with image completed date
         '''
         return self.db.executeSelect(SQL_GET_IMAGE_COMPLETE_DATE, (scvu_image_id,))
+
+    def getImageByIdAndName(self, image_id, image_file_name):
+        '''
+        Function:   Gets image record by image_id + image_file_name
+        Input:      image_id, image_file_name
+        Output:     list of tuples (image_id, image_file_name)
+        '''
+        return self.db.executeSelect(SQL_GET_IMAGE_BY_ID_AND_NAME, (image_id, image_file_name))
 
     def getImageAreaData(self, scvu_image_id):
         '''

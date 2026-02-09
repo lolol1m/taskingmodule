@@ -63,6 +63,13 @@ class ImageService:
                 error_msg = None
                 try:
                     with self.db.transaction():
+                        existing = self.images.getImageByIdAndName(image["imgId"], image["imageFileName"])
+                        if existing:
+                            existing_images.append({
+                                "image_id": image["imgId"],
+                                "image_file_name": image["imageFileName"],
+                            })
+                            continue
                         self.images.insertSensor(image["sensorName"])
                         image_inserted = self.images.insertImage(
                             image["imgId"],

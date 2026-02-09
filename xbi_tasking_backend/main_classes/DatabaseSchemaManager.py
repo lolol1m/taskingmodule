@@ -98,6 +98,16 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS assignee_id")
                 cursor.execute("ALTER TABLE image DROP COLUMN IF EXISTS vetter_id")
                 cursor.execute("DROP TABLE IF EXISTS users")
+                cursor.execute("ALTER TABLE image DROP CONSTRAINT IF EXISTS image_image_id_key")
+                cursor.execute("""
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'image_image_id_name_key'
+                """)
+                if not cursor.fetchone():
+                    cursor.execute(
+                        "ALTER TABLE image ADD CONSTRAINT image_image_id_name_key UNIQUE (image_id, image_file_name)"
+                    )
         except Exception as e:
             logger.warning("Could not check/initialize database schema: %s", e)
 
@@ -176,7 +186,7 @@ class DatabaseSchemaManager:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS image (
                     scvu_image_id SERIAL PRIMARY KEY,
-                    image_id BIGINT UNIQUE,
+                    image_id BIGINT,
                     image_file_name VARCHAR(255),
                     sensor_id INTEGER REFERENCES sensor(id),
                     upload_date TIMESTAMP,
@@ -189,7 +199,8 @@ class DatabaseSchemaManager:
                     cloud_cover_id INTEGER REFERENCES cloud_cover(id),
                     ew_status_id INTEGER REFERENCES ew_status(id),
                     target_tracing BOOLEAN,
-                    vetter_keycloak_id VARCHAR(255)
+                    vetter_keycloak_id VARCHAR(255),
+                    UNIQUE(image_id, image_file_name)
                 )
             """)
 
