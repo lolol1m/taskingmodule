@@ -231,10 +231,12 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
           }}
           rowHeight={64}
           loading={loading}
+          hideFooter
           slots={{ toolbar: GridToolbar }}
           sx={{
             width: '100%',
             height: '100%',
+            flex: 1,
             border: 'none',
             color: 'var(--text)',
             backgroundColor: 'var(--table-bg)',
@@ -273,11 +275,14 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
             },
-            '& .MuiDataGrid-footerContainer': {
-              borderTop: '1px solid var(--border-strong)',
-            },
           }}
         />
+        <div className="completed-images__total-rows">
+          <div className="completed-images__total-rows-left">
+            {selection.length > 0 ? `${selection.length} row(s) selected` : ''}
+          </div>
+          <div className="completed-images__total-rows-right">Total Rows: {rows.length}</div>
+        </div>
       </div>
     </div>
   )

@@ -57,7 +57,9 @@
   background: var(--table-bg);
   border: 1px solid var(--border-strong);
   border-radius: 12px;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   max-width: 100%;
   flex: 1;
   min-height: 360px;
@@ -65,6 +67,29 @@
   transition: max-width 700ms ease;
   scrollbar-color: var(--border-strong) var(--row-bg);
   scrollbar-width: thin;
+}
+
+.tasking-manager__grid .MuiDataGrid-root {
+  flex: 1;
+  min-height: 0;
+}
+
+.tasking-manager__total-rows {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-top: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tasking-manager__total-rows-left,
+.tasking-manager__total-rows-right {
+  white-space: nowrap;
 }
 
 .tasking-manager__grid .MuiDataGrid-cell .MuiAutocomplete-root {

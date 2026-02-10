@@ -18,6 +18,35 @@
   scrollbar-width: thin;
 }
 
+.admin-tab__grid--with-footer {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-tab__grid--with-footer .MuiDataGrid-root {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-tab__grid-footer {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-top: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.admin-tab__grid-footer-left,
+.admin-tab__grid-footer-right {
+  white-space: nowrap;
+}
+
 .admin-tab__grid::-webkit-scrollbar {
   width: 6px;
   height: 6px;

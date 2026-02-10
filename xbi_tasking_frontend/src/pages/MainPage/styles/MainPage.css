@@ -85,6 +85,7 @@
   --badge-border: #0b2f7a;
   --table-bg: #f8fafc;
   --row-bg: #f1f5f9;
+  --active: #3b82f6;
 }
 
 body.modal-blocked .sidebar,
@@ -95,6 +96,7 @@ body.modal-blocked .sidebar__collapse-toggle {
 .layout {
   display: grid;
   grid-template-columns: auto 1fr;
+  align-items: start;
   gap: 16px;
   padding: 16px;
   transition: grid-template-columns 700ms ease;

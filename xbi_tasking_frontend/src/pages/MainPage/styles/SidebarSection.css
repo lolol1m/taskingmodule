@@ -2,7 +2,8 @@
   padding: 16px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 120px);
+  height: calc(100vh - 120px);
+  overflow-y: auto;
   overflow-x: visible;
   box-sizing: border-box;
   will-change: width;
@@ -123,6 +124,11 @@
 .sidebar__section--bottom {
   margin-top: auto;
   gap: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding-top: 8px;
 }
 
 .sidebar__popover-wrap {
@@ -411,7 +417,7 @@
 
 /* Light mode text colors */
 .app-shell.is-light .sidebar__item--sub {
-  color: var(--subtext);
+  color: var(--text);
 }
 
 .caret.is-open .caret-arrow {

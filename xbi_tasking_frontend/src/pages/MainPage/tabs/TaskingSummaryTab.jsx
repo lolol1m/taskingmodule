@@ -1199,10 +1199,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           onProcessRowUpdateError={(err) => console.error(err)}
           columnVisibilityModel={visibilityModel}
           loading={loading}
+          hideFooter
           slots={{ toolbar: GridToolbar }}
           sx={{
             width: '100%',
             height: '100%',
+            flex: 1,
             border: 'none',
             color: 'var(--text)',
             backgroundColor: 'var(--table-bg)',
@@ -1303,11 +1305,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               backgroundColor: '#333f4f',
             },
 
-            '& .MuiDataGrid-footerContainer': {
-              borderTop: '1px solid var(--border-strong)',
-              color: 'var(--muted)',
-              backgroundColor: 'var(--panel)',
-            },
             '& .MuiDataGrid-toolbarContainer': {
               padding: '10px 12px',
               borderBottom: '1px solid var(--border-strong)',
@@ -1324,6 +1321,12 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             },
           }}
         />
+        <div className="tasking-summary__total-rows">
+          <div className="tasking-summary__total-rows-left">
+            {selection.length > 0 ? `${selection.length} row(s) selected` : ''}
+          </div>
+          <div className="tasking-summary__total-rows-right">Total Rows: {rows.length}</div>
+        </div>
         {error && <div className="tasking-summary__error">{error}</div>}
       </div>
     </div>

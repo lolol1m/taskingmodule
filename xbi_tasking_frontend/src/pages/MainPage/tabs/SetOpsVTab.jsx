@@ -139,7 +139,7 @@ function SetOpsVTab() {
 
       {error ? <Typography className="admin-tab__error">{error}</Typography> : null}
 
-      <div className="admin-tab__grid">
+      <div className="admin-tab__grid admin-tab__grid--with-footer">
         <DataGridPro
           rows={rows}
           columns={columns}
@@ -165,6 +165,7 @@ function SetOpsVTab() {
               })),
             )
           }}
+          hideFooter
           slots={{ toolbar: GridToolbar }}
           slotProps={{
             toolbar: {
@@ -175,6 +176,7 @@ function SetOpsVTab() {
           sx={{
             width: '100%',
             height: '100%',
+            flex: 1,
             border: 'none',
             color: 'var(--text)',
             backgroundColor: 'var(--table-bg)',
@@ -192,11 +194,14 @@ function SetOpsVTab() {
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
             },
-            '& .MuiDataGrid-footerContainer': {
-              borderTop: '1px solid var(--border-strong)',
-            },
           }}
         />
+        <div className="admin-tab__grid-footer">
+          <div className="admin-tab__grid-footer-left">
+            {selectionModel.ids.size > 0 ? `${selectionModel.ids.size} row(s) selected` : ''}
+          </div>
+          <div className="admin-tab__grid-footer-right">Total Rows: {rows.length}</div>
+        </div>
       </div>
     </div>
   )

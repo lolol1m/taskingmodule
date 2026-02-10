@@ -733,10 +733,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           checkboxSelectionVisibleOnly={false}
           rowHeight={64}
           loading={loading}
+          hideFooter
           slots={{ toolbar: GridToolbar }}
           sx={{
             width: '100%',
             height: '100%',
+            flex: 1,
             border: 'none',
             color: 'var(--text)',
             backgroundColor: 'var(--table-bg)',
@@ -861,6 +863,12 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             },
           }}
         />
+        <div className="tasking-manager__total-rows">
+          <div className="tasking-manager__total-rows-left">
+            {selectionModel.ids.size > 0 ? `${selectionModel.ids.size} row(s) selected` : ''}
+          </div>
+          <div className="tasking-manager__total-rows-right">Total Rows: {rows.length}</div>
+        </div>
         {error && <div className="tasking-manager__error">{error}</div>}
       </div>
 

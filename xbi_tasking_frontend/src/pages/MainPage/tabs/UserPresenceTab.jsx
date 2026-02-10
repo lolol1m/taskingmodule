@@ -56,6 +56,7 @@ const buildRows = (users) => {
 
 function UserPresenceTab() {
   const [rows, setRows] = useState([])
+  const [selectionModel, setSelectionModel] = useState(() => ({ type: 'include', ids: new Set() }))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -112,12 +113,30 @@ function UserPresenceTab() {
 
       {error ? <Typography className="admin-tab__error">{error}</Typography> : null}
 
-      <div className="admin-tab__grid">
+      <div className="admin-tab__grid admin-tab__grid--with-footer">
         <DataGridPro
           rows={rows}
           columns={columns}
           loading={loading}
+          checkboxSelection
           disableRowSelectionOnClick
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(model) => {
+            if (model?.ids instanceof Set) {
+              setSelectionModel(model)
+              return
+            }
+            if (model instanceof Set) {
+              setSelectionModel({ type: 'include', ids: model })
+              return
+            }
+            if (Array.isArray(model)) {
+              setSelectionModel({ type: 'include', ids: new Set(model) })
+              return
+            }
+            setSelectionModel({ type: 'include', ids: new Set() })
+          }}
+          hideFooter
           slots={{ toolbar: GridToolbar }}
           slotProps={{
             toolbar: {
@@ -128,6 +147,7 @@ function UserPresenceTab() {
           sx={{
             width: '100%',
             height: '100%',
+            flex: 1,
             border: 'none',
             color: 'var(--text)',
             backgroundColor: 'var(--table-bg)',
@@ -145,11 +165,14 @@ function UserPresenceTab() {
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
             },
-            '& .MuiDataGrid-footerContainer': {
-              borderTop: '1px solid var(--border-strong)',
-            },
           }}
         />
+        <div className="admin-tab__grid-footer">
+          <div className="admin-tab__grid-footer-left">
+            {selectionModel.ids.size > 0 ? `${selectionModel.ids.size} row(s) selected` : ''}
+          </div>
+          <div className="admin-tab__grid-footer-right">Total Rows: {rows.length}</div>
+        </div>
       </div>
     </div>
   )
