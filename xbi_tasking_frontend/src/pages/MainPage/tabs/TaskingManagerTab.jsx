@@ -156,7 +156,8 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             id: areaId,
             groupName: [parentName, areaName],
             treePath: [`img_${parentId}`, areaName],
-            assignee: readValue(entry, ['Assignee']) || null,
+            currentAssignee: readValue(entry, ['Assignee']) || '',
+            proposedAssignee: readValue(entry, ['Assignee']) || '',
             areaName,
             parentId,
             scvuImageAreaId: readValue(entry, ['SCVU Image Area ID', 'SCVU Image Area ID']) || null,
@@ -175,7 +176,8 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           id: imageId,
           groupName: [imageFileName],
           treePath: [`img_${imageId}`],
-          assignee: readValue(entry, ['Assignee']),
+          currentAssignee: readValue(entry, ['Assignee']) || '',
+          proposedAssignee: readValue(entry, ['Assignee']) || '',
           sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
           imageName: imageFileName,
           uploadDate: readValue(entry, ['Upload Date', 'UploadDate']) || null,
@@ -325,22 +327,34 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     if (!selectionModel.ids.size) return false
     return rows.some((row) => {
       if (!selectionModel.ids.has(row.id)) return false
-      const value = row.assignee
+      const value = row.proposedAssignee
       return value === null || value === undefined || value === ''
     })
   }, [rows, selectionModel])
 
-  const renderAssignee = (params) => {
-    let imgAssignee = ''
+  const renderCurrentAssignee = (params) => {
+    const isImageRow = params?.row?.groupName?.length === 1
+    if (isImageRow) {
+      const children = rows.filter((row) => row.parentId === params.row.id)
+      if (!children.length) return params.row.currentAssignee || ''
+      const first = children[0]?.currentAssignee || ''
+      const allSame = children.every((row) => (row.currentAssignee || '') === first)
+      return allSame ? first : 'Multiple'
+    }
+    return params.row.currentAssignee || ''
+  }
+
+  const renderProposedAssignee = (params) => {
+    let imgProposedAssignee = ''
     const rowNode = params.rowNode || { parent: null, children: [] }
     if (rowNode.parent === null && rowNode.children?.length) {
       const firstChildId = rowNode.children[0]
       const firstChild = rows.find((row) => row.id === firstChildId)
       const allMatch = rowNode.children.every((childId) => {
         const child = rows.find((row) => row.id === childId)
-        return child?.assignee === firstChild?.assignee
+        return child?.proposedAssignee === firstChild?.proposedAssignee
       })
-      imgAssignee = allMatch ? firstChild?.assignee : 'Multiple'
+      imgProposedAssignee = allMatch ? firstChild?.proposedAssignee : 'Multiple'
     }
 
     const sharedProps = {
@@ -359,7 +373,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         const optionId = typeof option === 'string' ? option : option?.id
         return optionId === 'Multiple'
       },
-      renderInput: (inputParams) => <TextField {...inputParams} placeholder="Assignee" size="small" />,
+      renderInput: (inputParams) => <TextField {...inputParams} placeholder="Proposed assignee" size="small" />,
       size: 'small',
       fullWidth: true,
       ListboxProps: {
@@ -368,13 +382,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     }
 
     const handleChange = (newValue) => {
-      let assigneeValue = newValue
-      if (assigneeValue == null) {
-        assigneeValue = ''
-      } else if (typeof assigneeValue === 'object' && assigneeValue.id) {
-        assigneeValue = assigneeValue.id
+      let proposedAssigneeValue = newValue
+      if (proposedAssigneeValue == null) {
+        proposedAssigneeValue = ''
+      } else if (typeof proposedAssigneeValue === 'object' && proposedAssigneeValue.id) {
+        proposedAssigneeValue = proposedAssigneeValue.id
       }
-      updateRows(params.id, (row) => ({ ...row, assignee: assigneeValue }))
+      updateRows(params.id, (row) => ({ ...row, proposedAssignee: proposedAssigneeValue }))
     }
 
     const isImageRow = params?.row?.groupName?.length === 1
@@ -382,18 +396,18 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       return (
         <Autocomplete
           {...sharedProps}
-          value={getValueOption(imgAssignee || params.value)}
+          value={getValueOption(imgProposedAssignee || params.value)}
           onChange={(_, newValue) => {
-            let assigneeValue = newValue
-            if (assigneeValue == null) {
-              assigneeValue = ''
-            } else if (typeof assigneeValue === 'object' && assigneeValue.id) {
-              assigneeValue = assigneeValue.id
+            let proposedAssigneeValue = newValue
+            if (proposedAssigneeValue == null) {
+              proposedAssigneeValue = ''
+            } else if (typeof proposedAssigneeValue === 'object' && proposedAssigneeValue.id) {
+              proposedAssigneeValue = proposedAssigneeValue.id
             }
             setRows((prev) =>
               prev.map((row) => {
                 if (row.id === params.id || row.parentId === params.id) {
-                  return { ...row, assignee: assigneeValue }
+                  return { ...row, proposedAssignee: proposedAssigneeValue }
                 }
                 return row
               }),
@@ -406,7 +420,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     return (
       <Autocomplete
         {...sharedProps}
-        value={getValueOption(params.value)}
+        value={getValueOption(params.row.proposedAssignee || params.value)}
         onChange={(_, newValue) => {
           handleChange(newValue)
           const parentId = params?.row?.parentId
@@ -414,17 +428,20 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           setRows((prev) => {
             const next = prev.map((row) => {
               if (row.id === params.id) {
-                return { ...row, assignee: newValue && newValue.id ? newValue.id : newValue || '' }
+                return {
+                  ...row,
+                  proposedAssignee: newValue && newValue.id ? newValue.id : newValue || '',
+                }
               }
               return row
             })
             const children = next.filter((row) => row.parentId === parentId)
             if (!children.length) return next
-            const first = children[0]?.assignee
-            const allSame = children.every((row) => row.assignee === first)
+            const first = children[0]?.proposedAssignee
+            const allSame = children.every((row) => row.proposedAssignee === first)
             return next.map((row) => {
               if (row.id === parentId) {
-                return { ...row, assignee: allSame ? first : 'Multiple' }
+                return { ...row, proposedAssignee: allSame ? first : 'Multiple' }
               }
               return row
             })
@@ -506,7 +523,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     })
     tasksToAssign.forEach((task) => {
       const areaId = task.scvuImageAreaId || task.id
-      let assigneeId = task.assignee
+      let assigneeId = task.proposedAssignee
       if (typeof assigneeId === 'object' && assigneeId?.id) {
         assigneeId = assigneeId.id
       }
@@ -551,6 +568,16 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
 
       if (hasPriority) {
         await api.postUpdateTaskingManagerData(prioritiesPayload)
+      }
+
+      if (hasTasks) {
+        // Promote proposed assignments to current assignments after confirmation.
+        setRows((prev) =>
+          prev.map((row) => ({
+            ...row,
+            currentAssignee: row.proposedAssignee || '',
+          })),
+        )
       }
 
       const summaryParts = []
@@ -618,19 +645,31 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         renderCell: renderPriority,
       },
       {
-        field: 'assignee',
-        headerName: 'Assignee',
+        field: 'uploadDate',
+        headerName: 'Upload Date',
         minWidth: 170,
         flex: 0.9,
-        renderCell: renderAssignee,
       },
-      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 170, flex: 0.9 },
       {
         field: 'ttg',
         headerName: 'Action',
         minWidth: 140,
         flex: 0.7,
         renderCell: renderTTG,
+      },
+      {
+        field: 'currentAssignee',
+        headerName: 'Current Assignee',
+        minWidth: 170,
+        flex: 0.9,
+        renderCell: renderCurrentAssignee,
+      },
+      {
+        field: 'proposedAssignee',
+        headerName: 'Proposed Assignee',
+        minWidth: 170,
+        flex: 0.9,
+        renderCell: renderProposedAssignee,
       },
     ],
     [rows, assignees, actionsEnabled],
