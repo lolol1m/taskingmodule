@@ -336,12 +336,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     const isImageRow = params?.row?.groupName?.length === 1
     if (isImageRow) {
       const children = rows.filter((row) => row.parentId === params.row.id)
-      if (!children.length) return params.row.currentAssignee || ''
+      if (!children.length) return params.row.currentAssignee || 'NIL'
       const first = children[0]?.currentAssignee || ''
       const allSame = children.every((row) => (row.currentAssignee || '') === first)
-      return allSame ? first : 'Multiple'
+      if (!allSame) return 'Multiple'
+      return first || 'NIL'
     }
-    return params.row.currentAssignee || ''
+    return params.row.currentAssignee || 'NIL'
   }
 
   const renderProposedAssignee = (params) => {
@@ -651,13 +652,6 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         flex: 0.9,
       },
       {
-        field: 'ttg',
-        headerName: 'Action',
-        minWidth: 140,
-        flex: 0.7,
-        renderCell: renderTTG,
-      },
-      {
         field: 'currentAssignee',
         headerName: 'Current Assignee',
         minWidth: 170,
@@ -670,6 +664,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         minWidth: 170,
         flex: 0.9,
         renderCell: renderProposedAssignee,
+      },
+      {
+        field: 'ttg',
+        headerName: 'Action',
+        minWidth: 140,
+        flex: 0.7,
+        renderCell: renderTTG,
       },
     ],
     [rows, assignees, actionsEnabled],
