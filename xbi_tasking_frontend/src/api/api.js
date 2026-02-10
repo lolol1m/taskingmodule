@@ -139,9 +139,10 @@ class API {
         return response.data
     }
 
-    async insertDSTAData(formData) {
+    async insertDSTAData(formData, autoAssign = true) {
         const response = await this.client.post("/images/insertDSTAData", formData, {
             headers: { "Content-Type": "multipart/form-data" },
+            params: { auto_assign: autoAssign },
         })
         return response.data
     }

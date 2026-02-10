@@ -14,7 +14,12 @@ router = APIRouter(prefix="/images", tags=["images"])
 
 
 @router.post("/insertDSTAData")
-async def insert_dsta_data(request: Request, file: UploadFile, user: dict = Depends(get_current_user)):
+async def insert_dsta_data(
+    request: Request,
+    file: UploadFile,
+    auto_assign: bool = True,
+    user: dict = Depends(get_current_user),
+):
     '''
     Function: Imports data from DSTA (in a json file) and inserts it into db
     
@@ -88,7 +93,7 @@ async def insert_dsta_data(request: Request, file: UploadFile, user: dict = Depe
     except json.JSONDecodeError as e:
         return error_response(400, "Invalid JSON file", "invalid_json", {"error": str(e)})
     try:
-        result = await run_blocking(request.app.state.image_service.insert_dsta_data, json_data)
+        result = await run_blocking(request.app.state.image_service.insert_dsta_data, json_data, auto_assign)
         if result.get("success"):
             images = result.get("images_inserted")
             areas = result.get("areas_inserted")

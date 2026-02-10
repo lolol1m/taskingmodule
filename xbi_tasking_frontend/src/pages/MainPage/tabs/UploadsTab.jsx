@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, LinearProgress } from '@mui/material'
 import API from '../../../api/api'
 import useNotifications from '../../../components/notifications/useNotifications.js'
@@ -25,8 +25,16 @@ function UploadsTab({ userRole }) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [inputKey, setInputKey] = useState(0)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const { addNotification } = useNotifications()
   const inputRef = useRef(null)
+  useEffect(() => {
+    document.body.classList.toggle('modal-blocked', confirmOpen)
+    return () => {
+      document.body.classList.remove('modal-blocked')
+    }
+  }, [confirmOpen])
+
 
   // Senior II and IA can upload parade state CSV
   const canUploadCSV = userRole === 'IA' || userRole === 'Senior II'
@@ -55,7 +63,7 @@ function UploadsTab({ userRole }) {
     setInputKey((prev) => prev + 1)
   }
 
-  const handleUpload = async () => {
+  const startUpload = async (autoAssign) => {
     if (!selectedFiles.length) return
 
     setLoading(true)
@@ -80,7 +88,7 @@ function UploadsTab({ userRole }) {
           })
           results.push({ file: file.name, type: 'parade' })
         } else {
-          const result = await api.insertDSTAData(formData)
+          const result = await api.insertDSTAData(formData, autoAssign)
           if (result?.success === false || result?.error) {
             throw new Error(result?.error || result?.message || 'Upload failed')
           }
@@ -135,6 +143,16 @@ function UploadsTab({ userRole }) {
       setLoading(false)
       setUploadProgress(0)
     }
+  }
+
+  const handleUpload = () => {
+    if (!selectedFiles.length) return
+    const jsonQueue = selectedFiles.filter((f) => getFileType(f.name) === 'json')
+    if (jsonQueue.length > 0) {
+      setConfirmOpen(true)
+      return
+    }
+    startUpload(true)
   }
 
   const jsonFiles = selectedFiles.filter((f) => getFileType(f.name) === 'json')
@@ -284,6 +302,54 @@ function UploadsTab({ userRole }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className={`uploads-confirm ${confirmOpen ? 'is-open' : ''}`}>
+        <div className="uploads-confirm__backdrop" />
+        <div className="uploads-confirm__content">
+          <button
+            className="uploads-confirm__close"
+            type="button"
+            onClick={() => setConfirmOpen(false)}
+            aria-label="Close"
+          >
+            <img src="/src/assets/close.png" alt="" />
+          </button>
+          <div className="uploads-confirm__header">
+            <div className="uploads-confirm__icon">
+              <img src="/src/assets/warning.png" alt="" />
+            </div>
+            <div>
+              <div className="uploads-confirm__title">Apply auto assignment?</div>
+              <div className="uploads-confirm__subtitle">
+                Auto assignment will distribute newly uploaded tasks. You can also continue without auto assignment
+                and manually assign later.
+              </div>
+            </div>
+          </div>
+          <div className="uploads-confirm__actions">
+            <Button
+              className="uploads-confirm__button uploads-confirm__button--ghost"
+              onClick={() => {
+                setConfirmOpen(false)
+                startUpload(false)
+              }}
+              disabled={loading}
+            >
+              No auto assignment
+            </Button>
+            <Button
+              className="uploads-confirm__button uploads-confirm__button--primary"
+              onClick={() => {
+                setConfirmOpen(false)
+                startUpload(true)
+              }}
+              disabled={loading}
+            >
+              Continue
+            </Button>
           </div>
         </div>
       </div>

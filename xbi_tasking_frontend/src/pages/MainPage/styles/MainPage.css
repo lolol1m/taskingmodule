@@ -87,6 +87,11 @@
   --row-bg: #f1f5f9;
 }
 
+body.modal-blocked .sidebar,
+body.modal-blocked .sidebar__collapse-toggle {
+  pointer-events: none;
+}
+
 .layout {
   display: grid;
   grid-template-columns: auto 1fr;

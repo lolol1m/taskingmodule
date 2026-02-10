@@ -270,3 +270,163 @@
   opacity: 0.3;
   cursor: not-allowed;
 }
+
+.uploads-confirm {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000001;
+}
+
+.uploads-confirm.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.uploads-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 15, 25, 0.65);
+}
+
+.uploads-confirm__content {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  width: calc(100% - 32px);
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  padding: 20px 22px;
+  color: var(--text);
+}
+
+.uploads-confirm__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  color: var(--muted);
+}
+
+.uploads-confirm__close img {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+  opacity: 0.7;
+  filter: invert(1);
+}
+
+.uploads-confirm__close:hover img {
+  opacity: 1;
+}
+
+.app-shell.is-light .uploads-confirm__close img {
+  filter: invert(0);
+}
+
+.uploads-confirm__header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.uploads-confirm__icon {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.uploads-confirm__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.uploads-confirm__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.uploads-confirm__subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.uploads-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.uploads-confirm__button {
+  text-transform: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.uploads-confirm__button--ghost {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: transparent;
+}
+
+.uploads-confirm__button--ghost:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.uploads-confirm__button--primary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.uploads-confirm__button--primary:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.app-shell.is-light .uploads-confirm__button--ghost,
+.app-shell.is-light .uploads-confirm__button--ghost:hover,
+.app-shell.is-light .uploads-confirm__button--ghost:focus,
+.app-shell.is-light .uploads-confirm__button--ghost:active {
+  color: #1d4ed8;
+}
+
+.app-shell.is-light .uploads-confirm__button--primary,
+.app-shell.is-light .uploads-confirm__button--primary:focus,
+.app-shell.is-light .uploads-confirm__button--primary:active {
+  color: #1d4ed8;
+  background: transparent;
+}
+
+.app-shell.is-light .uploads-confirm__button--primary:hover {
+  color: #1d4ed8;
+  background: rgba(29, 78, 216, 0.14);
+}
+
+.app-shell.is-light .uploads-confirm__button--ghost:hover {
+  color: #1d4ed8;
+  background: rgba(29, 78, 216, 0.08);
+}
