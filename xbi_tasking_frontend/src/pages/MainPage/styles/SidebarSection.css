@@ -35,6 +35,7 @@
   font-family: inherit;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
   transition: left 700ms ease, top 700ms ease;
+  z-index: 1000000;
 }
 
 .collapse-arrow {
