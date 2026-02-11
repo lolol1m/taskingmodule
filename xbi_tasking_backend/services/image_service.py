@@ -36,8 +36,21 @@ def _validate_date_range(start_dt, end_dt):
     max_days = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
     if end_dt < start_dt:
         raise ValueError("End Date must be after Start Date")
-    if (end_dt - start_dt).days > max_days:
+    if (end_dt - start_dt).total_seconds() > max_days * 24 * 60 * 60:
         raise ValueError(f"Date range cannot exceed {max_days} days")
+
+
+def _parse_date_range(payload):
+    start_raw = payload["Start Date"]
+    end_raw = payload["End Date"]
+    use_exact_time = bool(payload.get("Use Exact Time", False))
+    start_dt = dateutil.parser.isoparse(start_raw)
+    end_dt = dateutil.parser.isoparse(end_raw)
+
+    if not use_exact_time:
+        start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_dt = (end_dt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return start_dt, end_dt
 
 
 class ImageService:
@@ -186,11 +199,8 @@ class ImageService:
         return format_complete_image_image(image_data, area_data)
 
     def get_complete_image_data(self, payload, user=None):
-        start_dt = dateutil.parser.isoparse(payload["Start Date"])
-        end_dt = dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)
+        start_dt, end_dt = _parse_date_range(payload)
         _validate_date_range(start_dt, end_dt)
-        start_date = start_dt.strftime("%Y-%m-%d")
-        end_date = end_dt.strftime("%Y-%m-%d")
         limit, offset = _get_limit_offset(payload)
 
         account_type = None
@@ -202,14 +212,14 @@ class ImageService:
         is_ii_user = account_type == "II" or ("II" in roles and account_type != "Senior II" and account_type != "IA")
         if is_ii_user and user:
             image_data = self.images.getImageDataForUser(
-                start_date,
-                end_date,
+                start_dt,
+                end_dt,
                 user.get("sub"),
                 limit=limit,
                 offset=offset,
             )
         else:
-            image_data = self.images.getImageData(start_date, end_date, limit=limit, offset=offset)
+            image_data = self.images.getImageData(start_dt, end_dt, limit=limit, offset=offset)
         output = {}
         if not image_data:
             return output

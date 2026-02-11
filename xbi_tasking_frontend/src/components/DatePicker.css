@@ -1,0 +1,232 @@
+.date-picker-modal {
+  color: var(--text, #e5e7eb);
+  background: var(--panel, #15161a);
+  position: relative;
+  isolation: isolate;
+}
+
+.date-picker-modal__content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.date-picker-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.date-picker-modal__calendar {
+  border: 1px solid var(--border, #2b2d36);
+  border-radius: 10px;
+  background: var(--panel-2, #111318);
+  padding: 8px;
+  overflow-x: auto;
+}
+
+/* ── time controls ── */
+
+.date-picker-modal__time-controls {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  padding: 0 4px;
+}
+
+.date-picker-modal__time-half {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.date-picker-modal__time-half-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.date-picker-modal__time-header {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted, #9ca3af);
+}
+
+.date-picker-modal__date-text {
+  color: var(--text, #e5e7eb);
+  font-size: 14px !important;
+  white-space: nowrap;
+}
+
+.date-picker-modal__time-half-bottom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-picker-modal__time-arrow {
+  color: var(--muted, #9ca3af);
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0 10px;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 6px;
+}
+
+/* ── time number inputs ── */
+
+.date-picker-modal__time-input-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border, #2b2d36);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 34px;
+}
+
+.date-picker-modal__time-input {
+  width: 36px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text, #e5e7eb);
+  background: var(--panel, #15161a);
+  border: none;
+  outline: none;
+  padding: 0 2px;
+  -moz-appearance: textfield;
+}
+
+.date-picker-modal__time-input::-webkit-outer-spin-button,
+.date-picker-modal__time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.date-picker-modal__time-input-arrows {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border, #2b2d36);
+}
+
+.date-picker-modal__time-input-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel, #15161a);
+  color: var(--muted, #9ca3af);
+  border: none;
+  cursor: pointer;
+  font-size: 0.5rem;
+  padding: 0 4px;
+  flex: 1;
+  line-height: 1;
+}
+
+.date-picker-modal__time-input-arrow:hover {
+  background: var(--hover, #1b1d23);
+  color: var(--text, #e5e7eb);
+}
+
+/* ── AM/PM select ── */
+
+.date-picker-modal__select--ampm {
+  min-width: 68px;
+}
+
+.date-picker-modal__select--ampm .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border, #2b2d36) !important;
+}
+
+.date-picker-modal__select--ampm .MuiSelect-select {
+  color: var(--text, #e5e7eb);
+  background: var(--panel, #15161a);
+  padding: 5px 8px !important;
+  font-size: 0.9rem;
+}
+
+.date-picker-modal__select--ampm .MuiSvgIcon-root {
+  color: var(--text, #e5e7eb);
+  font-size: 1.1rem;
+}
+
+.date-picker-modal__colon {
+  color: var(--muted, #9ca3af);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* ── error ── */
+
+.date-picker-modal__error {
+  color: var(--danger, #ef4444);
+  font-size: 0.85rem;
+}
+
+/* ── actions ── */
+
+.date-picker-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border, #2b2d36);
+  margin-top: 2px;
+  padding-top: 14px;
+}
+
+.date-picker-modal__button {
+  text-transform: none !important;
+  border-radius: 8px !important;
+  min-width: 100px !important;
+  border: 1px solid transparent !important;
+  font-size: 0.9rem !important;
+  gap: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.date-picker-modal__button--cancel {
+  color: var(--text, #e5e7eb) !important;
+  background: transparent !important;
+  border-color: var(--border, #2b2d36) !important;
+}
+
+.date-picker-modal__button--cancel:hover {
+  background: var(--hover, #1b1d23) !important;
+}
+
+.date-picker-modal__button--apply {
+  color: #fff !important;
+  background: var(--accent, #3b82f6) !important;
+}
+
+.date-picker-modal__button--apply:hover {
+  filter: brightness(1.06);
+}
+
+.date-picker-modal__button--apply.Mui-disabled {
+  opacity: 0.55;
+  color: #fff !important;
+}
+
+.date-picker-modal__btn-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+@media (max-width: 760px) {
+  .date-picker-modal__time-controls {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .date-picker-modal__time-arrow {
+    display: none;
+  }
+}

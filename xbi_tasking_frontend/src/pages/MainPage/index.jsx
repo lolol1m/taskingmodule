@@ -57,6 +57,7 @@ function MainPage() {
     return {
       'Start Date': toISOLocal(range[0].toDate ? range[0].toDate() : range[0]),
       'End Date': toISOLocal(range[1].toDate ? range[1].toDate() : range[1]),
+      'Use Exact Time': true,
     }
   }
 

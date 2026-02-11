@@ -1,7 +1,7 @@
 SQL_GET_XBI_REPORT_IMAGE = (
     "SELECT sensor.name, sensor_category.name, report.name "
     "FROM image, sensor, sensor_category, report "
-    "WHERE (image.upload_date >= %s AND image.upload_date < %s) "
+    "WHERE (image.upload_date >= %s AND image.upload_date <= %s) "
     "AND sensor.id = image.sensor_id "
     "AND sensor.category_id = sensor_category.id "
     "AND report.id = image.report_id "

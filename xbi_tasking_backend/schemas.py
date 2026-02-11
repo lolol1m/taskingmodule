@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, RootModel
 class DateRangePayload(BaseModel):
     start_date: str = Field(..., alias="Start Date")
     end_date: str = Field(..., alias="End Date")
+    use_exact_time: bool = Field(False, alias="Use Exact Time")
 
     model_config = {"populate_by_name": True}
 

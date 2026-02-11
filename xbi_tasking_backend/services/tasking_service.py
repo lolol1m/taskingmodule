@@ -38,8 +38,34 @@ def _validate_date_range(start_dt, end_dt):
     max_days = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
     if end_dt < start_dt:
         raise ValueError("End Date must be after Start Date")
-    if (end_dt - start_dt).days > max_days:
+    if (end_dt - start_dt).total_seconds() > max_days * 24 * 60 * 60:
         raise ValueError(f"Date range cannot exceed {max_days} days")
+
+
+def _parse_date_range(payload, add_day_for_legacy=False):
+    start_raw = payload["Start Date"]
+    end_raw = payload["End Date"]
+    use_exact_time = bool(payload.get("Use Exact Time", False))
+    start_dt = dateutil.parser.isoparse(start_raw)
+    end_dt = dateutil.parser.isoparse(end_raw)
+
+    # Backward compatibility for legacy date-only flows:
+    # if end is date-only or midnight and exact-time mode is off,
+    # treat it as inclusive day-range by adding one day.
+    is_end_midnight = (
+        end_dt.hour == 0
+        and end_dt.minute == 0
+        and end_dt.second == 0
+        and end_dt.microsecond == 0
+    )
+    if not use_exact_time:
+        if add_day_for_legacy:
+            start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_dt = (end_dt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        elif "T" not in end_raw or is_end_midnight:
+            end_dt = end_dt + timedelta(days=1)
+
+    return start_dt, end_dt
 
 
 class TaskingService:
@@ -50,11 +76,8 @@ class TaskingService:
 
     def get_tasking_summary(self, payload, user=None):
         output = {}
-        start_dt = dateutil.parser.isoparse(payload["Start Date"])
-        end_dt = dateutil.parser.isoparse(payload["End Date"]) + timedelta(days=1)
+        start_dt, end_dt = _parse_date_range(payload, add_day_for_legacy=True)
         _validate_date_range(start_dt, end_dt)
-        start_date = start_dt.strftime("%Y-%m-%d")
-        end_date = end_dt.strftime("%Y-%m-%d")
         limit, offset = _get_limit_offset(payload)
 
         # Check if user is a basic II user (only sees their own tasks)
@@ -71,16 +94,16 @@ class TaskingService:
         # Get image data based on user role
         if is_ii_user and assignee_keycloak_id:
             image_datas = self.tasking.getTaskingSummaryImageDataForUser(
-                start_date,
-                end_date,
+                start_dt,
+                end_dt,
                 assignee_keycloak_id,
                 limit=limit,
                 offset=offset,
             )
         else:
             image_datas = self.tasking.getTaskingSummaryImageData(
-                start_date,
-                end_date,
+                start_dt,
+                end_dt,
                 limit=limit,
                 offset=offset,
             )
@@ -115,12 +138,7 @@ class TaskingService:
 
     def get_tasking_manager(self, payload):
         output = {}
-        start_raw = payload["Start Date"]
-        end_raw = payload["End Date"]
-        start_dt = dateutil.parser.isoparse(start_raw)
-        end_dt = dateutil.parser.isoparse(end_raw)
-        if "T" not in end_raw:
-            end_dt = end_dt + timedelta(days=1)
+        start_dt, end_dt = _parse_date_range(payload, add_day_for_legacy=False)
         _validate_date_range(start_dt, end_dt)
         limit, offset = _get_limit_offset(payload)
 

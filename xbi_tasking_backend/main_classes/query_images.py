@@ -74,8 +74,8 @@ SQL_GET_IMAGE_DATA = (
     "LEFT JOIN image_category ON image_category.id = image.image_category_id "
     "LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id "
     "WHERE image.completed_date IS NOT NULL "
-    "AND ((image.completed_date >= %s AND image.completed_date < %s) "
-    "OR (image.upload_date >= %s AND image.upload_date < %s))"
+    "AND ((image.completed_date >= %s AND image.completed_date <= %s) "
+    "OR (image.upload_date >= %s AND image.upload_date <= %s))"
 )
 
 SQL_GET_IMAGE_DATA_FOR_USER = """
@@ -91,8 +91,8 @@ SQL_GET_IMAGE_DATA_FOR_USER = """
     LEFT JOIN image_category ON image_category.id = image.image_category_id
     LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id
     WHERE image.completed_date IS NOT NULL
-        AND ((image.completed_date >= %s AND image.completed_date < %s)
-             OR (image.upload_date >= %s AND image.upload_date < %s))
+        AND ((image.completed_date >= %s AND image.completed_date <= %s)
+             OR (image.upload_date >= %s AND image.upload_date <= %s))
         AND EXISTS (
             SELECT 1
             FROM task t

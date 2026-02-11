@@ -170,6 +170,52 @@ class MainController_unittest(unittest.TestCase):
         }
         self.assertEqual(res, exp, "tasking summary get is incorrect")
 
+    def test_getTaskingSummaryData_exact_datetime_range(self):
+        self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name) VALUES (1, 'SB')")
+        self.mc.qm.db.executeInsert("INSERT INTO users(id, name) VALUES (1, 'hello')")
+        self.mc.qm.db.executeInsert("INSERT INTO area(area_name) VALUES ('area_exact') ON CONFLICT (area_name) DO NOTHING")
+        area_id = self.mc.qm.db.executeSelect("SELECT scvu_area_id FROM area WHERE area_name='area_exact'")[0][0]
+        task_status_id = self.mc.qm.getTaskStatusID("In Progress")
+        assignee_kc_id = self.mc.qm.getKeycloakUserID("hello")
+
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image(sensor_id, image_file_name, image_id, upload_date, image_datetime, priority_id) "
+            "VALUES (1, 'old.png', 101, '2023-02-07 09:15:00', '2023-02-07 09:15:00', 1)"
+        )
+        old_scvu_image_id = self.mc.qm.db.executeSelect("SELECT scvu_image_id FROM image WHERE image_id = 101")[0][0]
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image_area(scvu_image_id, scvu_area_id) VALUES (%s, %s)",
+            (old_scvu_image_id, area_id),
+        )
+        old_image_area_id = self.mc.qm.db.executeSelect(
+            "SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s",
+            (old_scvu_image_id,),
+        )[0][0]
+        self.mc.qm.assignTask(old_image_area_id, assignee_kc_id, task_status_id)
+
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image(sensor_id, image_file_name, image_id, upload_date, image_datetime, priority_id) "
+            "VALUES (1, 'new.png', 102, '2023-02-07 15:45:00', '2023-02-07 15:45:00', 1)"
+        )
+        new_scvu_image_id = self.mc.qm.db.executeSelect("SELECT scvu_image_id FROM image WHERE image_id = 102")[0][0]
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image_area(scvu_image_id, scvu_area_id) VALUES (%s, %s)",
+            (new_scvu_image_id, area_id),
+        )
+        new_image_area_id = self.mc.qm.db.executeSelect(
+            "SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s",
+            (new_scvu_image_id,),
+        )[0][0]
+        self.mc.qm.assignTask(new_image_area_id, assignee_kc_id, task_status_id)
+
+        res = self.mc.getTaskingSummaryData({
+            'Start Date': '2023-02-07T15:00:00',
+            'End Date': '2023-02-07T16:00:00',
+            'Use Exact Time': True,
+        })
+        self.assertIn(new_scvu_image_id, res, "exact datetime filter should include image inside window")
+        self.assertNotIn(old_scvu_image_id, res, "exact datetime filter should exclude image outside window")
+
     def test_getTaskingManagerData_baseCase(self):
         self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name) VALUES (1, 'SB')")
         self.mc.qm.db.executeInsert("INSERT INTO users(id, name) VALUES (1, 'user_hello')")
@@ -482,6 +528,56 @@ class MainController_unittest(unittest.TestCase):
         }
         self.assertEqual(res, exp, "getcompleteimagedata does not work")
 
+    def test_getCompleteImageData_exact_datetime_range(self):
+        self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name) VALUES (1, 'SB')")
+        self.mc.qm.db.executeInsert("INSERT INTO users(id, name) VALUES (1, 'hello')")
+        self.mc.qm.db.executeInsert("INSERT INTO area(area_name) VALUES ('area_complete_exact') ON CONFLICT (area_name) DO NOTHING")
+        area_id = self.mc.qm.db.executeSelect("SELECT scvu_area_id FROM area WHERE area_name='area_complete_exact'")[0][0]
+
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image(sensor_id, image_file_name, image_id, upload_date, image_datetime, report_id, priority_id, image_category_id, image_quality, cloud_cover_id, ew_status_id, completed_date, vetter_keycloak_id) "
+            "VALUES (1, 'complete_old.png', 201, '2023-02-07 09:15:00', '2023-02-07 09:15:00', 1, 1, 1, 'good', 1, 1, '2023-02-07 09:30:00', 'kc-hello')"
+        )
+        old_scvu_image_id = self.mc.qm.db.executeSelect("SELECT scvu_image_id FROM image WHERE image_id = 201")[0][0]
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image_area(scvu_image_id, scvu_area_id) VALUES (%s, %s)",
+            (old_scvu_image_id, area_id),
+        )
+        old_image_area_id = self.mc.qm.db.executeSelect(
+            "SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s",
+            (old_scvu_image_id,),
+        )[0][0]
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO task(assignee_id, task_status_id, scvu_image_area_id, remarks) VALUES (1, 3, %s, 'old remark')",
+            (old_image_area_id,),
+        )
+
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image(sensor_id, image_file_name, image_id, upload_date, image_datetime, report_id, priority_id, image_category_id, image_quality, cloud_cover_id, ew_status_id, completed_date, vetter_keycloak_id) "
+            "VALUES (1, 'complete_new.png', 202, '2023-02-07 15:45:00', '2023-02-07 15:45:00', 1, 1, 1, 'good', 1, 1, '2023-02-07 15:50:00', 'kc-hello')"
+        )
+        new_scvu_image_id = self.mc.qm.db.executeSelect("SELECT scvu_image_id FROM image WHERE image_id = 202")[0][0]
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image_area(scvu_image_id, scvu_area_id) VALUES (%s, %s)",
+            (new_scvu_image_id, area_id),
+        )
+        new_image_area_id = self.mc.qm.db.executeSelect(
+            "SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s",
+            (new_scvu_image_id,),
+        )[0][0]
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO task(assignee_id, task_status_id, scvu_image_area_id, remarks) VALUES (1, 3, %s, 'new remark')",
+            (new_image_area_id,),
+        )
+
+        res = self.mc.getCompleteImageData({
+            'Start Date': '2023-02-07T15:00:00',
+            'End Date': '2023-02-07T16:00:00',
+            'Use Exact Time': True,
+        })
+        self.assertIn(new_scvu_image_id, res, "exact datetime filter should include completed image in window")
+        self.assertNotIn(old_scvu_image_id, res, "exact datetime filter should exclude completed image outside window")
+
     def test_getSensorCategory_baseCase(self):
         self.mc.qm.db.executeInsert("INSERT INTO sensor_category(id, name) VALUES (1, 'UNCATEGORISED') ON CONFLICT DO NOTHING")
         self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name, category_id) VALUES (1, 'SB', 1)")
@@ -552,6 +648,26 @@ class MainController_unittest(unittest.TestCase):
         })
         exp = {'Category': ['UAV', 'AB', 'HB', 'AVIS'], 'Exploitable': [1, 0, 0, 0], 'Unexploitable': [0, 0, 0, 0], 'Remarks': ''}
         self.assertEqual(res, exp, "getXBIReportData doesnt work")
+
+    def test_getXBIReportData_exact_datetime_range(self):
+        self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name, category_id) VALUES (1, 'SB', 1)")
+        self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name, category_id) VALUES (2, 'SR', 2)")
+
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image(sensor_id, image_file_name, image_id, upload_date, image_datetime, report_id, priority_id, image_category_id, image_quality, cloud_cover_id, ew_status_id, completed_date) "
+            "VALUES (1, 'rep_old.png', 301, '2023-02-07 09:15:00', '2023-02-07 09:15:00', 1, 1, 1, 'good', 1, 1, '2023-02-07 09:30:00')"
+        )
+        self.mc.qm.db.executeInsert(
+            "INSERT INTO image(sensor_id, image_file_name, image_id, upload_date, image_datetime, report_id, priority_id, image_category_id, image_quality, cloud_cover_id, ew_status_id, completed_date) "
+            "VALUES (2, 'rep_new.png', 302, '2023-02-07 15:45:00', '2023-02-07 15:45:00', 1, 1, 1, 'good', 1, 1, '2023-02-07 15:50:00')"
+        )
+
+        res = self.mc.getXBIReportData({
+            'Start Date': '2023-02-07T15:00:00',
+            'End Date': '2023-02-07T16:00:00',
+            'Use Exact Time': True,
+        })
+        self.assertEqual(sum(res["Exploitable"]), 1, "exact datetime filter should only count one in-window image")
     
     def test_getXBIReportDataForExcel(self):
         self.mc.qm.db.executeInsert("INSERT INTO sensor(id, name, category_id) VALUES (1, 'SB', 1)")

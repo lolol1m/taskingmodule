@@ -27,8 +27,21 @@ def _validate_date_range(start_dt, end_dt):
     max_days = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
     if end_dt < start_dt:
         raise ValueError("End Date must be after Start Date")
-    if (end_dt - start_dt).days > max_days:
+    if (end_dt - start_dt).total_seconds() > max_days * 24 * 60 * 60:
         raise ValueError(f"Date range cannot exceed {max_days} days")
+
+
+def _parse_date_range(payload):
+    start_raw = payload["Start Date"]
+    end_raw = payload["End Date"]
+    use_exact_time = bool(payload.get("Use Exact Time", False))
+    start_dt = dateutil.parser.isoparse(start_raw)
+    end_dt = dateutil.parser.isoparse(end_raw)
+
+    if not use_exact_time:
+        start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_dt = (end_dt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return start_dt, end_dt
 
 
 class ReportService:
@@ -39,11 +52,11 @@ class ReportService:
 
     def get_xbi_report(self, start_date, end_date, limit=None, offset=None):
         start_dt = dateutil.parser.isoparse(start_date)
-        end_dt = dateutil.parser.isoparse(end_date) + timedelta(days=1)
+        end_dt = dateutil.parser.isoparse(end_date)
         _validate_date_range(start_dt, end_dt)
         image_datas = self.reports.getXBIReportImage(
-            start_dt.strftime("%Y-%m-%d"),
-            end_dt.strftime("%Y-%m-%d"),
+            start_dt,
+            end_dt,
             limit=limit,
             offset=offset,
         )
@@ -70,9 +83,11 @@ class ReportService:
 
     def get_xbi_report_data(self, payload):
         limit, offset = _get_limit_offset(payload)
+        start_dt, end_dt = _parse_date_range(payload)
+        _validate_date_range(start_dt, end_dt)
         exploitable, unexploitable = self.get_xbi_report(
-            payload["Start Date"],
-            payload["End Date"],
+            start_dt.isoformat(),
+            end_dt.isoformat(),
             limit=limit,
             offset=offset,
         )
@@ -97,9 +112,11 @@ class ReportService:
 
     def get_xbi_report_data_for_excel(self, payload):
         limit, offset = _get_limit_offset(payload)
+        start_dt, end_dt = _parse_date_range(payload)
+        _validate_date_range(start_dt, end_dt)
         exploitable, unexploitable = self.get_xbi_report(
-            payload["Start Date"],
-            payload["End Date"],
+            start_dt.isoformat(),
+            end_dt.isoformat(),
             limit=limit,
             offset=offset,
         )

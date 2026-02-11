@@ -39,7 +39,7 @@ SQL_GET_INCOMPLETE_IMAGES = (
     "LEFT JOIN sensor ON sensor.id = image.sensor_id "
     "LEFT JOIN priority ON priority.id = image.priority_id "
     "WHERE image.completed_date IS NULL "
-    "AND (image.upload_date >= %s AND image.upload_date < %s) "
+    "AND (image.upload_date >= %s AND image.upload_date <= %s) "
     "ORDER BY image.upload_date DESC"
 )
 
@@ -113,7 +113,7 @@ SQL_GET_TASKING_SUMMARY_IMAGE = """
     JOIN image_area ON image_area.scvu_image_id = image.scvu_image_id
     JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id
     WHERE image.completed_date IS NULL
-        AND (image.upload_date >= %s AND image.upload_date < %s)
+        AND (image.upload_date >= %s AND image.upload_date <= %s)
 """
 
 SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
@@ -132,7 +132,7 @@ SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
     JOIN image_area ON image_area.scvu_image_id = image.scvu_image_id
     JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id
     WHERE image.completed_date IS NULL
-        AND (image.upload_date >= %s AND image.upload_date < %s)
+        AND (image.upload_date >= %s AND image.upload_date <= %s)
         AND task.assignee_keycloak_id = %s
 """
 
