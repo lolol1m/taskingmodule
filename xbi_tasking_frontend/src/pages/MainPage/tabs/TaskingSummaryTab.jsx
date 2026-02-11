@@ -262,6 +262,15 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     return row ? row[field] : null
   }
 
+  const role = UserService.readUserRoleSingle()
+
+  const roundDownToHour = (value) => {
+    if (!value || typeof value !== 'string') return value
+    return value.replace(/(\d{2}):\d{2}:\d{2}$/, '$1:00:00')
+  }
+  const shouldRoundTime = role === 'II' || role === 'Senior II'
+  const dateFormatter = shouldRoundTime ? (value) => roundDownToHour(value) : undefined
+
   const columns = useMemo(
     () => [
       {
@@ -281,8 +290,8 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       },
       { field: 'sensorName', headerName: 'Sensor Name', minWidth: 110, flex: 0.6 },
       { field: 'imageId', headerName: 'Image ID', minWidth: 90, flex: 0.45 },
-      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 120, flex: 0.7 },
-      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 130, flex: 0.8 },
+      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 120, flex: 0.7, valueFormatter: dateFormatter },
+      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 130, flex: 0.8, valueFormatter: dateFormatter },
       { field: 'areaName', headerName: 'Area Name', minWidth: 110, flex: 0.6 },
       { field: 'assignee', headerName: 'Assignee', minWidth: 110, flex: 0.6 },
       {
@@ -977,7 +986,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     await processTask('/tasking/startTasks')
   }
 
-  const role = UserService.readUserRoleSingle()
   const isShow =
     role === 'II'
       ? { CT: true, VF: false, VP: false, CI: false }

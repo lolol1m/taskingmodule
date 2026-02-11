@@ -634,10 +634,19 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     return <div className="tasking-manager__notice">You do not have permission to view this tab.</div>
   }
 
+  const roundDownToHour = (value) => {
+    if (!value || typeof value !== 'string') return value
+    // Format: "YYYY-MM-DD, HH:MM:SS" → "YYYY-MM-DD, HH:00:00"
+    return value.replace(/(\d{2}):\d{2}:\d{2}$/, '$1:00:00')
+  }
+
+  const shouldRoundTime = role === 'II' || role === 'Senior II'
+  const dateFormatter = shouldRoundTime ? (value) => roundDownToHour(value) : undefined
+
   const columns = useMemo(
     () => [
       { field: 'sensorName', headerName: 'Sensor Name', minWidth: 140, flex: 0.7 },
-      { field: 'imageDatetime', headerName: 'Image Datetime', minWidth: 170, flex: 0.9 },
+      { field: 'imageDatetime', headerName: 'Image Datetime', minWidth: 170, flex: 0.9, valueFormatter: dateFormatter },
       {
         field: 'priority',
         headerName: 'Priority',
@@ -650,6 +659,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
         headerName: 'Upload Date',
         minWidth: 170,
         flex: 0.9,
+        valueFormatter: dateFormatter,
       },
       {
         field: 'currentAssignee',

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Typography } from '@mui/material'
 import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
+import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
 
 const api = new API()
@@ -86,13 +87,21 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const { addNotification } = useNotifications()
 
+  const role = UserService.readUserRoleSingle()
+  const roundDownToHour = (value) => {
+    if (!value || typeof value !== 'string') return value
+    return value.replace(/(\d{2}):\d{2}:\d{2}$/, '$1:00:00')
+  }
+  const shouldRoundTime = role === 'II' || role === 'Senior II'
+  const dateFormatter = shouldRoundTime ? (value) => roundDownToHour(value) : undefined
+
   const columns = useMemo(
     () => [
       { field: 'imageFileName', headerName: 'Image File Name', minWidth: 180, flex: 1.2 },
       { field: 'sensorName', headerName: 'Sensor Name', minWidth: 120, flex: 0.7 },
       { field: 'imageId', headerName: 'Image ID', minWidth: 90, flex: 0.5 },
-      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 140, flex: 0.8 },
-      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 160, flex: 0.9 },
+      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 140, flex: 0.8, valueFormatter: dateFormatter },
+      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 160, flex: 0.9, valueFormatter: dateFormatter },
       { field: 'areaName', headerName: 'Area Name', minWidth: 120, flex: 0.7 },
       { field: 'assignee', headerName: 'Assignee', minWidth: 120, flex: 0.7 },
       { field: 'vetter', headerName: 'Vetter', minWidth: 110, flex: 0.6 },
