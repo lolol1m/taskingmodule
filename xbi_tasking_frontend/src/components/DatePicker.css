@@ -98,6 +98,7 @@
   border: none;
   outline: none;
   padding: 0 2px;
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 
