@@ -4,8 +4,14 @@ code/
 dev_server.config
 
 .gitignore
+.env
+
 
 # Testing stuff
 testing/
 testing.config
 unittesting.py
+
+# Extra
+*.json
+start_backend.bat

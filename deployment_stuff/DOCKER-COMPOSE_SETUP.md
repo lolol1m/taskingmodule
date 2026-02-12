@@ -1,6 +1,8 @@
 # Guide to dockerize tasking module with docker-compose
 
 ## If you use an existing Keycloak container for testing locally (with realms and other setting configured)
+
+### ALSO DOES NOT WORK FOR DOCKER_COMPOSE CONTAINER, USE AN ISOLATED ONE
 Converting keycloak container into custom image to store data
 ```
 docker commit funny_container_name xbi-keycloak:custom
