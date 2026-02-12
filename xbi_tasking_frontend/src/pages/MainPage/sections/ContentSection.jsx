@@ -40,12 +40,13 @@ const tabLabelMap = {
 function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {
   const ActiveTab = tabMap[activeTab]
   const activeTabLabel = tabLabelMap[activeTab] || 'Overview'
+  const sectionLabel = activeTab?.startsWith('admin-') ? 'ADMIN' : 'HOME'
 
   return (
     <section className="content">
       <div className="content__page-header">
         <div className="content__breadcrumb" aria-label="Current page">
-          <span className="content__breadcrumb-home">HOME</span>
+          <span className="content__breadcrumb-home">{sectionLabel}</span>
           <span className="content__breadcrumb-separator">/</span>
           <span className="content__breadcrumb-current">{activeTabLabel}</span>
         </div>

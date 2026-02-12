@@ -38,6 +38,13 @@ const normalizeImageName = (value) => {
   return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
 }
 
+const getRemarksValue = (entry) => {
+  const raw = entry?.['Remarks'] ?? entry?.remarks ?? entry?.['remarks'] ?? ''
+  if (typeof raw !== 'string') return raw ?? ''
+  const normalized = raw.replace(/\\n/g, '\n')
+  return normalized.trim().length === 0 ? '' : normalized
+}
+
 const buildRows = (inputData) => {
   if (!inputData) return []
 
@@ -92,7 +99,7 @@ const buildRows = (inputData) => {
         targetTracing: entry['Target Tracing'],
         v10: entry['V10'],
         opsV: entry['OPS V'],
-        remarks: entry['Remarks'],
+        remarks: getRemarksValue(entry),
         childId: entry['Child ID'],
       })
       return
@@ -109,7 +116,7 @@ const buildRows = (inputData) => {
         treePath: [`img_${parentId}`, areaName],
         taskStatus: entry['Task Status'],
         assignee: entry['Assignee'],
-        remarks: entry['Remarks'],
+        remarks: getRemarksValue(entry),
         parentId,
         scvuTaskId: entry['SCVU Task ID'] || null,
       })
@@ -136,9 +143,17 @@ const normalizeStatus = (value) => {
 }
 
 const normalizeRemarksValue = (value) => {
-  if (typeof value !== 'string') return value
+  if (typeof value !== 'string') return ''
   // Allow users (or backend payloads) using literal "\n" to render as new lines.
-  return value.replace(/\\n/g, '\n')
+  const normalized = value.replace(/\\n/g, '\n')
+  // Treat whitespace-only/newline-only values as empty so placeholder works.
+  return normalized.trim().length === 0 ? '' : normalized
+}
+
+const toBackendTaskId = (rowKey) => {
+  const numericKey = Number(rowKey)
+  if (!Number.isFinite(numericKey)) return rowKey
+  return numericKey < 0 ? Math.abs(numericKey) : numericKey
 }
 
 const formatDateRange = (range) => {
@@ -370,21 +385,35 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         flex: 0.9,
         renderCell: (params) => {
           if (!params?.row) return ''
+          if (params.row.parentId === undefined) {
+            const parentRemarks = normalizeRemarksValue(params?.row?.remarks ?? '')
+            return (
+              <Box
+                className={`tasking-summary__remarks-parent${parentRemarks ? '' : ' is-empty'}`}
+                sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}
+              >
+                {parentRemarks || '—'}
+              </Box>
+            )
+          }
           const rowId = params.row.id
           const currentValue = normalizeRemarksValue(getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? '')
           return (
-            <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
               <textarea
+                rows={2}
                 value={currentValue ?? ''}
                 onClick={(event) => event.stopPropagation()}
                 onMouseDown={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                onFocus={(event) => event.stopPropagation()}
+                onKeyDownCapture={(event) => event.stopPropagation()}
                 onChange={(event) =>
                   setWorkingData((prev) =>
                     updateWorkingRow(prev, rowId, 'Remarks', normalizeRemarksValue(event.target.value), inputData),
                   )
                 }
-                placeholder="Add remarks"
+                placeholder="Add Remarks"
                 className="tasking-summary__remarks-input"
               />
             </Box>
@@ -867,7 +896,8 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       if (dataRow && dataRow['Parent ID'] !== undefined) {
         const parentId = dataRow['Parent ID']
         if (imageIds.includes(parentId)) {
-          dataToSave[key] = { ...(dataToSave[key] || {}), Remarks: dataRow['Remarks'] }
+          const taskId = toBackendTaskId(key)
+          dataToSave[taskId] = { ...(dataToSave[taskId] || {}), Remarks: normalizeRemarksValue(dataRow['Remarks'] ?? '') }
           hasChanges = true
         }
       }
@@ -935,12 +965,46 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       const dataRow = workingData?.[String(rowId)]
       if (!dataRow) return
       if (dataRow['Child ID']) {
+        const baseRow = inputData?.[String(rowId)] || {}
+        const hasImageChanges = JSON.stringify(dataRow) !== JSON.stringify(baseRow)
+        if (!hasImageChanges) return
         if (dataRow['Report'] == null || dataRow['Image Category'] == null || dataRow['Cloud Cover'] == null) {
           hasNull = true
         }
+        payload[rowId] = dataRow
+        return
       }
-      payload[rowId] = dataRow
+      if (dataRow['Parent ID'] !== undefined) {
+        const taskId = dataRow['SCVU Task ID'] ?? toBackendTaskId(rowId)
+        const baseRow = inputData?.[String(rowId)] || {}
+        const currentRemarks = normalizeRemarksValue(dataRow['Remarks'] ?? '')
+        const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
+        if (currentRemarks !== baseRemarks) {
+          payload[taskId] = { ...(payload[taskId] || {}), Remarks: currentRemarks }
+        }
+      }
     })
+
+    // Always persist edited task remarks, even if the user selected only image rows.
+    Object.keys(workingData || {}).forEach((key) => {
+      const currentRow = workingData?.[key]
+      if (!currentRow || currentRow['Parent ID'] === undefined) return
+      const currentRemarks = normalizeRemarksValue(currentRow['Remarks'] ?? '')
+      const baseRow = inputData?.[key] || {}
+      const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
+      if (currentRemarks !== baseRemarks) {
+        const taskId = currentRow['SCVU Task ID'] ?? toBackendTaskId(key)
+        payload[taskId] = { ...(payload[taskId] || {}), Remarks: currentRemarks }
+      }
+    })
+
+    if (Object.keys(payload).length === 0) {
+      addNotification({
+        title: 'Nothing to update',
+        meta: 'No changes detected in selected rows',
+      })
+      return
+    }
 
     if (hasNull) {
       addNotification({
