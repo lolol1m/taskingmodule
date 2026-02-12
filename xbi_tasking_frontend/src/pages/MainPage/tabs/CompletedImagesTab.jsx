@@ -160,6 +160,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         title: 'Images uncompleted',
         meta: `Just now · ${selection.length} images`,
       })
+      localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('Uncomplete images failed:', err)

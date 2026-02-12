@@ -190,7 +190,9 @@ class ImageService:
 
     def uncomplete_images(self, payload):
         for image_id in payload["SCVU Image ID"]:
-            self.images.uncompleteImage(image_id)
+            with self.db.transaction():
+                self.images.uncompleteImage(image_id)
+                self.tasking.resetImageTasksFromCompleted(image_id)
 
     def format_complete_image_area(self, area_data, image_id):
         return format_complete_image_area(area_data, image_id)

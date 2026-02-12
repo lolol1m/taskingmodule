@@ -179,6 +179,17 @@ SQL_UPDATE_TASK_STATUS = (
     "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
 )
 
+SQL_RESET_IMAGE_TASKS_FROM_COMPLETED = (
+    "UPDATE task "
+    "SET task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "WHERE task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "AND scvu_image_area_id IN ("
+    "  SELECT scvu_image_area_id "
+    "  FROM image_area "
+    "  WHERE scvu_image_id = %s"
+    ")"
+)
+
 SQL_UPDATE_TASKING_SUMMARY_IMAGE = (
     "UPDATE image SET report_id = (SELECT id FROM report WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)), "
     "image_category_id = (SELECT id FROM image_category WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)), "
@@ -509,6 +520,18 @@ class TaskingQueries:
         Output:     NIL
         '''
         self.db.executeUpdate(SQL_UPDATE_TASK_STATUS, (TaskStatus.IN_PROGRESS, task_id, TaskStatus.VERIFYING))
+
+    def resetImageTasksFromCompleted(self, scvu_image_id):
+        '''
+        Function:   Resets all completed tasks for an image to verifying
+                    when an image is uncompleted.
+        Input:      scvu_image_id
+        Output:     NIL
+        '''
+        self.db.executeUpdate(
+            SQL_RESET_IMAGE_TASKS_FROM_COMPLETED,
+            (TaskStatus.VERIFYING, TaskStatus.COMPLETED, scvu_image_id),
+        )
 
     def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing):
         '''
