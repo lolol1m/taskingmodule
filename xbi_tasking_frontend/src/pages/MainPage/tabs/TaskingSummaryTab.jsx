@@ -135,6 +135,12 @@ const normalizeStatus = (value) => {
   return normalized
 }
 
+const normalizeRemarksValue = (value) => {
+  if (typeof value !== 'string') return value
+  // Allow users (or backend payloads) using literal "\n" to render as new lines.
+  return value.replace(/\\n/g, '\n')
+}
+
 const formatDateRange = (range) => {
   if (!range) return 'Select display date'
   const start = range['Start Date']
@@ -365,16 +371,18 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
         renderCell: (params) => {
           if (!params?.row) return ''
           const rowId = params.row.id
-          const currentValue = getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? ''
+          const currentValue = normalizeRemarksValue(getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? '')
           return (
             <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
-              <input
+              <textarea
                 value={currentValue ?? ''}
                 onClick={(event) => event.stopPropagation()}
                 onMouseDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Remarks', event.target.value, inputData))
+                  setWorkingData((prev) =>
+                    updateWorkingRow(prev, rowId, 'Remarks', normalizeRemarksValue(event.target.value), inputData),
+                  )
                 }
                 placeholder="Add remarks"
                 className="tasking-summary__remarks-input"
