@@ -9,6 +9,7 @@ import UploadsTab from '../tabs/UploadsTab.jsx'
 import GenerateBinCountTab from '../tabs/GenerateBinCountTab.jsx'
 import UpdateSensorCategoryTab from '../tabs/UpdateSensorCategoryTab.jsx'
 import ChangePasswordTab from '../tabs/ChangePasswordTab.jsx'
+import NotificationsPanel from '../../../components/notifications/NotificationsPanel.jsx'
 
 const tabMap = {
   summary: TaskingSummaryTab,
@@ -23,11 +24,33 @@ const tabMap = {
   "settings-password": ChangePasswordTab
 }
 
+const tabLabelMap = {
+  summary: 'Tasking Summary',
+  manager: 'Tasking Manager',
+  completed: 'Completed Images',
+  'admin-create-user': 'Create User',
+  'admin-presence': 'User Presence',
+  'admin-opsv': 'Set OPS V',
+  'admin-uploads': 'Uploads',
+  'admin-bin': 'Generate Bin Count',
+  'admin-sensor': 'Update Sensor Category',
+  'settings-password': 'Change Password',
+}
+
 function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {
   const ActiveTab = tabMap[activeTab]
+  const activeTabLabel = tabLabelMap[activeTab] || 'Overview'
 
   return (
     <section className="content">
+      <div className="content__page-header">
+        <div className="content__breadcrumb" aria-label="Current page">
+          <span className="content__breadcrumb-home">HOME</span>
+          <span className="content__breadcrumb-separator">/</span>
+          <span className="content__breadcrumb-current">{activeTabLabel}</span>
+        </div>
+        <NotificationsPanel />
+      </div>
       {ActiveTab ? (
         <ActiveTab dateRange={dateRange} onOpenDatePicker={onOpenDatePicker} isCollapsed={isCollapsed} userRole={userRole} />
       ) : (

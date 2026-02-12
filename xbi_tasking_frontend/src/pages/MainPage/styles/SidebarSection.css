@@ -10,8 +10,8 @@
   transition: width 700ms ease, padding 700ms ease;
   z-index: 10;
   position: relative;
-  background: var(--panel);
-  border: 1px solid var(--border-strong);
+  background: transparent;
+  border: none;
   border-radius: 12px;
 }
 
@@ -219,9 +219,9 @@
   position: sticky;
   bottom: 0;
   z-index: 2;
-  background: var(--panel);
+  background: transparent;
   padding-top: 8px;
-  border-top: 1px solid var(--border-strong);
+  border-top: none;
 }
 
 .sidebar__popover-wrap {

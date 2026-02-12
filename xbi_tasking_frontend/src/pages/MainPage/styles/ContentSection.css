@@ -8,7 +8,40 @@
   z-index: 1;
   max-width: 100%;
   overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
   transition: padding 700ms ease;
+}
+
+.content__page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+}
+
+.content__breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.content__breadcrumb-home {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.content__breadcrumb-separator {
+  color: var(--muted);
+}
+
+.content__breadcrumb-current {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .content__topbar {
