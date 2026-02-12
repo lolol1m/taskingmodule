@@ -20,7 +20,9 @@ const formatFileSize = (bytes) => {
 }
 
 function UploadsTab({ userRole }) {
-  const [selectedFiles, setSelectedFiles] = useState([])
+  const [taskFiles, setTaskFiles] = useState([])
+  const [psFiles, setPsFiles] = useState([])
+  const [activeSection, setActiveSection] = useState('tasks')
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
@@ -38,62 +40,64 @@ function UploadsTab({ userRole }) {
 
   // Senior II and IA can upload parade state CSV
   const canUploadCSV = userRole === 'IA' || userRole === 'Senior II'
+  const selectedFiles = activeSection === 'ps' ? psFiles : taskFiles
 
-  const handleFiles = (fileList) => {
+  useEffect(() => {
+    if (!canUploadCSV && activeSection === 'ps') {
+      setActiveSection('tasks')
+    }
+  }, [canUploadCSV, activeSection])
+
+  const handleFiles = (fileList, section = activeSection) => {
     let files = Array.from(fileList || [])
     if (!files.length) return
-    // Filter out CSV files if user cannot upload them
-    if (!canUploadCSV) {
-      files = files.filter((f) => getFileType(f.name) !== 'csv')
-    }
+
+    const expectedType = section === 'ps' ? 'csv' : 'json'
+    if (section === 'ps' && !canUploadCSV) return
+    files = files.filter((f) => getFileType(f.name) === expectedType)
     if (!files.length) return
-    setSelectedFiles((prev) => {
+
+    const setFiles = section === 'ps' ? setPsFiles : setTaskFiles
+    setFiles((prev) => {
       const existingNames = new Set(prev.map((f) => f.name))
       const newFiles = files.filter((f) => !existingNames.has(f.name))
       return [...prev, ...newFiles]
     })
   }
 
-  const removeFile = (fileName) => {
-    setSelectedFiles((prev) => prev.filter((f) => f.name !== fileName))
+  const removeFile = (fileName, section = activeSection) => {
+    const setFiles = section === 'ps' ? setPsFiles : setTaskFiles
+    setFiles((prev) => prev.filter((f) => f.name !== fileName))
   }
 
   const clearAllFiles = () => {
-    setSelectedFiles([])
+    if (activeSection === 'ps') {
+      setPsFiles([])
+    } else {
+      setTaskFiles([])
+    }
     setInputKey((prev) => prev + 1)
   }
 
-  const startUpload = async (autoAssign) => {
-    if (!selectedFiles.length) return
+  const startTaskUpload = async (autoAssign) => {
+    if (!taskFiles.length) return
 
     setLoading(true)
     setUploadProgress(0)
 
     try {
       const results = []
-      const csvQueue = selectedFiles.filter((f) => getFileType(f.name) === 'csv')
-      const jsonQueue = selectedFiles.filter((f) => getFileType(f.name) === 'json')
-      const uploadQueue = [...csvQueue, ...jsonQueue]
+      const uploadQueue = [...taskFiles]
       const total = uploadQueue.length
       for (let i = 0; i < uploadQueue.length; i++) {
         const file = uploadQueue[i]
         const formData = new FormData()
         formData.append('file', file)
-        if (file.name.toLowerCase().endsWith('.csv')) {
-          await api.client({
-            url: '/users/updateUsers',
-            method: 'post',
-            data: formData,
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-          results.push({ file: file.name, type: 'parade' })
-        } else {
-          const result = await api.insertDSTAData(formData, autoAssign)
-          if (result?.success === false || result?.error) {
-            throw new Error(result?.error || result?.message || 'Upload failed')
-          }
-          results.push({ file: file.name, type: 'json', result })
+        const result = await api.insertDSTAData(formData, autoAssign)
+        if (result?.success === false || result?.error) {
+          throw new Error(result?.error || result?.message || 'Upload failed')
         }
+        results.push({ file: file.name, type: 'json', result })
         setUploadProgress(Math.round(((i + 1) / total) * 100))
       }
 
@@ -115,24 +119,54 @@ function UploadsTab({ userRole }) {
       const hasWarnings = jsonResults.some((entry) => (entry.result?.errors || []).length > 0)
 
       let meta = 'Just now · Upload completed'
-      if (jsonResults.length === 0) {
-        meta = 'Just now · Parade state updated'
-      } else {
-        const metaParts = []
-        if (totals.images || totals.areas) {
-          metaParts.push(`${totals.images} images, ${totals.areas} areas`)
-        }
-        if (existingCount) {
-          metaParts.push(`${existingCount} already existed`)
-        }
-        if (!metaParts.length) {
-          metaParts.push('No new data (duplicates skipped)')
-        }
-        meta = `Just now · ${metaParts.join(', ')}`
+      const metaParts = []
+      if (totals.images || totals.areas) {
+        metaParts.push(`${totals.images} images, ${totals.areas} areas`)
       }
+      if (existingCount) {
+        metaParts.push(`${existingCount} already existed`)
+      }
+      if (!metaParts.length) {
+        metaParts.push('No new data (duplicates skipped)')
+      }
+      meta = `Just now · ${metaParts.join(', ')}`
 
       addNotification({ title: hasWarnings ? 'Upload completed with warnings' : 'Upload completed', meta })
-      setSelectedFiles([])
+      setTaskFiles([])
+      setInputKey((prev) => prev + 1)
+    } catch (error) {
+      addNotification({
+        title: 'Upload failed',
+        meta: error?.response?.data?.detail || error?.message || 'Please try again',
+      })
+    } finally {
+      setLoading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  const startPSUpload = async () => {
+    if (!canUploadCSV || !psFiles.length) return
+
+    setLoading(true)
+    setUploadProgress(0)
+
+    try {
+      const total = psFiles.length
+      for (let i = 0; i < psFiles.length; i++) {
+        const file = psFiles[i]
+        const formData = new FormData()
+        formData.append('file', file)
+        await api.client({
+          url: '/users/updateUsers',
+          method: 'post',
+          data: formData,
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        setUploadProgress(Math.round(((i + 1) / total) * 100))
+      }
+      addNotification({ title: 'Upload completed', meta: 'Just now · Parade state updated' })
+      setPsFiles([])
       setInputKey((prev) => prev + 1)
     } catch (error) {
       addNotification({
@@ -147,16 +181,12 @@ function UploadsTab({ userRole }) {
 
   const handleUpload = () => {
     if (!selectedFiles.length) return
-    const jsonQueue = selectedFiles.filter((f) => getFileType(f.name) === 'json')
-    if (jsonQueue.length > 0) {
+    if (activeSection === 'tasks') {
       setConfirmOpen(true)
       return
     }
-    startUpload(true)
+    startPSUpload()
   }
-
-  const jsonFiles = selectedFiles.filter((f) => getFileType(f.name) === 'json')
-  const csvFiles = selectedFiles.filter((f) => getFileType(f.name) === 'csv')
 
   return (
     <div className="admin-tab uploads-tab">
@@ -164,9 +194,9 @@ function UploadsTab({ userRole }) {
         <div className="content__heading">
           <div className="content__title">Uploads</div>
           <div className="content__subtitle">
-            {canUploadCSV
-              ? 'Upload DSTA JSON files for tasking data and/or CSV files for parade state.'
-              : 'Upload DSTA JSON files for tasking data.'}
+            {activeSection === 'tasks'
+              ? 'Upload DSTA JSON files for tasking data.'
+              : 'Upload Parade State CSV files.'}
           </div>
         </div>
         <div className="content__controls">
@@ -181,7 +211,9 @@ function UploadsTab({ userRole }) {
               disabled={loading || selectedFiles.length === 0}
               onClick={handleUpload}
             >
-              {loading ? 'Uploading...' : `Upload${selectedFiles.length > 0 ? ` (${selectedFiles.length})` : ''}`}
+              {loading
+                ? 'Uploading...'
+                : `${activeSection === 'tasks' ? 'Upload Tasks' : 'Upload PS'}${selectedFiles.length > 0 ? ` (${selectedFiles.length})` : ''}`}
             </Button>
           </div>
         </div>
@@ -189,6 +221,26 @@ function UploadsTab({ userRole }) {
 
       {/* Main Content */}
       <div className="uploads-main">
+        <div className="uploads-sections">
+          <button
+            type="button"
+            className={`uploads-section-tab ${activeSection === 'tasks' ? 'is-active' : ''}`}
+            onClick={() => setActiveSection('tasks')}
+            disabled={loading}
+          >
+            Tasks
+          </button>
+          <button
+            type="button"
+            className={`uploads-section-tab ${activeSection === 'ps' ? 'is-active' : ''}`}
+            onClick={() => setActiveSection('ps')}
+            disabled={loading || !canUploadCSV}
+            title={!canUploadCSV ? 'Only Senior II and IA can upload Parade State CSV' : 'Parade State uploads'}
+          >
+            Parade State
+          </button>
+        </div>
+
         {/* Dropzone */}
         <div
           className={`uploads-dropzone ${isDragging ? 'is-dragging' : ''}`}
@@ -201,17 +253,22 @@ function UploadsTab({ userRole }) {
           onDrop={(event) => {
             event.preventDefault()
             setIsDragging(false)
-            handleFiles(event.dataTransfer.files)
+            handleFiles(event.dataTransfer.files, activeSection)
           }}
         >
           <img className="uploads-dropzone__icon" src="/src/assets/upload.png" alt="" />
           <div className="uploads-dropzone__text">
-            <span className="uploads-dropzone__title">Drag & drop files here</span>
+            <span className="uploads-dropzone__title">
+              Drag & drop {activeSection === 'tasks' ? 'task JSON' : 'PS CSV'} files here
+            </span>
             <span className="uploads-dropzone__subtitle">or click to browse</span>
           </div>
           <div className="uploads-dropzone__types">
-            <span className="uploads-type uploads-type--json">JSON</span>
-            {canUploadCSV && <span className="uploads-type uploads-type--csv">CSV</span>}
+            {activeSection === 'tasks' ? (
+              <span className="uploads-type uploads-type--json">JSON</span>
+            ) : (
+              <span className="uploads-type uploads-type--csv">CSV</span>
+            )}
           </div>
           <input
             ref={inputRef}
@@ -219,8 +276,8 @@ function UploadsTab({ userRole }) {
             key={inputKey}
             type="file"
             multiple
-            accept={canUploadCSV ? '.json,.csv,application/json,text/csv' : '.json,application/json'}
-            onChange={(event) => handleFiles(event.target.files)}
+            accept={activeSection === 'tasks' ? '.json,application/json' : '.csv,text/csv'}
+            onChange={(event) => handleFiles(event.target.files, activeSection)}
           />
         </div>
 
@@ -239,15 +296,20 @@ function UploadsTab({ userRole }) {
             )}
           </div>
           <div className="uploads-files__list">
-            {/* JSON Tasking Group - Always visible */}
             <div className="uploads-group">
               <div className="uploads-group__label">
-                <span className="uploads-type uploads-type--json">JSON</span>
-                <span>Tasking ({jsonFiles.length})</span>
+                {activeSection === 'tasks' ? (
+                  <span className="uploads-type uploads-type--json">JSON</span>
+                ) : (
+                  <span className="uploads-type uploads-type--csv">CSV</span>
+                )}
+                <span>
+                  {activeSection === 'tasks' ? `Tasking (${taskFiles.length})` : `Parade State (${psFiles.length})`}
+                </span>
               </div>
               <div className="uploads-group__files">
-                {jsonFiles.length > 0 ? (
-                  jsonFiles.map((file) => (
+                {selectedFiles.length > 0 ? (
+                  selectedFiles.map((file) => (
                     <div className="uploads-file" key={file.name}>
                       <span className="uploads-file__name">{file.name}</span>
                       <span className="uploads-file__size">{formatFileSize(file.size)}</span>
@@ -255,7 +317,7 @@ function UploadsTab({ userRole }) {
                         className="uploads-file__remove"
                         onClick={(e) => {
                           e.stopPropagation()
-                          removeFile(file.name)
+                          removeFile(file.name, activeSection)
                         }}
                         type="button"
                         disabled={loading}
@@ -265,43 +327,12 @@ function UploadsTab({ userRole }) {
                     </div>
                   ))
                 ) : (
-                  <div className="uploads-group__empty">No JSON files selected</div>
+                  <div className="uploads-group__empty">
+                    {activeSection === 'tasks' ? 'No JSON files selected' : 'No CSV files selected'}
+                  </div>
                 )}
               </div>
             </div>
-
-            {/* CSV Parade State Group - Only visible for IA */}
-            {canUploadCSV && (
-              <div className="uploads-group">
-                <div className="uploads-group__label">
-                  <span className="uploads-type uploads-type--csv">CSV</span>
-                  <span>Parade State ({csvFiles.length})</span>
-                </div>
-                <div className="uploads-group__files">
-                  {csvFiles.length > 0 ? (
-                    csvFiles.map((file) => (
-                      <div className="uploads-file" key={file.name}>
-                        <span className="uploads-file__name">{file.name}</span>
-                        <span className="uploads-file__size">{formatFileSize(file.size)}</span>
-                        <button
-                          className="uploads-file__remove"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeFile(file.name)
-                          }}
-                          type="button"
-                          disabled={loading}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="uploads-group__empty">No CSV files selected</div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -334,7 +365,7 @@ function UploadsTab({ userRole }) {
               className="uploads-confirm__button uploads-confirm__button--ghost"
               onClick={() => {
                 setConfirmOpen(false)
-                startUpload(false)
+                startTaskUpload(false)
               }}
               disabled={loading}
             >
@@ -344,7 +375,7 @@ function UploadsTab({ userRole }) {
               className="uploads-confirm__button uploads-confirm__button--primary"
               onClick={() => {
                 setConfirmOpen(false)
-                startUpload(true)
+                startTaskUpload(true)
               }}
               disabled={loading}
             >
