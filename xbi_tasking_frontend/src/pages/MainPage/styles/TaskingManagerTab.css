@@ -54,16 +54,16 @@
 }
 
 .tasking-manager__grid {
-  background: var(--table-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   max-width: 100%;
   flex: 1;
-  min-height: 360px;
-  max-height: 660px;
+  min-height: 0;
+  max-height: 620px;
   transition: max-width 700ms ease;
   scrollbar-color: var(--border-strong) var(--row-bg);
   scrollbar-width: thin;
@@ -75,31 +75,21 @@
 }
 
 .tasking-manager__total-rows {
-  height: 34px;
+  height: 26px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 14px;
-  border-top: 1px solid var(--border-strong);
-  background: var(--panel);
+  justify-content: flex-end;
+  padding: 0 4px;
+  border-top: none;
+  background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   flex-shrink: 0;
 }
 
 .tasking-manager__total-rows-left,
 .tasking-manager__total-rows-right {
   white-space: nowrap;
-}
-
-.tasking-manager__grid .MuiDataGrid-cell .MuiAutocomplete-root {
-  margin-top: 0;
-  align-self: flex-start;
-}
-
-.tasking-manager__grid .MuiDataGrid-cell .MuiInputBase-root {
-  position: relative;
-  top: 15px;
 }
 
 .tasking-manager__grid::-webkit-scrollbar {

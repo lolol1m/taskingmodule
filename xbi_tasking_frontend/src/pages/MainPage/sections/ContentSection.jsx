@@ -51,11 +51,15 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
         </div>
         <NotificationsPanel />
       </div>
-      {ActiveTab ? (
-        <ActiveTab dateRange={dateRange} onOpenDatePicker={onOpenDatePicker} isCollapsed={isCollapsed} userRole={userRole} />
-      ) : (
-        <TabPlaceholder title="Not found" description="No view is mapped for this selection." />
-      )}
+      <div className="content__body">
+        <div className="content__tab-shell">
+          {ActiveTab ? (
+            <ActiveTab dateRange={dateRange} onOpenDatePicker={onOpenDatePicker} isCollapsed={isCollapsed} userRole={userRole} />
+          ) : (
+            <TabPlaceholder title="Not found" description="No view is mapped for this selection." />
+          )}
+        </div>
+      </div>
     </section>
   )
 }

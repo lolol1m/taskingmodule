@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Typography } from '@mui/material'
-import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import { DataGridPro } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 import useNotifications from '../../../components/notifications/useNotifications.js'
 
@@ -143,6 +143,7 @@ function SetOpsVTab() {
         <DataGridPro
           rows={rows}
           columns={columns}
+          disableColumnResize
           loading={loading}
           checkboxSelection
           disableRowSelectionOnClick
@@ -165,34 +166,69 @@ function SetOpsVTab() {
               })),
             )
           }}
+          scrollbarSize={0}
+          columnHeaderHeight={40}
           hideFooter
-          slots={{ toolbar: GridToolbar }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 300 },
-            },
-          }}
           sx={{
             width: '100%',
             height: '100%',
             flex: 1,
             border: 'none',
             color: 'var(--text)',
-            backgroundColor: 'var(--table-bg)',
+            backgroundColor: 'transparent',
+            '& .MuiDataGrid-virtualScroller': {
+              overflowX: 'hidden',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-overlay': {
+              backgroundColor: 'transparent',
+            },
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
               color: 'var(--muted)',
               textTransform: 'uppercase',
               fontSize: '11px',
               letterSpacing: '0.04em',
               borderBottom: '1px solid var(--border-strong)',
             },
+            '& .MuiDataGrid-columnHeaderTitle': {
+              color: 'var(--muted)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+            },
             '& .MuiDataGrid-columnHeader': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-columnSeparator': {
+              display: 'none',
+            },
+            '& .MuiDataGrid-scrollbarFiller': {
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-scrollbarFiller--header': {
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
+              color: 'var(--muted)',
+            },
+            '& .MuiDataGrid-row': {
+              backgroundColor: 'var(--table-bg)',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
+            },
+            '& .MuiDataGrid-row.Mui-selected': {
+              backgroundColor: '#333f4f',
+            },
+            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root.Mui-checked': {
+              color: 'var(--accent)',
             },
           }}
         />

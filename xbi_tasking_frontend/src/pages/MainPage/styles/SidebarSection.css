@@ -39,7 +39,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 55px;
+  height: 57px;
   box-sizing: border-box;
   padding: 4px 36px 10px 4px;
   margin-bottom: 6px;
@@ -47,8 +47,8 @@
 }
 
 .sidebar__brand-logo {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 4px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--header-bg) 72%, #ffffff 28%);
@@ -61,12 +61,12 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   flex: 1;
 }
 
 .sidebar__brand-title {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.1;
   font-weight: 600;
   color: var(--text);
@@ -76,7 +76,7 @@
 }
 
 .sidebar__brand-id {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.1;
   color: var(--muted);
   white-space: nowrap;

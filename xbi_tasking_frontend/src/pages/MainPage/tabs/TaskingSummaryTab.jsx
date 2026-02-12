@@ -6,11 +6,12 @@ import {
   Checkbox,
   ClickAwayListener,
   LinearProgress,
+  MenuItem,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
-import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import { DataGridPro } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 import { ToastContainer, toast} from 'react-toastify';
 import UserService from '../../../auth/UserService';
@@ -212,7 +213,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
       alignItems: 'center',
       borderRadius: 6,
       backgroundColor,
-      marginTop: '20px',
       color: 'var(--text)',
     },
     '& .MuiInputBase-input::placeholder': {
@@ -252,6 +252,29 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
     '& .MuiInputBase-input::placeholder': {
       color: 'var(--muted)',
       opacity: 1,
+    },
+  })
+
+  const reportSelectFieldSx = (backgroundColor = 'transparent') => ({
+    width: '100%',
+    '& .MuiOutlinedInput-root': {
+      height: 28,
+      minHeight: 28,
+      alignItems: 'center',
+      borderRadius: 999,
+      backgroundColor,
+      color: 'var(--text)',
+    },
+    '& .MuiSelect-select': {
+      padding: '0 26px 0 10px !important',
+      display: 'flex',
+      alignItems: 'center',
+      height: '28px',
+      lineHeight: '28px',
+      fontSize: 13,
+    },
+    '& .MuiSvgIcon-root': {
+      color: 'var(--muted)',
     },
   })
 
@@ -304,26 +327,33 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Report') ?? params?.row?.report ?? null
           return (
-            <Autocomplete
-              disablePortal
-              options={getDropdownOptions('Report', 'Report')}
-              value={currentValue ?? null}
-              onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Report', newValue, inputData))
-              }
-              size="small"
-              fullWidth
-              isOptionEqualToValue={(option, value) => option === value}
-              renderInput={(inputParams) => (
-                <TextField
-                  {...inputParams}
-                  placeholder="Report"
-                  size="small"
-                  variant="outlined"
-                  sx={dropdownFieldSx(reportColor(currentValue))}
-                />
-              )}
-            />
+            <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={currentValue ?? ''}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+                onChange={(event) =>
+                  setWorkingData((prev) =>
+                    updateWorkingRow(prev, rowId, 'Report', event.target.value || null, inputData),
+                  )
+                }
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => (selected ? selected : 'Report'),
+                }}
+                sx={reportSelectFieldSx(reportColor(currentValue))}
+              >
+                <MenuItem value="" sx={{ display: 'none' }} />
+                {getDropdownOptions('Report', 'Report').map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
           )
         },
       },
@@ -337,18 +367,19 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? ''
           return (
-            <TextField
-              value={currentValue ?? ''}
-              onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-              onChange={(event) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Remarks', event.target.value, inputData))
-              }
-              placeholder="Add remarks"
-              size="small"
-              fullWidth
-              sx={inlineTextFieldSx()}
-            />
+            <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+              <input
+                value={currentValue ?? ''}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+                onChange={(event) =>
+                  setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Remarks', event.target.value, inputData))
+                }
+                placeholder="Add remarks"
+                className="tasking-summary__remarks-input"
+              />
+            </Box>
           )
         },
       },
@@ -368,13 +399,21 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           const progressValue = parseProgress(taskCompleted)
           if (progressValue !== null) {
             return (
-              <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center' }}>
+              <Box
+                sx={{
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  gap: 0.5,
+                }}
+              >
                 <LinearProgress
                   variant="determinate"
                   value={progressValue}
-                  sx={{ height: 6, borderRadius: 999, marginTop: 3   }}
+                  sx={{ height: 5, borderRadius: 999 }}
                 />
-                <Typography variant="caption" sx={{ color: 'var(--muted)', lineHeight: 1 }}>
+                <Typography variant="caption" sx={{ color: 'var(--muted)', lineHeight: 1.2 }}>
                   {taskCompleted}
                 </Typography>
               </Box>
@@ -1170,6 +1209,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
           treeData
           rows={rows}
           columns={columns}
+          disableColumnResize
           getTreeDataPath={getTreeDataPath}
           groupingColDef={{
             headerName: 'Image/Area Name',
@@ -1201,31 +1241,36 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             }
             setSelection([])
           }}
-          rowHeight={70}
+          rowHeight={56}
+          columnHeaderHeight={40}
+          scrollbarSize={0}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
           onProcessRowUpdateError={(err) => console.error(err)}
           columnVisibilityModel={visibilityModel}
           loading={loading}
           hideFooter
-          slots={{ toolbar: GridToolbar }}
           sx={{
             width: '100%',
             height: '100%',
             flex: 1,
             border: 'none',
             color: 'var(--text)',
-            backgroundColor: 'var(--table-bg)',
+            backgroundColor: 'transparent',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
               color: 'var(--muted)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
             },
             '& .MuiDataGrid-cell': {
               display: 'flex',
               alignItems: 'center',
               borderColor: 'var(--border-strong)',
-              paddingTop: 4,
-              paddingBottom: 4,
+              paddingTop: 0,
+              paddingBottom: 0,
+              fontSize: 13,
             },
             '& .MuiDataGrid-cellContent': {
               width: '100%',
@@ -1237,7 +1282,7 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             '& .MuiDataGrid-cell .MuiInputBase-root': {
               height: 28,
               minHeight: 28,
-              fontSize: 12,
+              fontSize: 13,
             },
             '& .MuiDataGrid-cell .MuiInputBase-input': {
               paddingTop: 0,
@@ -1273,13 +1318,13 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             },
             '& .MuiDataGrid-virtualScroller': {
               overflowX: 'hidden',
-              backgroundColor: 'var(--table-bg)',
+              backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-overlay': {
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
               color: 'var(--muted)',
               textTransform: 'uppercase',
               fontSize: '11px',
@@ -1287,22 +1332,22 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
               borderBottom: '1px solid var(--border-strong)',
             },
             '& .MuiDataGrid-columnHeader': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-columnSeparator': {
+              display: 'none',
             },
             '& .MuiDataGrid-scrollbarFiller': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-scrollbarFiller--header': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
               color: 'var(--muted)',
             },
             '& .MuiDataGrid-row': {
               backgroundColor: 'var(--table-bg)',
-            },
-            '& .MuiDataGrid-row:nth-of-type(even)': {
-              backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
@@ -1311,12 +1356,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             '& .MuiDataGrid-row.Mui-selected': {
       
               backgroundColor: '#333f4f',
-            },
-
-            '& .MuiDataGrid-toolbarContainer': {
-              padding: '10px 12px',
-              borderBottom: '1px solid var(--border-strong)',
-              color: 'var(--text)',
             },
             '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
               color: 'var(--muted)',

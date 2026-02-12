@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Typography } from '@mui/material'
-import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import { DataGridPro } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
 import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
@@ -220,6 +220,7 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
         <DataGridPro
           rows={rows}
           columns={columns}
+          disableColumnResize
           checkboxSelection
           disableRowSelectionOnClick
           filterModel={filterModel}
@@ -239,26 +240,32 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
             }
             setSelection([])
           }}
-          rowHeight={64}
+          rowHeight={56}
+          columnHeaderHeight={40}
+          scrollbarSize={0}
           loading={loading}
           hideFooter
-          slots={{ toolbar: GridToolbar }}
           sx={{
             width: '100%',
             height: '100%',
             flex: 1,
             border: 'none',
             color: 'var(--text)',
-            backgroundColor: 'var(--table-bg)',
+            backgroundColor: 'transparent',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
+              color: 'var(--muted)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
             },
             '& .MuiDataGrid-cell': {
               display: 'flex',
               alignItems: 'center',
               borderColor: 'var(--border-strong)',
-              paddingTop: 4,
-              paddingBottom: 4,
+              paddingTop: 0,
+              paddingBottom: 0,
+              fontSize: 13,
             },
             '& .MuiDataGrid-cellContent': {
               width: '100%',
@@ -269,10 +276,13 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
             },
             '& .MuiDataGrid-virtualScroller': {
               overflowX: 'hidden',
-              backgroundColor: 'var(--table-bg)',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-overlay': {
+              backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
               color: 'var(--muted)',
               textTransform: 'uppercase',
               fontSize: '11px',
@@ -280,10 +290,37 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
               borderBottom: '1px solid var(--border-strong)',
             },
             '& .MuiDataGrid-columnHeader': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-columnSeparator': {
+              display: 'none',
+            },
+            '& .MuiDataGrid-scrollbarFiller': {
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-scrollbarFiller--header': {
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
+              color: 'var(--muted)',
+            },
+            '& .MuiDataGrid-row': {
+              backgroundColor: 'var(--table-bg)',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
+            },
+            '& .MuiDataGrid-row.Mui-selected': {
+              backgroundColor: '#333f4f',
+            },
+            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root': {
+              color: 'var(--muted)',
+            },
+            '& .MuiCheckbox-root.Mui-checked': {
+              color: 'var(--accent)',
             },
           }}
         />

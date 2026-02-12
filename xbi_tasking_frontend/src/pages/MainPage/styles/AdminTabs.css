@@ -6,9 +6,9 @@
 }
 
 .admin-tab__grid {
-  background: var(--table-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   overflow: auto;
   max-width: 100%;
   flex: 1;
@@ -107,9 +107,9 @@
 
 .admin-bin__table-wrap {
   overflow: auto;
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  background: var(--table-bg);
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .admin-bin__table {

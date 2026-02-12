@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Autocomplete, Button, IconButton, TextField, Tooltip } from '@mui/material'
+import { Autocomplete, Button, IconButton, MenuItem, TextField, Tooltip } from '@mui/material'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
-import { DataGridPro, GridToolbar } from '@mui/x-data-grid-pro'
+import { DataGridPro } from '@mui/x-data-grid-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
@@ -297,22 +297,6 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     }
   }, [modalOpen])
 
-  const getValueOption = (value) => {
-    if (!value) return null
-    if (typeof value === 'object' && value.id) return value
-    const normalized = typeof value === 'string' ? value.toLowerCase() : value
-    const found = assignees.find((opt) => {
-      if (!opt) return false
-      if (opt?.id === value || opt === value) return true
-      if (typeof value === 'string') {
-        const optionName = opt?.name
-        return optionName === value || optionName?.toLowerCase() === normalized
-      }
-      return false
-    })
-    return found || null
-  }
-
   const updateRows = (rowId, updater) => {
     setRows((prev) => prev.map((row) => (row.id === rowId ? updater(row) : row)))
   }
@@ -358,97 +342,104 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
       imgProposedAssignee = allMatch ? firstChild?.proposedAssignee : 'Multiple'
     }
 
-    const sharedProps = {
-      disablePortal: true,
-      options: assignees || [],
-      getOptionLabel: (option) => {
-        if (typeof option === 'string') return option
-        return option?.name || option?.id || ''
-      },
-      isOptionEqualToValue: (option, value) => {
-        const optionId = typeof option === 'string' ? option : option?.id
-        const valueId = typeof value === 'string' ? value : value?.id
-        return optionId === valueId
-      },
-      getOptionDisabled: (option) => {
-        const optionId = typeof option === 'string' ? option : option?.id
-        return optionId === 'Multiple'
-      },
-      renderInput: (inputParams) => <TextField {...inputParams} placeholder="Proposed assignee" size="small" />,
-      size: 'small',
-      fullWidth: true,
-      ListboxProps: {
-        style: { maxHeight: 200, overflow: 'auto' },
-      },
-    }
-
-    const handleChange = (newValue) => {
-      let proposedAssigneeValue = newValue
-      if (proposedAssigneeValue == null) {
-        proposedAssigneeValue = ''
-      } else if (typeof proposedAssigneeValue === 'object' && proposedAssigneeValue.id) {
-        proposedAssigneeValue = proposedAssigneeValue.id
+    const selectableAssignees = (assignees || []).filter((option) => option?.id && option.id !== 'Multiple')
+    const applyAssignee = (nextValue) => {
+      const proposedAssigneeValue = nextValue || ''
+      if (isImageRow) {
+        setRows((prev) =>
+          prev.map((row) => {
+            if (row.id === params.id || row.parentId === params.id) {
+              return { ...row, proposedAssignee: proposedAssigneeValue }
+            }
+            return row
+          }),
+        )
+        return
       }
+
       updateRows(params.id, (row) => ({ ...row, proposedAssignee: proposedAssigneeValue }))
+      const parentId = params?.row?.parentId
+      if (parentId === undefined || parentId === null) return
+      setRows((prev) => {
+        const next = prev.map((row) => {
+          if (row.id === params.id) {
+            return {
+              ...row,
+              proposedAssignee: proposedAssigneeValue,
+            }
+          }
+          return row
+        })
+        const children = next.filter((row) => row.parentId === parentId)
+        if (!children.length) return next
+        const first = children[0]?.proposedAssignee
+        const allSame = children.every((row) => row.proposedAssignee === first)
+        return next.map((row) => {
+          if (row.id === parentId) {
+            return { ...row, proposedAssignee: allSame ? first : 'Multiple' }
+          }
+          return row
+        })
+      })
     }
 
     const isImageRow = params?.row?.groupName?.length === 1
-    if (isImageRow) {
-      return (
-        <Autocomplete
-          {...sharedProps}
-          value={getValueOption(imgProposedAssignee || params.value)}
-          onChange={(_, newValue) => {
-            let proposedAssigneeValue = newValue
-            if (proposedAssigneeValue == null) {
-              proposedAssigneeValue = ''
-            } else if (typeof proposedAssigneeValue === 'object' && proposedAssigneeValue.id) {
-              proposedAssigneeValue = proposedAssigneeValue.id
-            }
-            setRows((prev) =>
-              prev.map((row) => {
-                if (row.id === params.id || row.parentId === params.id) {
-                  return { ...row, proposedAssignee: proposedAssigneeValue }
-                }
-                return row
-              }),
-            )
-          }}
-        />
-      )
-    }
-
+    const currentValue = isImageRow
+      ? imgProposedAssignee || params?.row?.proposedAssignee || params.value || ''
+      : params?.row?.proposedAssignee || params.value || ''
     return (
-      <Autocomplete
-        {...sharedProps}
-        value={getValueOption(params.row.proposedAssignee || params.value)}
-        onChange={(_, newValue) => {
-          handleChange(newValue)
-          const parentId = params?.row?.parentId
-          if (parentId === undefined || parentId === null) return
-          setRows((prev) => {
-            const next = prev.map((row) => {
-              if (row.id === params.id) {
-                return {
-                  ...row,
-                  proposedAssignee: newValue && newValue.id ? newValue.id : newValue || '',
-                }
-              }
-              return row
-            })
-            const children = next.filter((row) => row.parentId === parentId)
-            if (!children.length) return next
-            const first = children[0]?.proposedAssignee
-            const allSame = children.every((row) => row.proposedAssignee === first)
-            return next.map((row) => {
-              if (row.id === parentId) {
-                return { ...row, proposedAssignee: allSame ? first : 'Multiple' }
-              }
-              return row
-            })
-          })
+      <TextField
+        select
+        size="small"
+        fullWidth
+        value={currentValue}
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+        onChange={(event) => applyAssignee(event.target.value)}
+        SelectProps={{
+          displayEmpty: true,
+          renderValue: (selected) => {
+            if (!selected) return 'Proposed assignee'
+            if (selected === 'Multiple') return 'Multiple'
+            const matched = selectableAssignees.find((option) => option.id === selected)
+            return matched?.name || selected
+          },
         }}
-      />
+        sx={{
+          width: '100%',
+          '& .MuiOutlinedInput-root': {
+            height: 28,
+            minHeight: 28,
+            borderRadius: 999,
+            backgroundColor: 'transparent',
+            color: 'var(--text)',
+          },
+          '& .MuiSelect-select': {
+            padding: '0 26px 0 10px !important',
+            display: 'flex',
+            alignItems: 'center',
+            height: '28px',
+            lineHeight: '28px',
+            fontSize: 13,
+          },
+          '& .MuiSvgIcon-root': {
+            color: 'var(--muted)',
+          },
+        }}
+      >
+        <MenuItem value="" sx={{ display: 'none' }} />
+        {currentValue === 'Multiple' ? (
+          <MenuItem value="Multiple" disabled>
+            Multiple
+          </MenuItem>
+        ) : null}
+        {selectableAssignees.map((option) => (
+          <MenuItem key={option.id} value={option.id}>
+            {option.name || option.id}
+          </MenuItem>
+        ))}
+      </TextField>
     )
   }
 
@@ -457,15 +448,48 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
     const isImageRow = params?.row?.groupName?.length === 1
     if (!isImageRow) return ''
     return (
-      <Autocomplete
-        disablePortal
-        options={options}
-        value={params.row.priority || null}
-        onChange={(_, newValue) => updateRows(params.row.id, (row) => ({ ...row, priority: newValue }))}
-        renderInput={(inputParams) => <TextField {...inputParams} placeholder="Priority" size="small" />}
+      <TextField
+        select
         size="small"
         fullWidth
-      />
+        value={params.row.priority || ''}
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+        onChange={(event) => updateRows(params.row.id, (row) => ({ ...row, priority: event.target.value }))}
+        SelectProps={{
+          displayEmpty: true,
+          renderValue: (selected) => (selected ? selected : 'Priority'),
+        }}
+        sx={{
+          width: '100%',
+          '& .MuiOutlinedInput-root': {
+            height: 28,
+            minHeight: 28,
+            borderRadius: 999,
+            backgroundColor: 'transparent',
+            color: 'var(--text)',
+          },
+          '& .MuiSelect-select': {
+            padding: '0 26px 0 10px !important',
+            display: 'flex',
+            alignItems: 'center',
+            height: '28px',
+            lineHeight: '28px',
+            fontSize: 13,
+          },
+          '& .MuiSvgIcon-root': {
+            color: 'var(--muted)',
+          },
+        }}
+      >
+        <MenuItem value="" sx={{ display: 'none' }} />
+        {options.map((option) => (
+          <MenuItem key={option} value={option}>
+            {option}
+          </MenuItem>
+        ))}
+      </TextField>
     )
   }
 
@@ -772,6 +796,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           treeData
           rows={rows}
           columns={columns}
+          disableColumnResize
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
           filterModel={filterModel}
@@ -781,26 +806,32 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
           rowSelectionModel={selectionModel}
           onRowSelectionModelChange={(model) => setSelectionModel(normalizeSelection(model))}
           checkboxSelectionVisibleOnly={false}
-          rowHeight={64}
+          rowHeight={56}
+          columnHeaderHeight={40}
+          scrollbarSize={0}
           loading={loading}
           hideFooter
-          slots={{ toolbar: GridToolbar }}
           sx={{
             width: '100%',
             height: '100%',
             flex: 1,
             border: 'none',
             color: 'var(--text)',
-            backgroundColor: 'var(--table-bg)',
+            backgroundColor: 'transparent',
             '& .MuiDataGrid-columnHeaderTitle': {
               paddingLeft: 0,
+              color: 'var(--muted)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
             },
             '& .MuiDataGrid-cell': {
               display: 'flex',
               alignItems: 'center',
               borderColor: 'var(--border-strong)',
-              paddingTop: 4,
-              paddingBottom: 4,
+              paddingTop: 0,
+              paddingBottom: 0,
+              fontSize: 13,
             },
             '& .MuiDataGrid-cellContent': {
               width: '100%',
@@ -812,7 +843,7 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             '& .MuiDataGrid-cell .MuiInputBase-root': {
               height: 30,
               minHeight: 30,
-              fontSize: 12,
+              fontSize: 13,
               color: 'var(--text)',
             },
             '& .MuiDataGrid-cell .MuiInputBase-input': {
@@ -840,10 +871,13 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
             },
             '& .MuiDataGrid-virtualScroller': {
               overflowX: 'hidden',
-              backgroundColor: 'var(--table-bg)',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-overlay': {
+              backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
               color: 'var(--muted)',
               textTransform: 'uppercase',
               fontSize: '11px',
@@ -851,37 +885,22 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
               borderBottom: '1px solid var(--border-strong)',
             },
             '& .MuiDataGrid-columnHeader': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
+            },
+            '& .MuiDataGrid-columnSeparator': {
+              display: 'none',
             },
             '& .MuiDataGrid-scrollbarFiller': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-scrollbarFiller--header': {
-              backgroundColor: 'var(--row-bg)',
+              backgroundColor: 'transparent',
             },
-            '& .MuiDataGrid-filler': {
-              backgroundColor: 'var(--row-bg)',
-            },
-            '& .MuiDataGrid-filler--header': {
-              backgroundColor: 'var(--row-bg)',
-            },
-            '& .MuiDataGrid-scrollbar': {
-              backgroundColor: 'var(--row-bg)',
-            },
-            '& .MuiDataGrid-scrollbar--vertical': {
-              backgroundColor: 'var(--row-bg)',
-            },
-            '& .MuiDataGrid-scrollbar--horizontal': {
-              backgroundColor: 'var(--row-bg)',
-            },
-            '& .MuiDataGrid-scrollbar .MuiDataGrid-scrollbarContent': {
-              backgroundColor: 'var(--row-bg)',
+            '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
+              color: 'var(--muted)',
             },
             '& .MuiDataGrid-row': {
               backgroundColor: 'var(--table-bg)',
-            },
-            '& .MuiDataGrid-row:nth-of-type(even)': {
-              backgroundColor: 'var(--row-bg)',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'var(--hover)',
@@ -892,16 +911,6 @@ function TaskingManagerTab({ dateRange, onOpenDatePicker }) {
               backgroundColor: '#333f4f',
             },
 
-            '& .MuiDataGrid-footerContainer': {
-              borderTop: '1px solid var(--border-strong)',
-              color: 'var(--muted)',
-              backgroundColor: 'var(--panel)',
-            },
-            '& .MuiDataGrid-toolbarContainer': {
-              padding: '10px 12px',
-              borderBottom: '1px solid var(--border-strong)',
-              color: 'var(--text)',
-            },
             '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
               color: 'var(--muted)',
             },
