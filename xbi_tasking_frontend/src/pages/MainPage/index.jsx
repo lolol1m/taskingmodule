@@ -3,7 +3,6 @@ import { Box } from '@mui/material'
 import DatePickerModal from '../../components/DatePicker.jsx'
 import NotificationsProvider from '../../components/notifications/NotificationsProvider.jsx'
 import ContentSection from './sections/ContentSection.jsx'
-import HeaderSection from './sections/HeaderSection.jsx'
 import SidebarSection from './sections/SidebarSection.jsx'
 import useUsername from './hooks/useUsername.js'
 import './styles/index.css'
@@ -20,7 +19,6 @@ function MainPage() {
   })
   const [open, setOpen] = useState(() => !localStorage.getItem('tasking_date_range'))
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [adminOpen, setAdminOpen] = useState(true)
   const [activeTab, setActiveTab] = useState('summary')
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -63,7 +61,6 @@ function MainPage() {
 
   useEffect(() => {
     if (isCollapsed) {
-      setAdminOpen(false)
       setSettingsOpen(false)
     }
   }, [isCollapsed])
@@ -74,22 +71,19 @@ function MainPage() {
       {dateRange && (
         <>
           <NotificationsProvider>
-            <HeaderSection username={username} />
-
             <main className={`layout ${isCollapsed ? 'is-collapsed' : ''}`}>
               <SidebarSection
                 isCollapsed={isCollapsed}
                 setIsCollapsed={setIsCollapsed}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                adminOpen={adminOpen}
-                setAdminOpen={setAdminOpen}
                 settingsOpen={settingsOpen}
                 setSettingsOpen={setSettingsOpen}
                 isDarkMode={isDarkMode}
                 setIsDarkMode={setIsDarkMode}
                 onLogout={handleLogout}
                 userRole={userRole}
+                username={username}
               />
 
               <ContentSection

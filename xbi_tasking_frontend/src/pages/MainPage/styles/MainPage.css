@@ -26,6 +26,7 @@
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
 }
 
 .app-shell {
@@ -97,11 +98,14 @@ body.modal-blocked .sidebar__collapse-toggle {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: start;
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
+  padding: 12px;
   transition: grid-template-columns 700ms ease;
   position: relative;
-  overflow: visible;
+  overflow-x: visible;
+  overflow-y: visible;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
 .layout.is-collapsed {

@@ -219,7 +219,6 @@ function UploadsTab({ userRole }) {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="uploads-main">
         <div className="uploads-sections">
           <button

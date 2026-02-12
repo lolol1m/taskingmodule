@@ -1,55 +1,144 @@
+import { useEffect, useRef, useState } from 'react'
 import adminIcon from '../../../assets/admin.png'
+import addUserIcon from '../../../assets/add-user.png'
 import checkMarkIcon from '../../../assets/check-mark.png'
 import checkIcon from '../../../assets/check.png'
 import downArrow from '../../../assets/down-arrow.png'
 import exitIcon from '../../../assets/exit.png'
 import layerIcon from '../../../assets/layer.png'
+import layoutIcon from '../../../assets/layouting.png'
 import nightIcon from '../../../assets/dark-mode.png'
+import reportIcon from '../../../assets/report.png'
+import sensorIcon from '../../../assets/sensor.png'
 import settingIcon from '../../../assets/gear.png'
 import sunIcon from '../../../assets/sun.png'
-import useActiveIndicator from '../hooks/useActiveIndicator.js'
+import uploadIcon from '../../../assets/upload_2.png'
+import logoIcon from '../../../assets/xbi.png'
 
 function SidebarSection({
   isCollapsed,
   setIsCollapsed,
   activeTab,
   setActiveTab,
-  adminOpen,
-  setAdminOpen,
   settingsOpen,
   setSettingsOpen,
   isDarkMode,
   setIsDarkMode,
   onLogout,
   userRole,
+  username,
 }) {
   // II role has limited access - no Tasking Manager or Admin
   const isBasicUser = userRole === 'II'
   // Only IA can create users
   const canCreateUsers = userRole === 'IA'
-  const { navRef, indicatorStyle } = useActiveIndicator({
-    activeTab,
-    isCollapsed,
-    adminOpen,
-    settingsOpen,
-  })
+  const settingsButtonRef = useRef(null)
+  const settingsPopoverRef = useRef(null)
+  const settingsCloseTimerRef = useRef(null)
+  const [settingsPopoverStyle, setSettingsPopoverStyle] = useState(null)
+  const clearSettingsCloseTimer = () => {
+    if (settingsCloseTimerRef.current) {
+      clearTimeout(settingsCloseTimerRef.current)
+      settingsCloseTimerRef.current = null
+    }
+  }
+  const openSettingsPopover = () => {
+    if (!isCollapsed) {
+      return
+    }
+    clearSettingsCloseTimer()
+    setSettingsOpen(true)
+  }
+  const closeSettingsPopoverWithDelay = () => {
+    if (!isCollapsed) {
+      return
+    }
+    clearSettingsCloseTimer()
+    settingsCloseTimerRef.current = setTimeout(() => {
+      setSettingsOpen(false)
+      settingsCloseTimerRef.current = null
+    }, 180)
+  }
+  const handleSettingsToggle = () => {
+    if (isCollapsed) {
+      return
+    }
+    setSettingsOpen((prev) => !prev)
+  }
+
+  useEffect(() => () => clearSettingsCloseTimer(), [])
+
+  useEffect(() => {
+    if (!isCollapsed || !settingsOpen) {
+      return
+    }
+
+    const updatePopoverPosition = () => {
+      if (!settingsButtonRef.current) {
+        return
+      }
+
+      const rect = settingsButtonRef.current.getBoundingClientRect()
+      setSettingsPopoverStyle({
+        position: 'fixed',
+        left: `${rect.right + 12}px`,
+        top: `${rect.top + rect.height * 0.4}px`,
+        transform: 'translateY(-35%)',
+        zIndex: 3000,
+      })
+    }
+
+    updatePopoverPosition()
+    window.addEventListener('resize', updatePopoverPosition)
+    window.addEventListener('scroll', updatePopoverPosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updatePopoverPosition)
+      window.removeEventListener('scroll', updatePopoverPosition, true)
+    }
+  }, [isCollapsed, settingsOpen])
+
+  useEffect(() => {
+    if (!isCollapsed || !settingsOpen) {
+      return
+    }
+
+    const handleOutsideClick = (event) => {
+      if (
+        settingsButtonRef.current?.contains(event.target) ||
+        settingsPopoverRef.current?.contains(event.target)
+      ) {
+        return
+      }
+      setSettingsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [isCollapsed, settingsOpen, setSettingsOpen])
 
   return (
-    <aside className="sidebar" style={{ width: isCollapsed ? '72px' : '290px' }}>
-      <div className="sidebar__content" ref={navRef}>
+    <aside className="sidebar" style={{ width: isCollapsed ? '68px' : '272px' }}>
+      <div className="sidebar__content">
+        <div className="sidebar__brand">
+          <img className="sidebar__brand-logo" src={logoIcon} alt="Tasking Module logo" />
+          <div className="sidebar__brand-meta">
+            <div className="sidebar__brand-title">Tasking Module</div>
+            <div className="sidebar__brand-id">ID: {username || '-'}</div>
+          </div>
+          <button
+            className={`sidebar__collapse-toggle ${isCollapsed ? 'is-collapsed' : ''}`}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            type="button"
+          >
+            <img className="collapse-arrow" src={layoutIcon} alt="" />
+          </button>
+        </div>
 
-        {(adminOpen || !isCollapsed) && <span className="sidebar__active-indicator" style={indicatorStyle} />}
         <div className="sidebar__section">
           <div className="sidebar__title">
-            <button
-              className={`sidebar__collapse-toggle ${isCollapsed ? 'is-collapsed' : ''}`}
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              style={{ left: isCollapsed ? '0px' : '242px' }}
-            >
-              <img className="collapse-arrow" src={downArrow} alt="" />
-            </button>
-            <span className="sidebar__title-text">Navigation</span>
+            <span className="sidebar__title-text">Home</span>
           </div>
           <button
             className={`sidebar__item ${activeTab === 'summary' ? 'is-active' : ''}`}
@@ -86,83 +175,77 @@ function SidebarSection({
 
         {!isBasicUser && (
           <div className="sidebar__section">
-            <div className="sidebar__popover-wrap">
+            <div className="sidebar__title">
+              <span className="sidebar__title-text">Admin</span>
+            </div>
+            <button
+              className={`sidebar__item ${activeTab === 'admin-presence' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('admin-presence')}
+            >
+              <span className="sidebar__icon">
+                <img src={checkIcon} alt="" />
+              </span>
+              <span className="sidebar__text">User Presence</span>
+            </button>
+            <button
+              className={`sidebar__item ${activeTab === 'admin-opsv' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('admin-opsv')}
+            >
+              <span className="sidebar__icon">
+                <img src={adminIcon} alt="" />
+              </span>
+              <span className="sidebar__text">Set OPS V</span>
+            </button>
+            <button
+              className={`sidebar__item ${activeTab === 'admin-bin' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('admin-bin')}
+            >
+              <span className="sidebar__icon">
+                <img src={reportIcon} alt="" />
+              </span>
+              <span className="sidebar__text">Generate Bin Count</span>
+            </button>
+            <button
+              className={`sidebar__item ${activeTab === 'admin-sensor' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('admin-sensor')}
+            >
+              <span className="sidebar__icon">
+                <img src={sensorIcon} alt="" />
+              </span>
+              <span className="sidebar__text">Update Sensor Category</span>
+            </button>
+            <button
+              className={`sidebar__item ${activeTab === 'admin-uploads' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('admin-uploads')}
+            >
+              <span className="sidebar__icon">
+                <img src={uploadIcon} alt="" />
+              </span>
+              <span className="sidebar__text">Uploads</span>
+            </button>
+            {canCreateUsers && (
               <button
-                className={`sidebar__item sidebar__item--toggle ${activeTab.includes("admin") && !adminOpen && "is-active"}`}
-                onClick={() => {if(!isCollapsed){
-  setAdminOpen(!adminOpen)
-                }
-                  
-                  }}
-                aria-expanded={adminOpen}
+                className={`sidebar__item ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('admin-create-user')}
               >
                 <span className="sidebar__icon">
-                  <img src={adminIcon} alt="" />
+                  <img src={addUserIcon} alt="" />
                 </span>
-                <span className="sidebar__text">Admin</span>
-                <span className={`caret ${adminOpen ? 'is-open' : ''}`}>
-                  <img className="caret-arrow" src={downArrow} alt="" />
-                </span>
+                <span className="sidebar__text">Create User</span>
               </button>
-              <div className={`sidebar__group ${adminOpen && !isCollapsed ? 'is-open' : ''}`}>
-                <button
-                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-presence' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('admin-presence')}
-                >
-                  <span className="sidebar__text">User Presence</span>
-                </button>
-                <button
-                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-opsv' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('admin-opsv')}
-                >
-                  <span className="sidebar__text">Set OPS V</span>
-                </button>
-                <button
-                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-bin' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('admin-bin')}
-                >
-                  <span className="sidebar__text">Generate Bin Count</span>
-                </button>
-                <button
-                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-sensor' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('admin-sensor')}
-                >
-                  <span className="sidebar__text">Update Sensor Category</span>
-                </button>
-                <button
-                  className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-uploads' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('admin-uploads')}
-                >
-                  <span className="sidebar__text">Uploads</span>
-                </button>
-                {canCreateUsers && (
-                  <button
-                    className={`sidebar__item sidebar__item--sub ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
-                    onClick={() => setActiveTab('admin-create-user')}
-                  >
-                    <span className="sidebar__text">Create User</span>
-                  </button>
-                )}
-              </div>
-              <div className="sidebar__popover sidebar__popover--admin">
-                <div className="sidebar__popover-title">Admin</div>
-                <button className={`sidebar__popover-item${activeTab === 'admin-presence' ? '-active' : ''}`} onClick={() => setActiveTab("admin-presence")}>User Presence</button>
-                <button className={`sidebar__popover-item${activeTab === 'admin-opsv' ? '-active' : ''}`}onClick={() => setActiveTab("admin-opsv")}>Set OPS V</button>
-                <button className={`sidebar__popover-item${activeTab === 'admin-bin' ? '-active' : ''}`} onClick={() => setActiveTab("admin-bin")}>Generate Bin Count</button>
-                <button className={`sidebar__popover-item${activeTab === 'admin-sensor' ? '-active' : ''}`} onClick={() => setActiveTab("admin-sensor")}>Update Sensor Category</button>
-                <button className={`sidebar__popover-item${activeTab === 'admin-uploads' ? '-active' : ''}`} onClick={() => setActiveTab("admin-uploads")}>Uploads</button>
-                {canCreateUsers && (
-                  <button className={`sidebar__popover-item${activeTab === 'admin-create-user' ? '-active' : ''}`} onClick={() => setActiveTab("admin-create-user")}>Create User</button>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         )}
         <div className="sidebar__section sidebar__section--bottom">
-          <div className="sidebar__popover-wrap">
+          <div
+            className={`sidebar__popover-wrap ${settingsOpen ? 'is-open' : ''}`}
+            onMouseEnter={openSettingsPopover}
+            onMouseLeave={closeSettingsPopoverWithDelay}
+          >
             <button
+              ref={settingsButtonRef}
               className="sidebar__item sidebar__item--settings sidebar__item--toggle"
-              onClick={() => setSettingsOpen((prev) => !prev)}
+              onClick={handleSettingsToggle}
               aria-expanded={settingsOpen}
             >
               <span className="sidebar__icon">
@@ -173,7 +256,13 @@ function SidebarSection({
                 <img className="caret-arrow" src={downArrow} alt="" />
               </span>
             </button>
-            <div className="sidebar__popover sidebar__popover--settings">
+            <div
+              ref={settingsPopoverRef}
+              className={`sidebar__popover sidebar__popover--settings ${settingsOpen && isCollapsed ? 'is-open' : ''}`}
+              style={isCollapsed && settingsOpen ? settingsPopoverStyle || undefined : undefined}
+              onMouseEnter={openSettingsPopover}
+              onMouseLeave={closeSettingsPopoverWithDelay}
+            >
               <div className="sidebar__popover-title">Settings</div>
               <button className="sidebar__popover-item">Help</button>
               <button className={`sidebar__popover-item${activeTab === 'settings-password' ? '-active' : ''}`} onClick={() => setActiveTab('settings-password')}>Change Password</button>
