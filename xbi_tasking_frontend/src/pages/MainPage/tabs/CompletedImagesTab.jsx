@@ -63,6 +63,7 @@ function CompletedImagesTab({ dateRange }) {
   const [rows, setRows] = useState([])
   const [selection, setSelection] = useState([])
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchText, setSearchText] = useState('')
@@ -157,6 +158,84 @@ function CompletedImagesTab({ dateRange }) {
     }
   }
 
+  const escapeCsvCell = (value) => {
+    if (value === null || value === undefined) return ''
+    const text = String(value)
+    if (/[",\n\r]/.test(text)) {
+      return `"${text.replace(/"/g, '""')}"`
+    }
+    return text
+  }
+
+  const handleExportCsv = async () => {
+    if (!rows.length) {
+      addNotification({
+        title: 'Nothing to export',
+        meta: 'No completed image data available for selected range',
+      })
+      return
+    }
+
+    try {
+      setExporting(true)
+      const exportColumns = [
+        { field: 'imageFileName', headerName: 'Image File Name' },
+        { field: 'sensorName', headerName: 'Sensor Name' },
+        { field: 'imageId', headerName: 'Image ID' },
+        { field: 'uploadDate', headerName: 'Upload Date' },
+        { field: 'imageDateTime', headerName: 'Image Date Time' },
+        { field: 'areaName', headerName: 'Area Name' },
+        { field: 'assignee', headerName: 'Assignee' },
+        { field: 'vetter', headerName: 'Vetter' },
+        { field: 'report', headerName: 'Report' },
+        { field: 'remarks', headerName: 'Remarks' },
+        { field: 'imageCategory', headerName: 'Image Category' },
+        { field: 'imageQuality', headerName: 'Image Quality' },
+        { field: 'cloudCover', headerName: 'Cloud Cover' },
+        { field: 'priority', headerName: 'Priority' },
+      ]
+
+      const header = exportColumns.map((col) => escapeCsvCell(col.headerName)).join(',')
+      const body = rows
+        .map((row) => {
+          const values = exportColumns.map((col) => {
+            const raw = row[col.field]
+            if ((col.field === 'uploadDate' || col.field === 'imageDateTime') && dateFormatter) {
+              return escapeCsvCell(dateFormatter(raw))
+            }
+            return escapeCsvCell(raw)
+          })
+          return values.join(',')
+        })
+        .join('\n')
+
+      const csvContent = `${header}\n${body}`
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      link.href = url
+      link.download = `completed-images-${stamp}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      addNotification({
+        title: 'CSV exported',
+        meta: `Just now · ${rows.length} rows downloaded`,
+      })
+    } catch (err) {
+      console.error('CSV export failed:', err)
+      addNotification({
+        title: 'Export failed',
+        meta: 'Just now · Unable to generate CSV',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="completed-images">
       <div className="content__topbar">
@@ -192,6 +271,11 @@ function CompletedImagesTab({ dateRange }) {
           Uncomplete Image
         </Button>
         {error ? <Typography className="completed-images__error">{error}</Typography> : null}
+        <Box sx={{ marginLeft: 'auto' }}>
+          <Button className="tasking-summary__button" onClick={handleExportCsv} disabled={!rows.length || exporting}>
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
+        </Box>
       </div>
 
       <div className="completed-images__grid">
