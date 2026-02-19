@@ -58,25 +58,7 @@ const buildRows = (inputData) => {
   return rows
 }
 
-const formatDateRange = (range) => {
-  if (!range) return 'Select display date'
-  const start = range['Start Date']
-  const end = range['End Date']
-  if (!start || !end) return 'Select display date'
-  const startDate = new Date(start)
-  const endDate = new Date(end)
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return 'Select display date'
-  }
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
-}
-
-function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
+function CompletedImagesTab({ dateRange }) {
   const [inputData, setInputData] = useState(null)
   const [rows, setRows] = useState([])
   const [selection, setSelection] = useState([])
@@ -196,10 +178,6 @@ function CompletedImagesTab({ dateRange, onOpenDatePicker }) {
 
               <span>Refresh</span>
                
-            </Button>
-            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
-              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
-              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>

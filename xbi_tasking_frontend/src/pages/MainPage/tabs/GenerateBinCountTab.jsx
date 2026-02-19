@@ -39,7 +39,7 @@ const formatDateRange = (range) => {
   return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
 }
 
-function GenerateBinCountTab({ dateRange, onOpenDatePicker }) {
+function GenerateBinCountTab({ dateRange }) {
   const [reportData, setReportData] = useState(null)
   const [sensorFilter, setSensorFilter] = useState('ALL')
   const [loading, setLoading] = useState(false)
@@ -146,10 +146,6 @@ function GenerateBinCountTab({ dateRange, onOpenDatePicker }) {
           <div className="action-bar">
             <Button className="tasking-summary__button" onClick={fetchReport} disabled={loading}>
               Generate
-            </Button>
-            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
-              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
-              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
             <Button
               className="tasking-summary__button"

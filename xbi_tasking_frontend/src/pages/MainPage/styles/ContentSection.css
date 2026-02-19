@@ -22,6 +22,53 @@
   padding: 14px 18px 0 18px;
 }
 
+.content__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.content__date-button {
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0 14px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.content__date-button:hover {
+  background: var(--hover);
+}
+
+.content__date-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.content__date-icon {
+  width: 13px;
+  height: 13px;
+  display: inline-block;
+  object-fit: contain;
+  filter: invert(1);
+}
+
+.app-shell.is-light .content__date-icon {
+  filter: invert(0);
+}
+
+.content__date-label {
+  white-space: nowrap;
+}
+
 .content__body {
   padding: 8px 18px 20px 18px;
 }

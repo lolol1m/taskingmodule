@@ -156,25 +156,7 @@ const toBackendTaskId = (rowKey) => {
   return numericKey < 0 ? Math.abs(numericKey) : numericKey
 }
 
-const formatDateRange = (range) => {
-  if (!range) return 'Select display date'
-  const start = range['Start Date']
-  const end = range['End Date']
-  if (!start || !end) return 'Select display date'
-  const startDate = new Date(start)
-  const endDate = new Date(end)
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return 'Select display date'
-  }
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
-}
-
-function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
+function TaskingSummaryTab({ dateRange, isCollapsed }) {
   const [inputData, setInputData] = useState(null)
   const [workingData, setWorkingData] = useState(null)
   const [dropdownValues, setDropdownValues] = useState(() => {
@@ -1180,10 +1162,6 @@ function TaskingSummaryTab({ dateRange, onOpenDatePicker, isCollapsed }) {
             </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
-            </Button>
-            <Button className="tasking-summary__button tasking-summary__button--date" onClick={onOpenDatePicker}>
-              <img className="date-button__icon" src="/src/assets/calendar.png" alt="" />
-              <span className="date-button__label">{formatDateRange(dateRange)}</span>
             </Button>
           </div>
         </div>

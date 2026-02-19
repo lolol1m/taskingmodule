@@ -37,6 +37,24 @@ const tabLabelMap = {
   'settings-password': 'Change Password',
 }
 
+const formatDateRange = (range) => {
+  if (!range) return 'Select display date'
+  const start = range['Start Date']
+  const end = range['End Date']
+  if (!start || !end) return 'Select display date'
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 'Select display date'
+  }
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
+}
+
 function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {
   const ActiveTab = tabMap[activeTab]
   const activeTabLabel = tabLabelMap[activeTab] || 'Overview'
@@ -50,7 +68,13 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
           <span className="content__breadcrumb-separator">/</span>
           <span className="content__breadcrumb-current">{activeTabLabel}</span>
         </div>
-        <NotificationsPanel />
+        <div className="content__header-actions">
+          <button type="button" className="content__date-button" onClick={onOpenDatePicker}>
+            <img className="content__date-icon" src="/src/assets/calendar.png" alt="" />
+            <span className="content__date-label">{formatDateRange(dateRange)}</span>
+          </button>
+          <NotificationsPanel />
+        </div>
       </div>
       <div className="content__body">
         <div className="content__tab-shell">
