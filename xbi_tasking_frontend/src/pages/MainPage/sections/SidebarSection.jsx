@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import adminIcon from '../../../assets/admin.png'
 import addUserIcon from '../../../assets/add-user.png'
 import checkMarkIcon from '../../../assets/check-mark.png'
 import checkIcon from '../../../assets/check.png'
@@ -186,15 +185,6 @@ function SidebarSection({
                 <img src={checkIcon} alt="" />
               </span>
               <span className="sidebar__text">User Presence</span>
-            </button>
-            <button
-              className={`sidebar__item ${activeTab === 'admin-opsv' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('admin-opsv')}
-            >
-              <span className="sidebar__icon">
-                <img src={adminIcon} alt="" />
-              </span>
-              <span className="sidebar__text">Set OPS V</span>
             </button>
             <button
               className={`sidebar__item ${activeTab === 'admin-bin' ? 'is-active' : ''}`}

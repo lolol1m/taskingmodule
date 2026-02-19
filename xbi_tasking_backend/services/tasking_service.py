@@ -121,10 +121,8 @@ class TaskingService:
 
         area_map = {}
         for row in area_rows:
-            image_id, task_id, area_name, task_status, remarks, username, v10, opsv = row
-            area_map.setdefault(image_id, []).append(
-                (task_id, area_name, task_status, remarks, username, v10, opsv)
-            )
+            image_id = row[0]
+            area_map.setdefault(image_id, []).append(tuple(row[1:]))
         for image_data in image_datas:
             image_id = image_data[0]
             area_datas = area_map.get(image_id, [])
@@ -236,16 +234,18 @@ class TaskingService:
             if "Report" in image_data:
                 self.tasking.updateTaskingSummaryImage(
                     image_id,
-                    image_data["Report"],
-                    image_data["Image Category"],
-                    image_data["Image Quality"],
-                    image_data["Cloud Cover"],
-                    image_data["Target Tracing"],
+                    image_data.get("Report"),
+                    image_data.get("Image Category"),
+                    image_data.get("Image Quality"),
+                    image_data.get("Cloud Cover"),
+                    image_data.get("Target Tracing"),
                 )
-            if "Remarks" in image_data:
+            if "Remarks" in image_data or "IR Reported" in image_data or "SF Reported" in image_data:
                 self.tasking.updateTaskingSummaryTask(
                     image_id,
-                    image_data["Remarks"],
+                    image_data.get("Remarks"),
+                    image_data.get("IR Reported"),
+                    image_data.get("SF Reported"),
                 )
 
     def complete_images(self, payload, vetter_keycloak_id):

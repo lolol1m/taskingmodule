@@ -70,6 +70,13 @@ def format_tasking_summary_area(area, parent_id):
         "Assignee": area[4],
         "Task Status": area[2],
         "Remarks": area[3],
+        "Area ID": area[7],
+        "Color": area[8],
+        "Service": area[9],
+        "Exploit Start Time": area[10].strftime(datetime_format) if area[10] else None,
+        "Exploit End Time": area[11].strftime(datetime_format) if area[11] else None,
+        "IR Reported": area[12],
+        "SF Reported": area[13],
         "SCVU Task ID": area[0],
         "Parent ID": parent_id
     }

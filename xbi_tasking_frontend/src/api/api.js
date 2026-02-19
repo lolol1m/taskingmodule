@@ -98,11 +98,6 @@ class API {
         return response.data
     }
 
-    async setOpsvAreas(body) {
-        const response = await this.client.post("/lookup/setOpsvAreas", body)
-        return response.data
-    }
-
     async postTaskingManagerData(body) {
         const response =await  this.client.post("/tasking/getTaskingManagerData",  body)
         return response.data

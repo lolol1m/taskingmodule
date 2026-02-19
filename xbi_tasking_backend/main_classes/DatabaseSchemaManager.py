@@ -98,6 +98,13 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS assignee_id")
                 cursor.execute("ALTER TABLE image DROP COLUMN IF EXISTS vetter_id")
                 cursor.execute("DROP TABLE IF EXISTS users")
+                cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS external_area_id BIGINT")
+                cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS color VARCHAR(255)")
+                cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS service VARCHAR(255)")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_start_time TIMESTAMP")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS ir_reported BOOLEAN DEFAULT FALSE")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS sf_reported BOOLEAN DEFAULT FALSE")
                 cursor.execute("ALTER TABLE image DROP CONSTRAINT IF EXISTS image_image_id_key")
                 cursor.execute("""
                     SELECT 1
@@ -209,6 +216,9 @@ class DatabaseSchemaManager:
                     scvu_image_area_id SERIAL PRIMARY KEY,
                     scvu_image_id INTEGER REFERENCES image(scvu_image_id),
                     scvu_area_id INTEGER REFERENCES area(scvu_area_id),
+                    external_area_id BIGINT,
+                    color VARCHAR(255),
+                    service VARCHAR(255),
                     UNIQUE(scvu_image_id, scvu_area_id)
                 )
             """)
@@ -226,7 +236,11 @@ class DatabaseSchemaManager:
                     scvu_image_area_id INTEGER UNIQUE REFERENCES image_area(scvu_image_area_id),
                     assignee_keycloak_id VARCHAR(255),
                     task_status_id INTEGER REFERENCES task_status(id),
-                    remarks TEXT
+                    remarks TEXT,
+                    exploit_start_time TIMESTAMP,
+                    exploit_end_time TIMESTAMP,
+                    ir_reported BOOLEAN DEFAULT FALSE,
+                    sf_reported BOOLEAN DEFAULT FALSE
                 )
             """)
 

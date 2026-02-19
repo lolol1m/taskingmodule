@@ -36,6 +36,14 @@ const normalizeImageName = (value) => {
   return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
 }
 
+const extractAreaIdFromName = (value) => {
+  if (!value || typeof value !== 'string') return null
+  const match = value.match(/(?:^|[_\-\s])(\d+)\s*$/)
+  if (!match) return null
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const toISOLocal = (date) => {
   if (!date) return null
   const d = new Date(date)
@@ -142,7 +150,7 @@ function TaskingManagerTab({ dateRange }) {
             proposedAssignee: readValue(entry, ['Assignee']) || '',
             areaName,
             parentId,
-            scvuImageAreaId: readValue(entry, ['SCVU Image Area ID', 'SCVU Image Area ID']) || null,
+            scvuImageAreaId: readValue(entry, ['Area ID', 'areaId', 'SCVU Image Area ID']) || null,
             imageName: null,
             imageDatetime: null,
             sensorName: null,
@@ -639,6 +647,7 @@ function TaskingManagerTab({ dateRange }) {
   if (role === 'II') {
     return <div className="tasking-manager__notice">You do not have permission to view this tab.</div>
   }
+  const canSeeSubImageName = role === 'IA'
 
   const roundDownToHour = (value) => {
     if (!value || typeof value !== 'string') return value
@@ -714,7 +723,14 @@ function TaskingManagerTab({ dateRange }) {
     valueGetter: (_value, row) => {
       const nameFromGroup =
         row?.groupName && Array.isArray(row.groupName) ? row.groupName[row.groupName.length - 1] : null
-      return nameFromGroup || row?.areaName || row?.imageName || row?.id?.toString() || 'unknown'
+      if (row?.parentId) {
+        const derivedAreaId = extractAreaIdFromName(row?.areaName || nameFromGroup || '')
+        const subImageId = row?.scvuImageAreaId ?? derivedAreaId ?? row?.id
+        if (!canSeeSubImageName) return `${subImageId ?? ''}`
+        const subImageName = row?.areaName || nameFromGroup || ''
+        return subImageName || `${subImageId ?? ''}`
+      }
+      return nameFromGroup || row?.imageName || row?.id?.toString() || 'unknown'
     },
   }
 

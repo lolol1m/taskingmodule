@@ -23,6 +23,24 @@ SQL_INSERT_IMAGE_AREA_DSTA = (
     "ON CONFLICT (scvu_image_id, scvu_area_id) DO NOTHING"
 )
 
+SQL_UPDATE_IMAGE_AREA_METADATA_BY_NAME = (
+    "UPDATE image_area "
+    "SET external_area_id = COALESCE(%s, external_area_id), "
+    "    color = COALESCE(%s, color), "
+    "    service = COALESCE(%s, service) "
+    "WHERE scvu_image_id = (SELECT scvu_image_id FROM image WHERE image_id = %s) "
+    "  AND scvu_area_id = (SELECT scvu_area_id FROM area WHERE area_name = %s)"
+)
+
+SQL_UPDATE_IMAGE_AREA_METADATA_BY_EXTERNAL_ID = (
+    "UPDATE image_area "
+    "SET external_area_id = %s, "
+    "    color = COALESCE(%s, color), "
+    "    service = COALESCE(%s, service) "
+    "WHERE scvu_image_id = (SELECT scvu_image_id FROM image WHERE image_id = %s) "
+    "  AND external_area_id = %s"
+)
+
 SQL_INSERT_TTG_IMAGE_RETURNING_ID = (
     "INSERT INTO image (image_file_name, sensor_id, upload_date, image_datetime, ew_status_id) "
     "VALUES (%s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'ttg done')) "
@@ -151,6 +169,28 @@ class ImageQueries:
         Output:     NIL
         '''
         self.db.executeInsert(SQL_INSERT_IMAGE_AREA_DSTA, (image_id, area_name))
+
+    def updateImageAreaMetadataByName(self, image_id, area_name, external_area_id=None, color=None, service=None):
+        '''
+        Function:   Updates metadata for a DSTA image_area row by image_id + area_name
+        Input:      image_id, area_name, external_area_id, color, service
+        Output:     number of updated rows
+        '''
+        return self.db.executeUpdate(
+            SQL_UPDATE_IMAGE_AREA_METADATA_BY_NAME,
+            (external_area_id, color, service, image_id, area_name),
+        )
+
+    def updateImageAreaMetadataByExternalId(self, image_id, external_area_id, color=None, service=None):
+        '''
+        Function:   Updates metadata for a DSTA image_area row by image_id + external_area_id
+        Input:      image_id, external_area_id, color, service
+        Output:     number of updated rows
+        '''
+        return self.db.executeUpdate(
+            SQL_UPDATE_IMAGE_AREA_METADATA_BY_EXTERNAL_ID,
+            (external_area_id, color, service, image_id, external_area_id),
+        )
 
     def insertTTGImageReturnsId(self, image_file_name, sensor_name, upload_date, image_datetime):
         '''

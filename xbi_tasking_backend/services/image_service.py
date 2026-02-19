@@ -106,6 +106,22 @@ class ImageService:
                                     image["imgId"],
                                     area["areaName"],
                                 )
+                                area_id = area.get("areaId")
+                                color = area.get("color")
+                                service = area.get("service")
+                                if area_id is not None:
+                                    # Persist source area id + metadata for downstream tasking summary display.
+                                    updated = self.images.updateImageAreaMetadataByExternalId(
+                                        image["imgId"], area_id, color=color, service=service
+                                    )
+                                    if not updated:
+                                        self.images.updateImageAreaMetadataByName(
+                                            image["imgId"], area["areaName"], external_area_id=area_id, color=color, service=service
+                                        )
+                                elif color is not None or service is not None:
+                                    self.images.updateImageAreaMetadataByName(
+                                        image["imgId"], area["areaName"], color=color, service=service
+                                    )
                                 area_count += 1
 
                                 if auto_assign:

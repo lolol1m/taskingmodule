@@ -154,8 +154,8 @@ class QueryManager():
     def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing):
         return self._tasking.updateTaskingSummaryImage(scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing)
     
-    def updateTaskingSummaryTask(self, scvu_task_id, remarks):
-        return self._tasking.updateTaskingSummaryTask(scvu_task_id, remarks)
+    def updateTaskingSummaryTask(self, scvu_task_id, remarks=None, ir_reported=None, sf_reported=None):
+        return self._tasking.updateTaskingSummaryTask(scvu_task_id, remarks, ir_reported, sf_reported)
 
     def getImageAreaData(self, scvu_image_id):
         return self._images.getImageAreaData(scvu_image_id)

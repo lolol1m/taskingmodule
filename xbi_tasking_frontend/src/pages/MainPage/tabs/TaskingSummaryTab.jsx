@@ -92,13 +92,16 @@ const buildRows = (inputData) => {
         report: entry['Report'],
         taskCompleted: resolveTaskCompleted(entry, key),
         priority: entry['Priority'],
-        imageCategory: entry['Image Category'],
         imageQuality: entry['Image Quality'],
         cloudCover: entry['Cloud Cover'],
-        ewStatus: entry['EW Status'],
-        targetTracing: entry['Target Tracing'],
-        v10: entry['V10'],
-        opsV: entry['OPS V'],
+        color: entry['Color'] ?? entry['color'] ?? '',
+        service: entry['Service'] ?? entry['service'] ?? '',
+        exploitStartTime:
+          entry['Exploit Start Time'] ?? entry['Expliot Start Time'] ?? entry['exploitStartTime'] ?? '',
+        exploitEndTime:
+          entry['Exploit End Time'] ?? entry['Expliot End Time'] ?? entry['exploitEndTime'] ?? '',
+        irReported: entry['IR Reported'] ?? entry['irReported'] ?? null,
+        sfReported: entry['SF Reported'] ?? entry['sfReported'] ?? null,
         remarks: getRemarksValue(entry),
         childId: entry['Child ID'],
       })
@@ -116,8 +119,19 @@ const buildRows = (inputData) => {
         treePath: [`img_${parentId}`, areaName],
         taskStatus: entry['Task Status'],
         assignee: entry['Assignee'],
+        areaName,
+        color: entry['Color'] ?? entry['color'] ?? '',
+        service: entry['Service'] ?? entry['service'] ?? '',
+        exploitStartTime:
+          entry['Exploit Start Time'] ?? entry['Expliot Start Time'] ?? entry['exploitStartTime'] ?? '',
+        exploitEndTime:
+          entry['Exploit End Time'] ?? entry['Expliot End Time'] ?? entry['exploitEndTime'] ?? '',
+        irReported: entry['IR Reported'] ?? entry['irReported'] ?? null,
+        sfReported: entry['SF Reported'] ?? entry['sfReported'] ?? null,
+        imageQuality: entry['Image Quality'] ?? parent?.['Image Quality'] ?? '',
         remarks: getRemarksValue(entry),
         parentId,
+        areaId: entry['Area ID'] ?? entry['areaId'] ?? entry['SCVU Image Area ID'] ?? null,
         scvuTaskId: entry['SCVU Task ID'] || null,
       })
     }
@@ -140,6 +154,14 @@ const normalizeStatus = (value) => {
   const normalized = String(value).trim().toLowerCase()
   if (normalized === 'in_progress' || normalized === 'inprogress') return 'in progress'
   return normalized
+}
+
+const extractAreaIdFromName = (value) => {
+  if (!value || typeof value !== 'string') return null
+  const match = value.match(/(?:^|[_\-\s])(\d+)\s*$/)
+  if (!match) return null
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 const normalizeRemarksValue = (value) => {
@@ -176,7 +198,6 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
   const [selection, setSelection] = useState([])
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
-  const [showDetails, setShowDetails] = useState(false)
   const [openCopy, setOpenCopy] = useState(false)
   const [clipboardValue, setClipboardValue] = useState('')
   const { addNotification } = useNotifications()
@@ -209,6 +230,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
   }
 
   const dropdownFieldSx = (backgroundColor = 'transparent') => ({
+    width: '100%',
     '& .MuiOutlinedInput-root': {
       height: 28,
       minHeight: 28,
@@ -227,6 +249,17 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       textAlign: 'center',
       color: 'var(--text)',
     },
+    '& .MuiSelect-select': {
+      padding: '0 26px 0 10px !important',
+      display: 'flex',
+      alignItems: 'center',
+      height: '28px',
+      lineHeight: '28px',
+      color: 'var(--text)',
+    },
+    '& .MuiSvgIcon-root': {
+      color: 'var(--muted)',
+    },
     '& .MuiAutocomplete-input': {
       color: 'var(--text)',
     },
@@ -239,6 +272,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     width: '100%',
     minWidth: 0,
     '& .MuiOutlinedInput-root': {
+      width: '100%',
       height: 28,
       minHeight: 28,
       paddingRight: 8,
@@ -248,13 +282,16 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       color: 'var(--text)',
     },
     '& .MuiOutlinedInput-input': {
-      padding: '0 10px',
+      padding: '0 8px',
       textAlign: 'left',
+      fontSize: 12,
       color: 'var(--text)',
+      whiteSpace: 'nowrap',
     },
     '& .MuiInputBase-input::placeholder': {
       color: 'var(--muted)',
       opacity: 1,
+      fontSize: 11,
     },
   })
 
@@ -281,6 +318,35 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     },
   })
 
+  const cloudCoverSelectSx = () => ({
+    width: '100%',
+    minWidth: 0,
+    '& .MuiOutlinedInput-root': {
+      width: '100%',
+      minWidth: 0,
+      height: 28,
+      minHeight: 28,
+      alignItems: 'center',
+      borderRadius: 999,
+      backgroundColor: 'transparent',
+      color: 'var(--text)',
+    },
+    '& .MuiSelect-select': {
+      padding: '0 26px 0 10px !important',
+      display: 'block',
+      textAlign: 'left',
+      height: '28px',
+      lineHeight: '28px',
+      fontSize: 12,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
+    '& .MuiSvgIcon-root': {
+      color: 'var(--muted)',
+    },
+  })
+
   const getWorkingValue = (rowId, field) => {
     const source = workingData || inputData
     if (!source) return null
@@ -289,6 +355,31 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
   }
 
   const role = UserService.readUserRoleSingle()
+  const canSeeSubImageName = role === 'IA'
+
+  const getSubImageLabel = (row, fallbackName = '') => {
+    if (!row?.parentId) return fallbackName || row?.id?.toString() || 'unknown'
+    const derivedAreaId = extractAreaIdFromName(row?.areaName || fallbackName)
+    const subImageId = row?.areaId ?? derivedAreaId ?? row?.scvuTaskId ?? row?.id
+    if (!canSeeSubImageName) return `${subImageId ?? ''}`
+    const subImageName = row?.areaName || fallbackName || ''
+    return subImageName || `${subImageId ?? ''}`
+  }
+
+  const getAggregatedImageQuality = (row) => {
+    if (!row?.childId || !Array.isArray(row.childId)) return ''
+    const qualityValues = row.childId
+      .map((taskId) => {
+        const numericTaskId = Number(taskId)
+        if (!Number.isFinite(numericTaskId)) return ''
+        const taskRowId = -Math.abs(numericTaskId)
+        const quality = getWorkingValue(taskRowId, 'Image Quality')
+        return typeof quality === 'string' ? quality.trim() : ''
+      })
+      .filter((value) => value.length > 0)
+    if (qualityValues.length === 0) return row?.imageQuality || ''
+    return qualityValues.join('\n')
+  }
 
   const roundDownToHour = (value) => {
     if (!value || typeof value !== 'string') return value
@@ -311,7 +402,8 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           if (!hierarchy || !Array.isArray(hierarchy) || hierarchy.length === 0) {
             return row.id?.toString() || 'Unknown'
           }
-          return hierarchy[hierarchy.length - 1]
+          const nameFromGroup = hierarchy[hierarchy.length - 1]
+          return getSubImageLabel(row, nameFromGroup)
         },
       },
       { field: 'sensorName', headerName: 'Sensor Name', minWidth: 110, flex: 0.6 },
@@ -443,34 +535,71 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       },
       { field: 'priority', headerName: 'Priority', minWidth: 90, flex: 0.5 },
       {
-        field: 'imageCategory',
-        headerName: 'Image Category',
+        field: 'color',
+        headerName: 'Color',
+        minWidth: 110,
+        flex: 0.55,
+        renderCell: (params) => params?.row?.color || '—',
+      },
+      {
+        field: 'service',
+        headerName: 'Service',
+        minWidth: 120,
+        flex: 0.6,
+        renderCell: (params) => params?.row?.service || '—',
+      },
+      {
+        field: 'exploitStartTime',
+        headerName: 'Exploit Start Time',
         minWidth: 140,
-        flex: 0.7,
+        flex: 0.75,
+        renderCell: (params) => params?.row?.exploitStartTime || '—',
+      },
+      {
+        field: 'exploitEndTime',
+        headerName: 'Exploit End Time',
+        minWidth: 140,
+        flex: 0.75,
+        renderCell: (params) => params?.row?.exploitEndTime || '—',
+      },
+      {
+        field: 'irReported',
+        headerName: 'IR Reported',
+        minWidth: 95,
+        flex: 0.5,
         renderCell: (params) => {
-          if (!params?.row?.childId) return null
+          if (!params?.row || role !== 'IA') return ''
+          if (params?.row?.parentId === undefined) return formatBoolean(params?.row?.irReported)
           const rowId = params.row.id
-          const currentValue = getWorkingValue(rowId, 'Image Category') ?? params?.row?.imageCategory ?? null
+          const currentValue = Boolean(getWorkingValue(rowId, 'IR Reported') ?? params?.row?.irReported)
           return (
-            <Autocomplete
-              disablePortal
-              options={getDropdownOptions('Image Category', 'Image Category')}
-              value={currentValue ?? null}
+            <Checkbox
+              checked={currentValue}
+              onClick={(event) => event.stopPropagation()}
               onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Category', newValue, inputData))
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'IR Reported', newValue, inputData))
               }
-              size="small"
-              fullWidth
-              isOptionEqualToValue={(option, value) => option === value}
-              renderInput={(inputParams) => (
-                <TextField
-                  {...inputParams}
-                  placeholder="Img Category"
-                  size="small"
-                  variant="outlined"
-                  sx={dropdownFieldSx()}
-                />
-              )}
+            />
+          )
+        },
+      },
+      {
+        field: 'sfReported',
+        headerName: 'SF Reported',
+        minWidth: 95,
+        flex: 0.5,
+        renderCell: (params) => {
+          if (!params?.row || role !== 'IA') return ''
+          if (params?.row?.parentId === undefined) return formatBoolean(params?.row?.sfReported)
+          const rowId = params.row.id
+          const currentValue = Boolean(getWorkingValue(rowId, 'SF Reported') ?? params?.row?.sfReported)
+          return (
+            <Checkbox
+              checked={currentValue}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(_, newValue) =>
+                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'SF Reported', newValue, inputData))
+              }
             />
           )
         },
@@ -478,115 +607,77 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       {
         field: 'imageQuality',
         headerName: 'Image Quality',
-        minWidth: 140,
-        flex: 0.7,
+        minWidth: 145,
+        flex: 0.72,
         renderCell: (params) => {
-          if (!params?.row?.childId) return ''
+          if (!params?.row) return ''
+          if (params.row.parentId === undefined) {
+            const aggregated = getAggregatedImageQuality(params.row)
+            return (
+              <Box className="tasking-summary__remarks-parent" sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}>
+                {aggregated || '—'}
+              </Box>
+            )
+          }
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Image Quality') ?? params?.row?.imageQuality ?? ''
           return (
-            <TextField
-              value={currentValue ?? ''}
-              onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-              onChange={(event) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
-              }
-              placeholder="Image quality"
-              size="small"
-              fullWidth
-              sx={inlineTextFieldSx()}
-            />
+            <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
+              <textarea
+                rows={1}
+                value={currentValue ?? ''}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                onFocus={(event) => event.stopPropagation()}
+                onKeyDownCapture={(event) => event.stopPropagation()}
+                onChange={(event) =>
+                  setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
+                }
+                placeholder="Image quality"
+                className="tasking-summary__remarks-input"
+              />
+            </Box>
           )
         },
       },
       {
         field: 'cloudCover',
         headerName: 'Cloud Cover',
-        minWidth: 120,
-        flex: 0.6,
+        minWidth: 132,
+        flex: 0.68,
         renderCell: (params) => {
           if (!params?.row?.childId) return null
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Cloud Cover') ?? params?.row?.cloudCover ?? null
           return (
-            <Autocomplete
-              disablePortal
-              options={getDropdownOptions('Cloud Cover', 'Cloud Cover')}
-              value={currentValue ?? null}
-              onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Cloud Cover', newValue, inputData))
-              }
-              size="small"
-              fullWidth
-              isOptionEqualToValue={(option, value) => option === value}
-              renderInput={(inputParams) => (
-                <TextField {...inputParams} placeholder="CC" size="small" variant="outlined" sx={dropdownFieldSx()} />
-              )}
-            />
-          )
-        },
-      },
-      {
-        field: 'ewStatus',
-        headerName: 'EW Status',
-        minWidth: 100,
-        flex: 0.5,
-        renderCell: (params) => params?.row?.ewStatus || '—',
-      },
-      {
-        field: 'targetTracing',
-        headerName: 'Target Tracing',
-        minWidth: 110,
-        flex: 0.5,
-        renderCell: (params) => {
-          if (!params?.row?.childId) return ''
-          const rowId = params.row.id
-          const currentValue = Boolean(getWorkingValue(rowId, 'Target Tracing') ?? params?.row?.targetTracing)
-          return (
-            <Checkbox
-              checked={currentValue}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Target Tracing', newValue, inputData))
-              }
-            />
-          )
-        },
-      },
-      {
-        field: 'v10',
-        headerName: 'V10',
-        minWidth: 70,
-        flex: 0.4,
-        renderCell: (params) => {
-          if (!params?.row?.childId) return ''
-          const rowId = params.row.id
-          const currentValue = Boolean(getWorkingValue(rowId, 'V10') ?? params?.row?.v10)
-          return (
-            <Checkbox
-              checked={currentValue}
-              onChange={(_, newValue) => setWorkingData((prev) => updateWorkingRow(prev, rowId, 'V10', newValue, inputData))}
-            />
-          )
-        },
-      },
-      {
-        field: 'opsV',
-        headerName: 'OPS V',
-        minWidth: 70,
-        flex: 0.4,
-        renderCell: (params) => {
-          if (!params?.row?.childId) return ''
-          const rowId = params.row.id
-          const currentValue = Boolean(getWorkingValue(rowId, 'OPS V') ?? params?.row?.opsV)
-          return (
-            <Checkbox
-              checked={currentValue}
-              onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'OPS V', newValue, inputData))
-              }
-            />
+            <Box sx={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={currentValue ?? ''}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+                onChange={(event) =>
+                  setWorkingData((prev) =>
+                    updateWorkingRow(prev, rowId, 'Cloud Cover', event.target.value || null, inputData),
+                  )
+                }
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => (selected ? selected : 'CC'),
+                }}
+                sx={cloudCoverSelectSx()}
+              >
+                <MenuItem value="" sx={{ display: 'none' }} />
+                {getDropdownOptions('Cloud Cover', 'Cloud Cover').map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
           )
         },
       },
@@ -597,32 +688,11 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
   const columnVisibilityModel = useMemo(
     () => ({
       imageAreaName: false,
-      sensorName: !showDetails,
-      imageId: !showDetails,
-      uploadDate: !showDetails,
-      imageDateTime: !showDetails,
-      assignee: !showDetails,
-      report: !showDetails,
-      remarks: !showDetails,
-      imageStatus: !showDetails,
-      priority: !showDetails,
-      areaName: showDetails,
-      imageCategory: showDetails,
-      imageQuality: showDetails,
-      cloudCover: showDetails,
-      ewStatus: showDetails,
-      targetTracing: showDetails,
-      v10: showDetails,
-      opsV: showDetails,
+      irReported: role === 'IA',
+      sfReported: role === 'IA',
     }),
-    [showDetails],
+    [role],
   )
-
-  const [visibilityModel, setVisibilityModel] = useState(columnVisibilityModel)
-
-  useEffect(() => {
-    setVisibilityModel(columnVisibilityModel)
-  }, [columnVisibilityModel])
 
   useEffect(() => {
     setFilterModel((prev) => ({
@@ -950,7 +1020,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
         const baseRow = inputData?.[String(rowId)] || {}
         const hasImageChanges = JSON.stringify(dataRow) !== JSON.stringify(baseRow)
         if (!hasImageChanges) return
-        if (dataRow['Report'] == null || dataRow['Image Category'] == null || dataRow['Cloud Cover'] == null) {
+        if (dataRow['Report'] == null || dataRow['Cloud Cover'] == null) {
           hasNull = true
         }
         payload[rowId] = dataRow
@@ -961,8 +1031,33 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
         const baseRow = inputData?.[String(rowId)] || {}
         const currentRemarks = normalizeRemarksValue(dataRow['Remarks'] ?? '')
         const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
-        if (currentRemarks !== baseRemarks) {
-          payload[taskId] = { ...(payload[taskId] || {}), Remarks: currentRemarks }
+        const currentImageQuality = dataRow['Image Quality'] ?? dataRow.imageQuality ?? null
+        const baseImageQuality = baseRow['Image Quality'] ?? baseRow.imageQuality ?? null
+        const currentIrReported = dataRow['IR Reported'] ?? dataRow.irReported ?? null
+        const baseIrReported = baseRow['IR Reported'] ?? baseRow.irReported ?? null
+        const currentSfReported = dataRow['SF Reported'] ?? dataRow.sfReported ?? null
+        const baseSfReported = baseRow['SF Reported'] ?? baseRow.sfReported ?? null
+        const patch = { ...(payload[taskId] || {}) }
+        if (currentRemarks !== baseRemarks) patch['Remarks'] = currentRemarks
+        if (currentIrReported !== baseIrReported) patch['IR Reported'] = Boolean(currentIrReported)
+        if (currentSfReported !== baseSfReported) patch['SF Reported'] = Boolean(currentSfReported)
+        if (Object.keys(patch).length > 0) payload[taskId] = patch
+
+        // Image Quality is persisted on the parent image row in backend.
+        if (currentImageQuality !== baseImageQuality) {
+          const parentId = dataRow['Parent ID']
+          const parentRow = workingData?.[String(parentId)] || {}
+          if (parentRow['Report'] == null || parentRow['Cloud Cover'] == null) {
+            hasNull = true
+          }
+          payload[parentId] = {
+            ...(payload[parentId] || {}),
+            Report: parentRow['Report'] ?? null,
+            'Image Category': parentRow['Image Category'] ?? null,
+            'Cloud Cover': parentRow['Cloud Cover'] ?? null,
+            'Target Tracing': parentRow['Target Tracing'] ?? null,
+            'Image Quality': currentImageQuality,
+          }
         }
       }
     })
@@ -974,9 +1069,33 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       const currentRemarks = normalizeRemarksValue(currentRow['Remarks'] ?? '')
       const baseRow = inputData?.[key] || {}
       const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
-      if (currentRemarks !== baseRemarks) {
-        const taskId = currentRow['SCVU Task ID'] ?? toBackendTaskId(key)
-        payload[taskId] = { ...(payload[taskId] || {}), Remarks: currentRemarks }
+      const currentImageQuality = currentRow['Image Quality'] ?? currentRow.imageQuality ?? null
+      const baseImageQuality = baseRow['Image Quality'] ?? baseRow.imageQuality ?? null
+      const currentIrReported = currentRow['IR Reported'] ?? currentRow.irReported ?? null
+      const baseIrReported = baseRow['IR Reported'] ?? baseRow.irReported ?? null
+      const currentSfReported = currentRow['SF Reported'] ?? currentRow.sfReported ?? null
+      const baseSfReported = baseRow['SF Reported'] ?? baseRow.sfReported ?? null
+      const taskId = currentRow['SCVU Task ID'] ?? toBackendTaskId(key)
+      const patch = { ...(payload[taskId] || {}) }
+      if (currentRemarks !== baseRemarks) patch['Remarks'] = currentRemarks
+      if (currentIrReported !== baseIrReported) patch['IR Reported'] = Boolean(currentIrReported)
+      if (currentSfReported !== baseSfReported) patch['SF Reported'] = Boolean(currentSfReported)
+      if (Object.keys(patch).length > 0) payload[taskId] = patch
+
+      if (currentImageQuality !== baseImageQuality) {
+        const parentId = currentRow['Parent ID']
+        const parentRow = workingData?.[String(parentId)] || {}
+        if (parentRow['Report'] == null || parentRow['Cloud Cover'] == null) {
+          hasNull = true
+        }
+        payload[parentId] = {
+          ...(payload[parentId] || {}),
+          Report: parentRow['Report'] ?? null,
+          'Image Category': parentRow['Image Category'] ?? null,
+          'Cloud Cover': parentRow['Cloud Cover'] ?? null,
+          'Target Tracing': parentRow['Target Tracing'] ?? null,
+          'Image Quality': currentImageQuality,
+        }
       }
     })
 
@@ -1019,7 +1138,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     if (params?.row?.parentId !== undefined && params.field === 'remarks') {
       return true
     }
-    if (params?.row?.childId && params.field === 'imageQuality') {
+    if (params?.row?.parentId !== undefined && params.field === 'imageQuality') {
       return true
     }
     return false
@@ -1234,24 +1353,6 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
 
 
 
-        <div className="tasking-summary__actions-right">
-          <div className="tasking-summary__segmented" role="group" aria-label="Column view toggle">
-            <button
-              type="button"
-              className={`tasking-summary__segment ${!showDetails ? 'is-active' : ''}`}
-              onClick={() => setShowDetails(false)}
-            >
-              Primary Columns
-            </button>
-            <button
-              type="button"
-              className={`tasking-summary__segment ${showDetails ? 'is-active' : ''}`}
-              onClick={() => setShowDetails(true)}
-            >
-              Secondary Columns
-            </button>
-          </div>
-        </div>
       </div>
 
       <div className="tasking-summary__grid">
@@ -1263,13 +1364,13 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           getTreeDataPath={getTreeDataPath}
           groupingColDef={{
             headerName: 'Image/Area Name',
-            minWidth: showDetails ? 170 : 200,
-            flex: showDetails ? 1.05 : 1.3,
+            minWidth: 200,
+            flex: 1.3,
             hideDescendantCount: true,
             valueGetter: (_value, row) => {
               const nameFromGroup =
                 row?.groupName && Array.isArray(row.groupName) ? row.groupName[row.groupName.length - 1] : null
-              return nameFromGroup || row?.areaName || row?.id?.toString() || 'unknown'
+              return getSubImageLabel(row, nameFromGroup || row?.areaName || '')
             },
           }}
           checkboxSelection
@@ -1293,11 +1394,10 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           }}
           rowHeight={56}
           columnHeaderHeight={40}
-          scrollbarSize={0}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
           onProcessRowUpdateError={(err) => console.error(err)}
-          columnVisibilityModel={visibilityModel}
+          columnVisibilityModel={columnVisibilityModel}
           loading={loading}
           hideFooter
           sx={{
@@ -1367,7 +1467,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
               transform: 'translateX(32px)',
             },
             '& .MuiDataGrid-virtualScroller': {
-              overflowX: 'hidden',
+              overflowX: 'auto',
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-overlay': {

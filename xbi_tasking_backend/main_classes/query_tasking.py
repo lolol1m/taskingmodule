@@ -138,7 +138,12 @@ SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
 
 SQL_GET_TASKING_SUMMARY_AREA = (
     "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, "
-    "task.assignee_keycloak_id, area.v10, area.opsv "
+    "task.assignee_keycloak_id, area.v10, area.opsv, "
+    "COALESCE(image_area.external_area_id, image_area.scvu_image_area_id) as area_id, "
+    "image_area.color, image_area.service, "
+    "task.exploit_start_time, task.exploit_end_time, "
+    "COALESCE(task.ir_reported, false) as ir_reported, "
+    "COALESCE(task.sf_reported, false) as sf_reported "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN area ON image_area.scvu_area_id = area.scvu_area_id "
@@ -150,7 +155,12 @@ SQL_GET_TASKING_SUMMARY_AREA = (
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv,
+        COALESCE(image_area.external_area_id, image_area.scvu_image_area_id) as area_id,
+        image_area.color, image_area.service,
+        task.exploit_start_time, task.exploit_end_time,
+        COALESCE(task.ir_reported, false) as ir_reported,
+        COALESCE(task.sf_reported, false) as sf_reported
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
@@ -162,7 +172,12 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv,
+        COALESCE(image_area.external_area_id, image_area.scvu_image_area_id) as area_id,
+        image_area.color, image_area.service,
+        task.exploit_start_time, task.exploit_end_time,
+        COALESCE(task.ir_reported, false) as ir_reported,
+        COALESCE(task.sf_reported, false) as sf_reported
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
@@ -175,6 +190,22 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
 
 SQL_UPDATE_TASK_STATUS = (
     "UPDATE task SET task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
+)
+
+SQL_UPDATE_TASK_STATUS_START = (
+    "UPDATE task SET "
+    "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "exploit_start_time = COALESCE(exploit_start_time, CURRENT_TIMESTAMP) "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
+)
+
+SQL_UPDATE_TASK_STATUS_COMPLETE = (
+    "UPDATE task SET "
+    "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "exploit_end_time = CURRENT_TIMESTAMP "
     "WHERE scvu_task_id = %s "
     "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
 )
@@ -199,7 +230,13 @@ SQL_UPDATE_TASKING_SUMMARY_IMAGE = (
     "WHERE scvu_image_id = %s"
 )
 
-SQL_UPDATE_TASKING_SUMMARY_TASK = "UPDATE task SET remarks = %s WHERE scvu_task_id = %s"
+SQL_UPDATE_TASKING_SUMMARY_TASK = (
+    "UPDATE task SET "
+    "remarks = COALESCE(%s, remarks), "
+    "ir_reported = COALESCE(%s, ir_reported), "
+    "sf_reported = COALESCE(%s, sf_reported) "
+    "WHERE scvu_task_id = %s"
+)
 
 
 class TaskingQueries:
@@ -437,9 +474,41 @@ class TaskingQueries:
 
         formatted_results = []
         for row in results:
-            task_id, area_name, task_status, remarks, assignee_keycloak_id, v10, opsv = row
+            (
+                task_id,
+                area_name,
+                task_status,
+                remarks,
+                assignee_keycloak_id,
+                v10,
+                opsv,
+                area_id,
+                color,
+                service,
+                exploit_start_time,
+                exploit_end_time,
+                ir_reported,
+                sf_reported,
+            ) = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
-            formatted_results.append((task_id, area_name, task_status, remarks, username, v10, opsv))
+            formatted_results.append(
+                (
+                    task_id,
+                    area_name,
+                    task_status,
+                    remarks,
+                    username,
+                    v10,
+                    opsv,
+                    area_id,
+                    color,
+                    service,
+                    exploit_start_time,
+                    exploit_end_time,
+                    ir_reported,
+                    sf_reported,
+                )
+            )
 
         return formatted_results
 
@@ -461,9 +530,43 @@ class TaskingQueries:
 
         formatted_results = []
         for row in results:
-            image_id, task_id, area_name, task_status, remarks, assignee_keycloak_id, v10, opsv = row
+            (
+                image_id,
+                task_id,
+                area_name,
+                task_status,
+                remarks,
+                assignee_keycloak_id,
+                v10,
+                opsv,
+                area_id,
+                color,
+                service,
+                exploit_start_time,
+                exploit_end_time,
+                ir_reported,
+                sf_reported,
+            ) = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
-            formatted_results.append((image_id, task_id, area_name, task_status, remarks, username, v10, opsv))
+            formatted_results.append(
+                (
+                    image_id,
+                    task_id,
+                    area_name,
+                    task_status,
+                    remarks,
+                    username,
+                    v10,
+                    opsv,
+                    area_id,
+                    color,
+                    service,
+                    exploit_start_time,
+                    exploit_end_time,
+                    ir_reported,
+                    sf_reported,
+                )
+            )
         return formatted_results
 
     def getTaskingSummaryAreaDataForImagesForUser(self, image_ids, assignee_keycloak_id):
@@ -484,9 +587,43 @@ class TaskingQueries:
 
         formatted_results = []
         for row in results:
-            image_id, task_id, area_name, task_status, remarks, assignee_kc_id, v10, opsv = row
+            (
+                image_id,
+                task_id,
+                area_name,
+                task_status,
+                remarks,
+                assignee_kc_id,
+                v10,
+                opsv,
+                area_id,
+                color,
+                service,
+                exploit_start_time,
+                exploit_end_time,
+                ir_reported,
+                sf_reported,
+            ) = row
             username = usernames.get(assignee_kc_id) if assignee_kc_id else AssigneeLabel.UNASSIGNED
-            formatted_results.append((image_id, task_id, area_name, task_status, remarks, username, v10, opsv))
+            formatted_results.append(
+                (
+                    image_id,
+                    task_id,
+                    area_name,
+                    task_status,
+                    remarks,
+                    username,
+                    v10,
+                    opsv,
+                    area_id,
+                    color,
+                    service,
+                    exploit_start_time,
+                    exploit_end_time,
+                    ir_reported,
+                    sf_reported,
+                )
+            )
         return formatted_results
 
     def startTask(self, task_id):
@@ -495,7 +632,7 @@ class TaskingQueries:
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS, (TaskStatus.IN_PROGRESS, task_id, TaskStatus.INCOMPLETE))
+        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_START, (TaskStatus.IN_PROGRESS, task_id, TaskStatus.INCOMPLETE))
 
     def completeTask(self, task_id):
         '''
@@ -503,7 +640,7 @@ class TaskingQueries:
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS, (TaskStatus.VERIFYING, task_id, TaskStatus.IN_PROGRESS))
+        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_COMPLETE, (TaskStatus.VERIFYING, task_id, TaskStatus.IN_PROGRESS))
 
     def verifyPass(self, task_id):
         '''
@@ -554,10 +691,10 @@ class TaskingQueries:
             ),
         )
 
-    def updateTaskingSummaryTask(self, scvu_task_id, remarks):
+    def updateTaskingSummaryTask(self, scvu_task_id, remarks=None, ir_reported=None, sf_reported=None):
         '''
-        Function:   Updates remarks of task
-        Input:      scvu_task_id, remarks
+        Function:   Updates editable tasking summary fields on task row
+        Input:      scvu_task_id, remarks, ir_reported, sf_reported
         Output:     NIL
         '''
-        self.db.executeUpdate(SQL_UPDATE_TASKING_SUMMARY_TASK, (remarks, scvu_task_id))
+        self.db.executeUpdate(SQL_UPDATE_TASKING_SUMMARY_TASK, (remarks, ir_reported, sf_reported, scvu_task_id))
