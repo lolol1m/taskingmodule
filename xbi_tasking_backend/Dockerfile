@@ -2,6 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && \
+    apt-get autoremove -y
+
+COPY keycloak.crt /usr/local/share/ca-certificates/keycloak.crt
+COPY keycloak.crt /etc/ssl/certs
+
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
+RUN update-ca-certificates
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

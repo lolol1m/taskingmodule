@@ -1,46 +1,58 @@
-version: "3.9"
+version: "1.0"
 
 services:
 
   frontend:
-    build: ./xbi-ui
+    build: ./xbi_tasking_frontend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-frontend
-    container_name: xbi-frontend
+    container_name: xbi-frontend-trial
     depends_on:
       - backend
     environment:
-      REACT_APP_DB_API_URL: http://localhost:5000
-      # REACT_APP_DB_API_URL: http://backend:5000
+      VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
+      VITE_BACKEND_URL: http://localhost:5000
+      VITE_KEYCLOAK_URL: https://localhost:8443
+      # VITE_KEYCLOAK_URL: http://keycloak:8080
+      VITE_KEYCLOAK_REALM: xbi-tasking
+      VITE_CLIENT_ID: xbi-tasking-frontend
     ports:
-      - "3000:3000"
+      - "5173:5173"
 
   backend:
     build: ./xbi_tasking_backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-backend
-    container_name: xbi-backend
+    container_name: xbi-backend-trial
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
         condition: service_started
     environment:
+      # FRONTEND_URL: https://lol_no:5173      
+      FRONTEND_URL: https://localhost:5173      
+
       # Database
       DB_HOST: postgres
       DB_NAME: XBI_TASKING_3
+      DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: password
+      AUTO_INIT_DB: true
 
       # Keycloak 
-      KEYCLOAK_PUBLIC_URL: http://localhost:8080
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: https://localhost:8443
+      KEYCLOAK_INTERNAL_URL: https://keycloak:8443
       KEYCLOAK_REALM: xbi-tasking
       KEYCLOAK_CLIENT_ID: xbi-tasking-backend
-      KEYCLOAK_CLIENT_SECRET: Zj7CYgoGf7pOuW18fEcmNFwI7HIK1k0K
+      # KEYCLOAK_CLIENT_SECRET: Zj7CYgoGf7pOuW18fEcmNFwI7HIK1k0K
+      KEYCLOAK_CLIENT_SECRET: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
       KEYCLOAK_ADMIN_CLIENT_ID: xbi-tasking-admin
-      KEYCLOAK_ADMIN_CLIENT_SECRET: 9YMbyTXVTpjPErz8jGwmWtjwfsNDnont
+      # KEYCLOAK_ADMIN_CLIENT_SECRET: 9YMbyTXVTpjPErz8jGwmWtjwfsNDnont
+      KEYCLOAK_ADMIN_CLIENT_SECRET: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
       KEYCLOAK_ENABLED: "true"
+      ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
 
     ports:
       - "5000:5000"
@@ -48,7 +60,7 @@ services:
 
   postgres:
     image: postgres:15.6
-    container_name: xbi-postgres
+    container_name: xbi-postgres-trial
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -66,18 +78,26 @@ services:
 
 
   keycloak:
-    image: xbi-keycloak:custom
-    container_name: xbi-keycloak
-    command: 
-    - start-dev
-    - --import-realm
-    - --hostname=localhost
-    - --hostname-strict=false
+    build: ./deployment_stuff/xbi-keycloak/
+
+    # image: xbi-keycloak:2.7
+    container_name: xbi-keycloak-trial
+    # command: 
+    # - start-dev
+    # - --import-realm
+    # - --hostname=localhost
+    # - --hostname-strict=false
+    # - --https-certificate-file=/opt/keycloak/conf/keycloak.crt
+    # - --https-certificate-key-file=/opt/keycloak/conf/keycloak.key
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      # KEYCLOAK_ADMIN: admin
+      # KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
     ports:
-      - "8080:8080"
+      # - "8080:8080"
+      - "8443:8443"
     volumes:
       - keycloak_data:/opt/keycloak/data
 

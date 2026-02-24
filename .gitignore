@@ -9,3 +9,5 @@ XBI_UI/
 xbi_tasking_backend/code/
 xbi_tasking_backend/dev_server.config
 mockui/
+dev_server.config
+docker-compose.yml
