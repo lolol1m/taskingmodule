@@ -78,17 +78,18 @@ services:
 
 
   keycloak:
-    build: ./deployment_stuff/xbi-keycloak/
+    # build: ./deployment_stuff/xbi-keycloak/
 
     # image: xbi-keycloak:2.7
-    container_name: xbi-keycloak-trial
-    # command: 
-    # - start-dev
-    # - --import-realm
-    # - --hostname=localhost
-    # - --hostname-strict=false
-    # - --https-certificate-file=/opt/keycloak/conf/keycloak.crt
-    # - --https-certificate-key-file=/opt/keycloak/conf/keycloak.key
+    image: quay.io/keycloak/keycloak:26.5.4
+    # container_name: xbi-keycloak-trial
+    command: 
+    - start-dev
+    - --import-realm
+    - --hostname=localhost
+    - --hostname-strict=false
+    - --https-certificate-file=/opt/keycloak/conf/keycloak.crt
+    - --https-certificate-key-file=/opt/keycloak/conf/keycloak.key
     environment:
       # KEYCLOAK_ADMIN: admin
       # KEYCLOAK_ADMIN_PASSWORD: admin
@@ -100,7 +101,14 @@ services:
       - "8443:8443"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - keycloak_cert:/opt/keycloak/conf
 
 volumes:
   pgdata:
   keycloak_data:
+  keycloak_cert:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "${PWD}/deployment_stuff/xbi-keycloak/ca_certs"
