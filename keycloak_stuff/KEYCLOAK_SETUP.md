@@ -38,7 +38,6 @@
    - Click **Save**
 
 
-
 ### 2. Configure Backend Client
 
 **This is the REQUIRED client for authentication.**
@@ -89,7 +88,7 @@
 
 ### 5. (Optional) Configure Admin Client for User Listing
 
-**Note**: This client is OPTIONAL. It's only needed if you want the `/getUsers` endpoint to query Keycloak for users with specific roles. The application will work fine without it - the endpoint will just return users from the database instead.
+**Note**: This client is required if you want the `/getUsers` endpoint to query Keycloak for users with specific roles. The legacy database users table has been removed, so `/getUsers` depends on Keycloak.
 
 If you don't need Keycloak user listing, you can skip this section and leave `admin_client_secret` as `your_admin_client_secret` in the config file.
 
@@ -102,6 +101,7 @@ If you don't need Keycloak user listing, you can skip this section and leave `ad
    - **Enable Client authentication** (makes it confidential)
    - **Disable Standard flow** (not needed for service account)
    - **Enable Service accounts roles** (required for admin API access)
+   - **Enable Direct Access Grant** (required for changing user passwords)
    - Click **Next**
 4. In **Login settings**:
    - **Valid redirect URIs**: Leave empty
@@ -114,7 +114,10 @@ If you don't need Keycloak user listing, you can skip this section and leave `ad
    - `view-users` (to view users)
    - `query-users` (to query users by role)
    - `view-realm` (to access realm info)
+   - `manage-users` (to manage users info)
 
+   
+   
 ## Backend Configuration
 
 ### Environment Variables

@@ -1,10 +1,11 @@
 import unittest
-from main_classes import ConfigClass
+
+from config import get_config, load_config
 
 class ConfigClass_unittest(unittest.TestCase):
     @classmethod
     def setUpClass(self):
-        ConfigClass("testing.config")
+        load_config("testing.config")
 
     @classmethod
     def tearDownClass(self):
@@ -18,27 +19,27 @@ class ConfigClass_unittest(unittest.TestCase):
 
     def test_getDatabaseName_baseCase(self):
         res = "XBI_TASKING_3_TEST"
-        exp = ConfigClass._instance.getDatabaseName()
+        exp = get_config().getDatabaseName()
         self.assertEqual(res, exp, "does not equal to db name")
 
     def test_getIPAddress_baseCase(self):
-        res = "192.168.1.2"
-        exp = ConfigClass._instance.getIPAddress()
+        res = "localhost"
+        exp = get_config().getIPAddress()
         self.assertEqual(res, exp, "does not equal to IP")
 
     def test_getPort_baseCase(self):
         res = "5432"
-        exp = ConfigClass._instance.getPort()
+        exp = get_config().getPort()
         self.assertEqual(res, exp, "does not equal to port")
     
     def test_getUser_baseCase(self):
         res = "postgres"
-        exp = ConfigClass._instance.getUser()
+        exp = get_config().getUser()
         self.assertEqual(res, exp, "does not equal to User")
 
     def test_getPassword_baseCase(self):
-        res = "P@ssword1"
-        exp = ConfigClass._instance.getPassword()
+        res = "admin123"
+        exp = get_config().getPassword()
         self.assertEqual(res, exp, "does not equal to Password")
 
     def startUnitTest(self):

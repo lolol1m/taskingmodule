@@ -1,14 +1,15 @@
 import unittest
 import psycopg2
 
-from main_classes import Database, ConfigClass
+from config import get_config, load_config
+from main_classes.Database import Database
 
 class Database_unittest(unittest.TestCase):
     @classmethod
     def setUpClass(self):
-        ConfigClass("testing.config")
-        self.db = Database()
-        if ConfigClass._instance.getDatabaseName() != "XBI_TASKING_3_TEST":
+        config = load_config("testing.config")
+        self.db = Database(config=config)
+        if get_config().getDatabaseName() != "XBI_TASKING_3_TEST":
             print("PLS CHECK YOUR config file")
             exit()
         else:
@@ -20,6 +21,7 @@ class Database_unittest(unittest.TestCase):
 
     def setUp(self):
         self.db.deleteAll()
+        self.db.seed_test_data()
 
     def tearDown(self):
         self.db.deleteAll()
@@ -61,11 +63,10 @@ class Database_unittest(unittest.TestCase):
         self.assertEqual(res, exp, "delete failed")
     
     def test_executeInsertMany_baseCase(self):
-        temp = [('hello',),  ('hello hello',), ('pair of hello hello',), ('walrus',)]
-        self.db.executeInsertMany(f"INSERT INTO users (name) VALUES (%s)", temp)
-        res = self.db.executeSelect("SELECT * from users")[0][1]
-        exp = 'hello'
-        self.assertEqual(res, exp, "executeInsertMany does not work")
+        temp = [('test_cat_a',),  ('test_cat_b',), ('test_cat_c',), ('test_cat_d',)]
+        self.db.executeInsertMany("INSERT INTO sensor_category (name) VALUES (%s)", temp)
+        res = self.db.executeSelect("SELECT name FROM sensor_category WHERE name = 'test_cat_a'")
+        self.assertEqual(len(res), 1, "executeInsertMany does not work")
 
     def test_executeUpdateMany_baseCase(self):
         self.db.executeInsert("INSERT INTO sensor(id, name) VALUES (1, 'SB')")
