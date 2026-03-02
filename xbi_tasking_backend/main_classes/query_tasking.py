@@ -217,9 +217,20 @@ SQL_UPDATE_TASK_STATUS_COMPLETE = (
     "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
 )
 
+SQL_UPDATE_TASK_STATUS_VERIFY_FAIL = (
+    "UPDATE task SET "
+    "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "exploit_start_time = NULL, "
+    "exploit_end_time = NULL "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
+)
+
 SQL_RESET_IMAGE_TASKS_FROM_COMPLETED = (
     "UPDATE task "
-    "SET task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "SET task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "exploit_start_time = NULL, "
+    "exploit_end_time = NULL "
     "WHERE task_status_id = (SELECT id FROM task_status WHERE name = %s) "
     "AND scvu_image_area_id IN ("
     "  SELECT scvu_image_area_id "
@@ -673,22 +684,26 @@ class TaskingQueries:
 
     def verifyFail(self, task_id):
         '''
-        Function:   Updates task status to In Progress if it is currently Verifying
+        Function:   Re-queues task as Incomplete and clears exploit timestamps
+                    if it is currently Verifying.
         Input:      task_id is the id of the task to be updated
         Output:     NIL
         '''
-        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS, (TaskStatus.IN_PROGRESS, task_id, TaskStatus.VERIFYING))
+        self.db.executeUpdate(
+            SQL_UPDATE_TASK_STATUS_VERIFY_FAIL,
+            (TaskStatus.INCOMPLETE, task_id, TaskStatus.VERIFYING),
+        )
 
     def resetImageTasksFromCompleted(self, scvu_image_id):
         '''
-        Function:   Resets all completed tasks for an image to verifying
+        Function:   Resets all completed tasks for an image to incomplete
                     when an image is uncompleted.
         Input:      scvu_image_id
         Output:     NIL
         '''
         self.db.executeUpdate(
             SQL_RESET_IMAGE_TASKS_FROM_COMPLETED,
-            (TaskStatus.VERIFYING, TaskStatus.COMPLETED, scvu_image_id),
+            (TaskStatus.INCOMPLETE, TaskStatus.COMPLETED, scvu_image_id),
         )
 
     def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing):

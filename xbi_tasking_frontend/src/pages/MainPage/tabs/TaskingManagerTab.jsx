@@ -18,6 +18,8 @@ const TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY = 'taskingManagerStagedAutoAssign'
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
+const TABLE_AUTO_REFRESH_MS = 5000
+
 const isDateRangeTooLarge = (range, maxDays) => {
   if (!range) return false
   const start = range['Start Date']
@@ -70,6 +72,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [hasPendingEdits, setHasPendingEdits] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const [actionsEnabled, setActionsEnabled] = useState(false)
@@ -254,6 +257,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       }
       const showAsProposedOnly = localStorage.getItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY) === '1'
       setRows(formatData(data, { showAsProposedOnly }))
+      setHasPendingEdits(false)
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
       const message = getErrorMessage(err, 'Unable to load tasking manager data.')
@@ -288,6 +292,15 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      if (!hasPendingEdits) {
+        setRefreshKey((prev) => prev + 1)
+      }
+    }, TABLE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timerId)
+  }, [hasPendingEdits])
 
   useEffect(() => {
     fetchTaskingManager()
@@ -348,6 +361,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     const applyAssignee = (nextValue) => {
       const proposedAssigneeValue = nextValue || ''
       if (isImageRow) {
+        setHasPendingEdits(true)
         setRows((prev) =>
           prev.map((row) => {
             if (row.id === params.id || row.parentId === params.id) {
@@ -359,6 +373,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         return
       }
 
+      setHasPendingEdits(true)
       updateRows(params.id, (row) => ({ ...row, proposedAssignee: proposedAssigneeValue }))
       const parentId = params?.row?.parentId
       if (parentId === undefined || parentId === null) return
@@ -458,7 +473,10 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
-        onChange={(event) => updateRows(params.row.id, (row) => ({ ...row, priority: event.target.value }))}
+        onChange={(event) => {
+          setHasPendingEdits(true)
+          updateRows(params.row.id, (row) => ({ ...row, priority: event.target.value }))
+        }}
         SelectProps={{
           displayEmpty: true,
           renderValue: (selected) => (selected ? selected : 'Priority'),
@@ -607,12 +625,13 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           })),
         )
       }
+      setHasPendingEdits(false)
 
       const summaryParts = []
       if (hasTasks) summaryParts.push(`${tasksPayload.Tasks.length} tasks assigned`)
       if (hasPriority) summaryParts.push(`${Object.keys(prioritiesPayload).length} priorities updated`)
       addNotification({
-        title: 'Tasking Manager updated',
+        title: 'Tasking updated',
         meta: `Just now · ${summaryParts.join(' · ')}`,
       })
       setRefreshKey((prev) => prev + 1)

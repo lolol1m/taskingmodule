@@ -67,9 +67,17 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
           title: 'Unverified Tasks',
           subtitle: 'Review and verify completed tasks for the selected date range.',
           taskStatusFilter: 'verifying',
+          showVerificationActions: true,
+          verificationOnlyActions: true,
+          readOnlyInputs: true,
         }
       : activeTab === 'summary'
-        ? { title: 'Tasking Summary', subtitle: 'Task status overview for the selected date range.' }
+        ? {
+            title: 'Tasking Summary',
+            subtitle: 'Task status overview for the selected date range.',
+            taskStatusFilter: ['incomplete', 'in progress', 'not started'],
+            showVerificationActions: false,
+          }
         : activeTab === 'manager'
           ? { title: 'Tasking Assignments', subtitle: 'Manage tasking priorities, assignees, and TTGs.' }
           : activeTab === 'completed-verified'

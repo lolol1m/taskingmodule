@@ -59,7 +59,8 @@ SQL_GET_IMAGE_COMPLETE_DATE = "SELECT completed_date FROM image WHERE scvu_image
 SQL_GET_IMAGE_BY_ID_AND_NAME = "SELECT image_id, image_file_name FROM image WHERE image_id = %s AND image_file_name = %s"
 
 SQL_GET_IMAGE_AREA_DATA = (
-    "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id "
+    "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, "
+    "COALESCE(task.ir_reported, false) as ir_reported, COALESCE(task.sf_reported, false) as sf_reported "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN area ON image_area.scvu_area_id = area.scvu_area_id "
@@ -70,7 +71,9 @@ SQL_GET_IMAGE_AREA_DATA = (
 
 SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id,
+        COALESCE(task.ir_reported, false) as ir_reported,
+        COALESCE(task.sf_reported, false) as sf_reported
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
@@ -250,26 +253,26 @@ class ImageQueries:
         '''
         Function: Gets image area data for completed images
         Input: scvu_image_id
-        Output: scvu_task_id, area name, remarks, assignee name
+        Output: scvu_task_id, area name, remarks, assignee name, ir_reported, sf_reported
         '''
         results = self.db.executeSelect(SQL_GET_IMAGE_AREA_DATA, (scvu_image_id,))
         assignee_ids = [row[3] for row in results if row[3]]
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
         for row in results:
-            task_id, area_name, remarks, assignee_keycloak_id = row
+            task_id, area_name, remarks, assignee_keycloak_id, ir_reported, sf_reported = row
             if assignee_keycloak_id:
                 assignee = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
             else:
                 assignee = AssigneeLabel.UNASSIGNED
-            formatted.append((task_id, area_name, remarks, assignee))
+            formatted.append((task_id, area_name, remarks, assignee, ir_reported, sf_reported))
         return formatted
 
     def getImageAreaDataForImages(self, scvu_image_ids):
         '''
         Function: Gets image area data for completed images (batch)
         Input: scvu_image_ids
-        Output: list of tuples with image_id, task_id, area_name, remarks, assignee
+        Output: list of tuples with image_id, task_id, area_name, remarks, assignee, ir_reported, sf_reported
         '''
         if not scvu_image_ids:
             return []
@@ -281,12 +284,12 @@ class ImageQueries:
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
         for row in results:
-            image_id, task_id, area_name, remarks, assignee_keycloak_id = row
+            image_id, task_id, area_name, remarks, assignee_keycloak_id, ir_reported, sf_reported = row
             if assignee_keycloak_id:
                 assignee = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
             else:
                 assignee = AssigneeLabel.UNASSIGNED
-            formatted.append((image_id, task_id, area_name, remarks, assignee))
+            formatted.append((image_id, task_id, area_name, remarks, assignee, ir_reported, sf_reported))
         return formatted
 
     def getImageData(self, start_date, end_date, limit=None, offset=None):

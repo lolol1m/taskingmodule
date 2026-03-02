@@ -21,6 +21,8 @@ const api = new API()
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
+const TABLE_AUTO_REFRESH_MS = 5000
+
 
 
 const updateWorkingRow = (prev, rowId, field, value, baseData = null) => {
@@ -184,6 +186,9 @@ function TaskingSummaryTab({
   title = 'Tasking Summary',
   subtitle = 'Task status overview for the selected date range.',
   taskStatusFilter = null,
+  showVerificationActions = true,
+  verificationOnlyActions = false,
+  readOnlyInputs = false,
 }) {
   const [inputData, setInputData] = useState(null)
   const [workingData, setWorkingData] = useState(null)
@@ -201,6 +206,7 @@ function TaskingSummaryTab({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [hasPendingEdits, setHasPendingEdits] = useState(false)
   const [selection, setSelection] = useState([])
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
@@ -208,15 +214,25 @@ function TaskingSummaryTab({
   const [clipboardValue, setClipboardValue] = useState('')
   const { addNotification } = useNotifications()
   const handleTooltipClose = () => setOpenCopy(false)
+  const applyWorkingDataChange = (updater) => {
+    setWorkingData((prev) => updater(prev))
+    setHasPendingEdits(true)
+  }
 
   const rows = useMemo(() => buildRows(workingData || inputData), [workingData, inputData])
+  const normalizedStatusFilters = useMemo(() => {
+    if (!taskStatusFilter) return null
+    const values = Array.isArray(taskStatusFilter) ? taskStatusFilter : [taskStatusFilter]
+    const normalized = values.map((value) => normalizeStatus(value)).filter(Boolean)
+    if (!normalized.length) return null
+    return new Set(normalized)
+  }, [taskStatusFilter])
   const displayedRows = useMemo(() => {
-    if (!taskStatusFilter) return rows
-    const normalizedTarget = normalizeStatus(taskStatusFilter)
+    if (!normalizedStatusFilters) return rows
     const includedChildIds = new Set(
       rows
         .filter((row) => row?.parentId !== undefined)
-        .filter((row) => normalizeStatus(row?.taskStatus) === normalizedTarget)
+        .filter((row) => normalizedStatusFilters.has(normalizeStatus(row?.taskStatus)))
         .map((row) => row.id),
     )
     const parentIds = new Set(
@@ -226,7 +242,7 @@ function TaskingSummaryTab({
         .filter((value) => value !== undefined && value !== null),
     )
     return rows.filter((row) => parentIds.has(row.id) || includedChildIds.has(row.id))
-  }, [rows, taskStatusFilter])
+  }, [rows, normalizedStatusFilters])
 
   const reportColor = (value) => {
     switch (value) {
@@ -404,6 +420,36 @@ function TaskingSummaryTab({
     return qualityValues.join('\n')
   }
 
+  const parseExploitTimestamp = (value) => {
+    if (!value || typeof value !== 'string') return null
+    // Backend commonly sends "YYYY-MM-DD, HH:mm:ss".
+    const normalized = value.includes(', ') ? value.replace(', ', 'T') : value
+    const parsed = new Date(normalized)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const getAggregatedExploitTime = (row, field, mode, gridApi) => {
+    if (!row?.childId || !Array.isArray(row.childId)) return row?.[field] || ''
+    const dateValues = row.childId
+      .map((taskId) => {
+        const numericTaskId = Number(taskId)
+        if (!Number.isFinite(numericTaskId)) return null
+        const taskRowId = -Math.abs(numericTaskId)
+        const taskRow = gridApi?.getRow?.(taskRowId)
+        if (!taskRow) return null
+        const rowValue = taskRow[field]
+        const parsed = parseExploitTimestamp(rowValue || '')
+        return parsed ? { parsed, raw: rowValue } : null
+      })
+      .filter(Boolean)
+
+    if (dateValues.length === 0) return row?.[field] || ''
+    if (mode === 'min') {
+      return dateValues.reduce((acc, curr) => (curr.parsed < acc.parsed ? curr : acc)).raw
+    }
+    return dateValues.reduce((acc, curr) => (curr.parsed > acc.parsed ? curr : acc)).raw
+  }
+
   const roundDownToHour = (value) => {
     if (!value || typeof value !== 'string') return value
     return value.replace(/(\d{2}):\d{2}:\d{2}$/, '$1:00:00')
@@ -444,6 +490,9 @@ function TaskingSummaryTab({
           if (!params?.row?.childId) return null
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Report') ?? params?.row?.report ?? null
+          if (readOnlyInputs) {
+            return <Box sx={{ width: '100%' }}>{currentValue || '—'}</Box>
+          }
           return (
             <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
               <TextField
@@ -454,7 +503,7 @@ function TaskingSummaryTab({
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) =>
+                  applyWorkingDataChange((prev) =>
                     updateWorkingRow(prev, rowId, 'Report', event.target.value || null, inputData),
                   )
                 }
@@ -495,6 +544,16 @@ function TaskingSummaryTab({
           }
           const rowId = params.row.id
           const currentValue = normalizeRemarksValue(getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? '')
+          if (readOnlyInputs) {
+            return (
+              <Box
+                className={`tasking-summary__remarks-parent${currentValue ? '' : ' is-empty'}`}
+                sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}
+              >
+                {currentValue || '—'}
+              </Box>
+            )
+          }
           return (
             <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
               <textarea
@@ -506,7 +565,7 @@ function TaskingSummaryTab({
                 onFocus={(event) => event.stopPropagation()}
                 onKeyDownCapture={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) =>
+                  applyWorkingDataChange((prev) =>
                     updateWorkingRow(prev, rowId, 'Remarks', normalizeRemarksValue(event.target.value), inputData),
                   )
                 }
@@ -576,14 +635,28 @@ function TaskingSummaryTab({
         headerName: 'Exploit Start Time',
         minWidth: 140,
         flex: 0.75,
-        renderCell: (params) => params?.row?.exploitStartTime || '—',
+        renderCell: (params) => {
+          if (!params?.row) return '—'
+          if (params.row.parentId === undefined) {
+            const earliestStart = getAggregatedExploitTime(params.row, 'exploitStartTime', 'min', params.api)
+            return earliestStart || '—'
+          }
+          return params.row.exploitStartTime || '—'
+        },
       },
       {
         field: 'exploitEndTime',
         headerName: 'Exploit End Time',
         minWidth: 140,
         flex: 0.75,
-        renderCell: (params) => params?.row?.exploitEndTime || '—',
+        renderCell: (params) => {
+          if (!params?.row) return '—'
+          if (params.row.parentId === undefined) {
+            const latestEnd = getAggregatedExploitTime(params.row, 'exploitEndTime', 'max', params.api)
+            return latestEnd || '—'
+          }
+          return params.row.exploitEndTime || '—'
+        },
       },
       {
         field: 'irReported',
@@ -595,12 +668,13 @@ function TaskingSummaryTab({
           if (params?.row?.parentId === undefined) return formatBoolean(params?.row?.irReported)
           const rowId = params.row.id
           const currentValue = Boolean(getWorkingValue(rowId, 'IR Reported') ?? params?.row?.irReported)
+          if (readOnlyInputs) return formatBoolean(currentValue)
           return (
             <Checkbox
               checked={currentValue}
               onClick={(event) => event.stopPropagation()}
               onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'IR Reported', newValue, inputData))
+                applyWorkingDataChange((prev) => updateWorkingRow(prev, rowId, 'IR Reported', newValue, inputData))
               }
             />
           )
@@ -616,12 +690,13 @@ function TaskingSummaryTab({
           if (params?.row?.parentId === undefined) return formatBoolean(params?.row?.sfReported)
           const rowId = params.row.id
           const currentValue = Boolean(getWorkingValue(rowId, 'SF Reported') ?? params?.row?.sfReported)
+          if (readOnlyInputs) return formatBoolean(currentValue)
           return (
             <Checkbox
               checked={currentValue}
               onClick={(event) => event.stopPropagation()}
               onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'SF Reported', newValue, inputData))
+                applyWorkingDataChange((prev) => updateWorkingRow(prev, rowId, 'SF Reported', newValue, inputData))
               }
             />
           )
@@ -644,6 +719,13 @@ function TaskingSummaryTab({
           }
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Image Quality') ?? params?.row?.imageQuality ?? ''
+          if (readOnlyInputs) {
+            return (
+              <Box className="tasking-summary__remarks-parent" sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}>
+                {currentValue || '—'}
+              </Box>
+            )
+          }
           return (
             <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
               <textarea
@@ -655,7 +737,9 @@ function TaskingSummaryTab({
                 onFocus={(event) => event.stopPropagation()}
                 onKeyDownCapture={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
+                  applyWorkingDataChange((prev) =>
+                    updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData),
+                  )
                 }
                 placeholder="Image quality"
                 className="tasking-summary__remarks-input"
@@ -673,6 +757,9 @@ function TaskingSummaryTab({
           if (!params?.row?.childId) return null
           const rowId = params.row.id
           const currentValue = getWorkingValue(rowId, 'Cloud Cover') ?? params?.row?.cloudCover ?? null
+          if (readOnlyInputs) {
+            return <Box sx={{ width: '100%' }}>{currentValue || '—'}</Box>
+          }
           return (
             <Box sx={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'center' }}>
               <TextField
@@ -683,7 +770,7 @@ function TaskingSummaryTab({
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) =>
+                  applyWorkingDataChange((prev) =>
                     updateWorkingRow(prev, rowId, 'Cloud Cover', event.target.value || null, inputData),
                   )
                 }
@@ -705,7 +792,7 @@ function TaskingSummaryTab({
         },
       },
     ],
-    [],
+    [readOnlyInputs, role],
   )
 
   const columnVisibilityModel = useMemo(
@@ -1146,6 +1233,7 @@ function TaskingSummaryTab({
     try {
       setError(null)
       await api.postUpdateTaskingSummaryData(payload)
+      setHasPendingEdits(false)
       addNotification({
         title: 'Tasking Summary updated',
         meta: `Just now · ${selection.length} rows updated`,
@@ -1174,7 +1262,7 @@ function TaskingSummaryTab({
 
   const processRowUpdate = (newRow) => {
     if (!newRow?.id) return newRow
-    setWorkingData((prev) => {
+    applyWorkingDataChange((prev) => {
       let next = prev
       if (newRow.remarks !== undefined) {
         next = updateWorkingRow(next, newRow.id, 'Remarks', newRow.remarks)
@@ -1230,8 +1318,17 @@ function TaskingSummaryTab({
     role === 'II'
       ? { CT: true, VF: false, VP: false, CI: false }
       : role === 'Senior II' || role === 'IA'
-        ? { CT: true, VF: true, VP: true, CI: true }
-        : { CT: true, VF: true, VP: true, CI: true }
+        ? { CT: true, VF: showVerificationActions, VP: showVerificationActions, CI: showVerificationActions }
+        : { CT: true, VF: showVerificationActions, VP: showVerificationActions, CI: showVerificationActions }
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      if (!hasPendingEdits) {
+        setRefreshKey((prev) => prev + 1)
+      }
+    }, TABLE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timerId)
+  }, [hasPendingEdits])
 
   useEffect(() => {
     fetchSummary()
@@ -1240,6 +1337,7 @@ function TaskingSummaryTab({
   useEffect(() => {
     if (inputData) {
       setWorkingData(inputData)
+      setHasPendingEdits(false)
     }
   }, [inputData])
 
@@ -1317,22 +1415,24 @@ function TaskingSummaryTab({
       <div className="tasking-summary__actions">
         <div className="tasking-summary__actions-left">
           <div className="tasking-summary__action-buttons">
-            <ClickAwayListener onClickAway={handleTooltipClose}>
-              <Tooltip
-                PopperProps={{ disablePortal: true }}
-                onClose={handleTooltipClose}
-                open={openCopy}
-                disableFocusListener
-                disableHoverListener
-                disableTouchListener
-                title={clipboardValue}
-              >
-                <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
-                  Start Task
-                </Button>
-              </Tooltip>
-            </ClickAwayListener>
-            {isShow.CT ? (
+            {!verificationOnlyActions ? (
+              <ClickAwayListener onClickAway={handleTooltipClose}>
+                <Tooltip
+                  PopperProps={{ disablePortal: true }}
+                  onClose={handleTooltipClose}
+                  open={openCopy}
+                  disableFocusListener
+                  disableHoverListener
+                  disableTouchListener
+                  title={clipboardValue}
+                >
+                  <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
+                    Start Task
+                  </Button>
+                </Tooltip>
+              </ClickAwayListener>
+            ) : null}
+            {!verificationOnlyActions && isShow.CT ? (
               <Button
                 className="tasking-summary__button"
                 onClick={() => processTask('/tasking/completeTasks')}
@@ -1359,7 +1459,7 @@ function TaskingSummaryTab({
                 Verify Pass
               </Button>
             ) : null}
-            {isShow.CI ? (
+            {!verificationOnlyActions && isShow.CI ? (
               <Button
                 className="tasking-summary__button"
                 onClick={() => processImage('/tasking/completeImages')}
@@ -1368,9 +1468,11 @@ function TaskingSummaryTab({
                 Complete Image
               </Button>
             ) : null}
-            <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
-              Apply Change
-            </Button>
+            {!verificationOnlyActions ? (
+              <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
+                Apply Change
+              </Button>
+            ) : null}
           </div>
         </div>
 

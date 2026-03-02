@@ -6,6 +6,9 @@ def format_complete_image_area(area_data, image_id):
         "Area Name" : area_data[1],
         "Remarks" : area_data[2],
         "Assignee" : area_data[3],
+        "IR Reported": area_data[4],
+        "SF Reported": area_data[5],
+        "SCVU Task ID": area_data[0],
         "Parent ID" : image_id,
     }
 
@@ -29,10 +32,16 @@ def format_complete_image_image(image_data, area_data):
         'EW Status' : image_data[11],
         'Vetter': image_data[12]
     }
+    has_ir = False
+    has_sf = False
     for area in area_data:
         childList.append(area[0])
         remarks += area[2] + "\n"
+        has_ir = has_ir or bool(area[4])
+        has_sf = has_sf or bool(area[5])
     output['Child ID'] = childList
     output['Remarks'] = remarks
+    output['IR Reported'] = has_ir
+    output['SF Reported'] = has_sf
 
     return output
