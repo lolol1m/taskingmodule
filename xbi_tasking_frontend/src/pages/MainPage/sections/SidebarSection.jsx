@@ -7,6 +7,7 @@ import exitIcon from '../../../assets/exit.png'
 import layerIcon from '../../../assets/layer.png'
 import layoutIcon from '../../../assets/layouting.png'
 import nightIcon from '../../../assets/dark-mode.png'
+import removeIcon from '../../../assets/remove.png'
 import reportIcon from '../../../assets/report.png'
 import sensorIcon from '../../../assets/sensor.png'
 import settingIcon from '../../../assets/gear.png'
@@ -156,9 +157,9 @@ function SidebarSection({
 
           >
             <span className="sidebar__icon">
-              <img src={checkMarkIcon} alt="" />
+              <img src={removeIcon} alt="" />
             </span>
-            <span className="sidebar__text">Completed, but Unverified Tasks</span>
+            <span className="sidebar__text">Unverified Tasks</span>
           </button>
           <button
             className={`sidebar__item ${activeTab === 'completed-verified' ? 'is-active' : ''}`}
@@ -168,7 +169,7 @@ function SidebarSection({
             <span className="sidebar__icon">
               <img src={checkMarkIcon} alt="" />
             </span>
-            <span className="sidebar__text">Completed, Verified Tasks</span>
+            <span className="sidebar__text">Verified Tasks</span>
           </button>
           {!isBasicUser && (
             <button

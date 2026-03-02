@@ -28,8 +28,8 @@ const tabMap = {
 const tabLabelMap = {
   summary: 'Tasking Summary',
   manager: 'Tasking Assignments',
-  'completed-unverified': 'Completed, but Unverified Tasks',
-  'completed-verified': 'Completed, Verified Tasks',
+  'completed-unverified': 'Unverified Tasks',
+  'completed-verified': 'Verified Tasks',
   submission: 'Submission',
   'admin-create-user': 'Create User',
   'admin-presence': 'User Presence',
@@ -64,7 +64,7 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
   const tabProps =
     activeTab === 'completed-unverified'
       ? {
-          title: 'Completed, but Unverified Tasks',
+          title: 'Unverified Tasks',
           subtitle: 'Review and verify completed tasks for the selected date range.',
           taskStatusFilter: 'verifying',
         }
@@ -73,7 +73,7 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
         : activeTab === 'manager'
           ? { title: 'Tasking Assignments', subtitle: 'Manage tasking priorities, assignees, and TTGs.' }
           : activeTab === 'completed-verified'
-            ? { title: 'Completed, Verified Tasks', subtitle: 'Review verified completed imagery for the selected date range.' }
+            ? { title: 'Verified Tasks', subtitle: 'Review verified completed imagery for the selected date range.' }
             : {}
 
   return (
