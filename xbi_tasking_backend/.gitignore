@@ -13,3 +13,5 @@ test_stub.py
 *.xlsx
 dev_server.config
 *.crt
+certs/
+demo_backend/

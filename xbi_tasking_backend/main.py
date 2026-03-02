@@ -52,11 +52,11 @@ if raw_origins:
     origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 else:
     origins = [
+        config.getFrontendURL(),
         "https://localhost:5173",
         "https://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        config.getFrontendURL()
     ]
 
 raw_methods = os.getenv("CORS_ALLOW_METHODS")
@@ -247,6 +247,6 @@ async def redoc_html():
 async def index():
     return "it works"
 
-
+#TODO Hardcoded where certs are placed
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True, ssl_certfile = "/certs/server.crt", ssl_keyfile = "/certs/server.key")
