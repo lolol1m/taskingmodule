@@ -13,6 +13,7 @@ import useNotifications from '../../../components/notifications/useNotifications
 
 const api = new API()
 const MAX_DATE_RANGE_DAYS = 90
+const TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY = 'taskingManagerStagedAutoAssign'
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
@@ -54,7 +55,15 @@ const toISOLocal = (date) => {
   )}:${pad(d.getSeconds())}.${ms}Z`
 }
 
-function TaskingManagerTab({ dateRange }) {
+const normalizeAssigneeValue = (value) => {
+  if (value === null || value === undefined) return ''
+  const normalized = String(value).trim()
+  if (!normalized) return ''
+  if (normalized.toLowerCase() === 'unassigned' || normalized.toLowerCase() === 'nil') return ''
+  return normalized
+}
+
+function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'Manage tasking priorities, assignees, and TTGs.' }) {
   const [rows, setRows] = useState([])
   const [assignees, setAssignees] = useState([{ id: 'Multiple', name: 'Multiple' }])
   const [selectionModel, setSelectionModel] = useState(() => ({ type: 'include', ids: new Set() }))
@@ -85,8 +94,9 @@ function TaskingManagerTab({ dateRange }) {
     })
   }
 
-  const formatData = (inputData) => {
+  const formatData = (inputData, options = {}) => {
     if (!inputData) return []
+    const showAsProposedOnly = Boolean(options.showAsProposedOnly)
 
     const entries = Array.isArray(inputData)
       ? inputData.map((entry, index) => {
@@ -120,6 +130,7 @@ function TaskingManagerTab({ dateRange }) {
     const formatted = entries
       .map(({ key, entry }) => {
         if (!entry) return null
+        const assigneeValue = normalizeAssigneeValue(readValue(entry, ['Assignee']))
 
         const parentIdValue = readValue(entry, ['Parent ID', 'ParentID', 'parent_id'])
         const areaNameValue = readValue(entry, ['Area Name', 'Area', 'Area_Name'])
@@ -146,8 +157,8 @@ function TaskingManagerTab({ dateRange }) {
             id: areaId,
             groupName: [parentName, areaName],
             treePath: [`img_${parentId}`, areaName],
-            currentAssignee: readValue(entry, ['Assignee']) || '',
-            proposedAssignee: readValue(entry, ['Assignee']) || '',
+            currentAssignee: showAsProposedOnly ? '' : assigneeValue,
+            proposedAssignee: assigneeValue,
             areaName,
             parentId,
             scvuImageAreaId: readValue(entry, ['Area ID', 'areaId', 'SCVU Image Area ID']) || null,
@@ -166,8 +177,8 @@ function TaskingManagerTab({ dateRange }) {
           id: imageId,
           groupName: [imageFileName],
           treePath: [`img_${imageId}`],
-          currentAssignee: readValue(entry, ['Assignee']) || '',
-          proposedAssignee: readValue(entry, ['Assignee']) || '',
+          currentAssignee: showAsProposedOnly ? '' : assigneeValue,
+          proposedAssignee: assigneeValue,
           sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
           imageName: imageFileName,
           uploadDate: readValue(entry, ['Upload Date', 'UploadDate']) || null,
@@ -241,7 +252,8 @@ function TaskingManagerTab({ dateRange }) {
         console.log('[TaskingManager] Raw response sample:', data)
         fetchTaskingManager.hasLogged = true
       }
-      setRows(formatData(data))
+      const showAsProposedOnly = localStorage.getItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY) === '1'
+      setRows(formatData(data, { showAsProposedOnly }))
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
       const message = getErrorMessage(err, 'Unable to load tasking manager data.')
@@ -579,6 +591,7 @@ function TaskingManagerTab({ dateRange }) {
       if (hasTasks) {
         await api.postAssignTask(tasksPayload)
         localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
+        localStorage.removeItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY)
       }
 
       if (hasPriority) {
@@ -745,8 +758,8 @@ function TaskingManagerTab({ dateRange }) {
     <div className="tasking-manager">
       <div className="content__topbar">
         <div className="content__heading">
-          <div className="content__title">Tasking Manager</div>
-          <div className="content__subtitle">Manage tasking priorities, assignees, and TTGs.</div>
+          <div className="content__title">{title}</div>
+          <div className="content__subtitle">{subtitle}</div>
         </div>
            <div className="content__controls">
           <div className="action-bar">
