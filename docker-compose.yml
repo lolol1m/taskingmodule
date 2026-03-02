@@ -57,7 +57,7 @@ services:
       ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
     
     volumes:
-      - ./xbi_tasking_backend/certs:/certs
+      - backend_cert:/certs
 
     ports:
       - "5000:5000"
@@ -117,3 +117,9 @@ volumes:
       type: "none"
       o: "bind"
       device: "${PWD}/deployment_stuff/xbi-keycloak/ca_certs"
+  backend_cert:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "${PWD}/xbi_tasking_backend/certs"
