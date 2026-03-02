@@ -336,7 +336,11 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
         }
     '''
     try:
-        result = await run_blocking(request.app.state.tasking_service.verify_pass, model_to_dict(payload))
+        result = await run_blocking(
+            request.app.state.tasking_service.verify_pass,
+            model_to_dict(payload),
+            user.get("sub"),
+        )
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)
             if audit:
@@ -356,7 +360,8 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
 @router.post("/verifyFail")
 async def verify_fail(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
-    Function: Verifies the Tasks as Failed and resets task status to In Progress
+    Function: Verifies the Tasks as Failed and re-queues them as Incomplete
+              so a fresh exploit window can be tracked on restart
     
     Input:
 

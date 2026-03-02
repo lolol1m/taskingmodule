@@ -221,12 +221,21 @@ class TaskingService:
         for task_id in payload["SCVU Task ID"]:
             self.tasking.completeTask(task_id)
     
-    def verify_pass(self, payload):
-        for task_id in payload["SCVU Task ID"]:
+    def verify_pass(self, payload, vetter_keycloak_id=None):
+        task_ids = payload.get("SCVU Task ID", [])
+        for task_id in task_ids:
             self.tasking.verifyPass(task_id)
+
+        # Auto-complete images after verification when every task under the image is completed.
+        if not task_ids or self._image_service is None:
+            return
+        image_ids = self.tasking.getImageIdsForTasks(task_ids)
+        if not image_ids:
+            return
+        self._image_service.complete_images({"SCVU Image ID": image_ids}, vetter_keycloak_id)
     
     def verify_fail(self, payload):
-        for task_id in payload["SCVU Task ID"]:
+        for task_id in payload.get("SCVU Task ID", []):
             self.tasking.verifyFail(task_id)
 
     def update_tasking_summary(self, payload):

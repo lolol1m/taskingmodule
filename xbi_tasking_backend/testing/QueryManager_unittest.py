@@ -389,13 +389,22 @@ class QueryManager_unittest(unittest.TestCase):
         self.qm.db.executeInsert(f"INSERT INTO image_area(scvu_image_id, scvu_area_id) VALUES (%s, %s)", (image_id, area_id))
         image_area_id = self.qm.db.executeSelect("SELECT scvu_image_area_id FROM image_area")[0][0]
         
-        self.qm.db.executeInsert(f"INSERT INTO task(assignee_id, task_status_id, scvu_image_area_id) VALUES (1, 3, %s)", (image_area_id, ))
+        self.qm.db.executeInsert(
+            "INSERT INTO task(assignee_id, task_status_id, scvu_image_area_id, exploit_start_time, exploit_end_time) "
+            "VALUES (1, 3, %s, '2023-02-07 11:44:10.973005', '2023-02-07 12:44:10.973005')",
+            (image_area_id, ),
+        )
         task_id = self.qm.db.executeSelect("SELECT scvu_task_id FROM task")[0][0]
         
         self.qm.verifyFail(task_id)
-        res = self.qm.db.executeSelect(f"SELECT task_status_id FROM task WHERE scvu_task_id = %s", (task_id,))[0][0]
-        exp = self.qm.db.executeSelect("SELECT id FROM task_status WHERE name = 'In Progress'")[0][0]
-        self.assertEqual(res, exp, "verifyFail base case failed")
+        res = self.qm.db.executeSelect(
+            "SELECT task_status_id, exploit_start_time, exploit_end_time FROM task WHERE scvu_task_id = %s",
+            (task_id,),
+        )[0]
+        exp_status = self.qm.db.executeSelect("SELECT id FROM task_status WHERE name = 'Incomplete'")[0][0]
+        self.assertEqual(res[0], exp_status, "verifyFail should set task status to Incomplete")
+        self.assertIsNone(res[1], "verifyFail should clear exploit_start_time")
+        self.assertIsNone(res[2], "verifyFail should clear exploit_end_time")
 
     def test_uncompleteImage_baseCase(self):
         pass

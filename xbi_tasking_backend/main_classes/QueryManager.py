@@ -72,6 +72,9 @@ class QueryManager():
     
     def getTaskStatusID(self, status_name):
         return self._tasking.getTaskStatusID(status_name)
+
+    def getImageIdsForTasks(self, task_ids):
+        return self._tasking.getImageIdsForTasks(task_ids)
     
     def completeImage(self, scvu_image_id, vetter_keycloak_id, current_datetime):
         return self._images.completeImage(scvu_image_id, vetter_keycloak_id, current_datetime)
