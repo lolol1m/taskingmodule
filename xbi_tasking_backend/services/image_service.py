@@ -221,23 +221,7 @@ class ImageService:
         _validate_date_range(start_dt, end_dt)
         limit, offset = _get_limit_offset(payload)
 
-        account_type = None
-        roles = []
-        if user:
-            account_type = user.get("account_type")
-            roles = user.get("roles", [])
-
-        is_ii_user = account_type == "II" or ("II" in roles and account_type != "Senior II" and account_type != "IA")
-        if is_ii_user and user:
-            image_data = self.images.getImageDataForUser(
-                start_dt,
-                end_dt,
-                user.get("sub"),
-                limit=limit,
-                offset=offset,
-            )
-        else:
-            image_data = self.images.getImageData(start_dt, end_dt, limit=limit, offset=offset)
+        image_data = self.images.getImageData(start_dt, end_dt, limit=limit, offset=offset)
         output = {}
         if not image_data:
             return output

@@ -27,8 +27,9 @@ function SidebarSection({
   userRole,
   username,
 }) {
-  // II role has limited access - no Tasking Manager or Admin
+  // II role has limited access - no Tasking Assignments or Admin
   const isBasicUser = userRole === 'II'
+  const isIaUser = userRole === 'IA'
   // Only IA can create users
   const canCreateUsers = userRole === 'IA'
   const settingsButtonRef = useRef(null)
@@ -150,14 +151,24 @@ function SidebarSection({
             <span className="sidebar__text">Tasking Summary</span>
           </button>
           <button
-            className={`sidebar__item ${activeTab === 'completed' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('completed')}
+            className={`sidebar__item ${activeTab === 'completed-unverified' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('completed-unverified')}
 
           >
             <span className="sidebar__icon">
               <img src={checkMarkIcon} alt="" />
             </span>
-            <span className="sidebar__text">Completed Images</span>
+            <span className="sidebar__text">Completed, but Unverified Tasks</span>
+          </button>
+          <button
+            className={`sidebar__item ${activeTab === 'completed-verified' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('completed-verified')}
+
+          >
+            <span className="sidebar__icon">
+              <img src={checkMarkIcon} alt="" />
+            </span>
+            <span className="sidebar__text">Completed, Verified Tasks</span>
           </button>
           {!isBasicUser && (
             <button
@@ -167,7 +178,18 @@ function SidebarSection({
               <span className="sidebar__icon">
                 <img src={layerIcon} alt="" />
               </span>
-              <span className="sidebar__text">Tasking Manager</span>
+              <span className="sidebar__text">Tasking Assignments</span>
+            </button>
+          )}
+          {isIaUser && (
+            <button
+              className={`sidebar__item ${activeTab === 'submission' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('submission')}
+            >
+              <span className="sidebar__icon">
+                <img src={uploadIcon} alt="" />
+              </span>
+              <span className="sidebar__text">Submission</span>
             </button>
           )}
         </div>

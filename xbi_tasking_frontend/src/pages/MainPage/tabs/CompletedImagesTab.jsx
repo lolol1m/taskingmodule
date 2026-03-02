@@ -58,7 +58,11 @@ const buildRows = (inputData) => {
   return rows
 }
 
-function CompletedImagesTab({ dateRange }) {
+function CompletedImagesTab({
+  dateRange,
+  title = 'Completed Images',
+  subtitle = 'Review completed imagery for the selected date range.',
+}) {
   const [inputData, setInputData] = useState(null)
   const [rows, setRows] = useState([])
   const [selection, setSelection] = useState([])
@@ -240,8 +244,8 @@ function CompletedImagesTab({ dateRange }) {
     <div className="completed-images">
       <div className="content__topbar">
         <div className="content__heading">
-          <div className="content__title">Completed Images</div>
-          <div className="content__subtitle">Review completed imagery for the selected date range.</div>
+          <div className="content__title">{title}</div>
+          <div className="content__subtitle">{subtitle}</div>
         </div>
         <div className="content__controls">
           <div className="action-bar">

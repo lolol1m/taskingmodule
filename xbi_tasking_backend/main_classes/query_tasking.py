@@ -30,6 +30,13 @@ SQL_GET_ALL_TASK_STATUS_FOR_IMAGE = (
     "WHERE image_area.scvu_image_id = %s"
 )
 
+SQL_GET_IMAGE_IDS_FOR_TASKS = """
+    SELECT DISTINCT ia.scvu_image_id
+    FROM task t
+    JOIN image_area ia ON ia.scvu_image_area_id = t.scvu_image_area_id
+    WHERE t.scvu_task_id IN ({placeholders})
+"""
+
 SQL_GET_TASK_STATUS_ID = "SELECT id FROM task_status WHERE name = %s"
 
 SQL_GET_INCOMPLETE_IMAGES = (
@@ -291,6 +298,20 @@ class TaskingQueries:
         if len(cursor) == 0:
             return None
         return cursor[0][0]
+
+    def getImageIdsForTasks(self, task_ids):
+        '''
+        Function:   Gets unique image IDs for a list of task IDs
+        Input:      iterable of scvu_task_id
+        Output:     list of scvu_image_id
+        '''
+        task_ids = list(task_ids or [])
+        if not task_ids:
+            return []
+        placeholders, values = build_in_clause(task_ids)
+        query = SQL_GET_IMAGE_IDS_FOR_TASKS.format(placeholders=placeholders)
+        rows = self.db.executeSelect(query, values)
+        return [row[0] for row in rows]
 
     def getIncompleteImages(self, start_date, end_date, limit=None, offset=None):
         '''

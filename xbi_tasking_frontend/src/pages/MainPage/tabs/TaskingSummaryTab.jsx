@@ -178,7 +178,13 @@ const toBackendTaskId = (rowKey) => {
   return numericKey < 0 ? Math.abs(numericKey) : numericKey
 }
 
-function TaskingSummaryTab({ dateRange, isCollapsed }) {
+function TaskingSummaryTab({
+  dateRange,
+  isCollapsed,
+  title = 'Tasking Summary',
+  subtitle = 'Task status overview for the selected date range.',
+  taskStatusFilter = null,
+}) {
   const [inputData, setInputData] = useState(null)
   const [workingData, setWorkingData] = useState(null)
   const [dropdownValues, setDropdownValues] = useState(() => {
@@ -204,6 +210,23 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
   const handleTooltipClose = () => setOpenCopy(false)
 
   const rows = useMemo(() => buildRows(workingData || inputData), [workingData, inputData])
+  const displayedRows = useMemo(() => {
+    if (!taskStatusFilter) return rows
+    const normalizedTarget = normalizeStatus(taskStatusFilter)
+    const includedChildIds = new Set(
+      rows
+        .filter((row) => row?.parentId !== undefined)
+        .filter((row) => normalizeStatus(row?.taskStatus) === normalizedTarget)
+        .map((row) => row.id),
+    )
+    const parentIds = new Set(
+      rows
+        .filter((row) => includedChildIds.has(row.id))
+        .map((row) => row.parentId)
+        .filter((value) => value !== undefined && value !== null),
+    )
+    return rows.filter((row) => parentIds.has(row.id) || includedChildIds.has(row.id))
+  }, [rows, taskStatusFilter])
 
   const reportColor = (value) => {
     switch (value) {
@@ -700,6 +723,11 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       quickFilterValues: searchText ? [searchText] : [],
     }))
   }, [searchText])
+
+  useEffect(() => {
+    const visibleIds = new Set(displayedRows.map((row) => row.id))
+    setSelection((prev) => prev.filter((id) => visibleIds.has(id)))
+  }, [displayedRows])
 
   const getTreeDataPath = (row) => {
     if (row.treePath && Array.isArray(row.treePath)) {
@@ -1266,8 +1294,8 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     <div className="tasking-summary">
       <div className="content__topbar">
         <div className="content__heading">
-          <div className="content__title">Tasking Summary</div>
-          <div className="content__subtitle">Task status overview for the selected date range.</div>
+          <div className="content__title">{title}</div>
+          <div className="content__subtitle">{subtitle}</div>
         </div>
         <div className="content__controls">
           <div className="action-bar">
@@ -1358,7 +1386,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       <div className="tasking-summary__grid">
         <DataGridPro
           treeData
-          rows={rows}
+          rows={displayedRows}
           columns={columns}
           disableColumnResize
           getTreeDataPath={getTreeDataPath}
@@ -1522,7 +1550,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           <div className="tasking-summary__total-rows-left">
             {selection.length > 0 ? `${selection.length} row(s) selected` : ''}
           </div>
-          <div className="tasking-summary__total-rows-right">Total Rows: {rows.length}</div>
+          <div className="tasking-summary__total-rows-right">Total Rows: {displayedRows.length}</div>
         </div>
         {error && <div className="tasking-summary__error">{error}</div>}
       </div>

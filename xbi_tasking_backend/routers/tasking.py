@@ -336,7 +336,11 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
         }
     '''
     try:
-        result = await run_blocking(request.app.state.tasking_service.verify_pass, model_to_dict(payload))
+        result = await run_blocking(
+            request.app.state.tasking_service.verify_pass,
+            model_to_dict(payload),
+            user.get("sub"),
+        )
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)
             if audit:
