@@ -193,6 +193,8 @@ async def update_tasking_manager_data(request: Request, payload: UpdateTaskingMa
                 )
             return StatusResponse(status="success", message="Tasking manager updated")
         return result
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_tasking_manager_update")
     except Exception:
         logger.exception("updateTaskingManagerData failed")
         return error_response(500, "Failed to update tasking manager", "update_tasking_manager_failed")

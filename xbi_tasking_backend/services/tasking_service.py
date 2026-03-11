@@ -153,8 +153,8 @@ class TaskingService:
             areas_by_image.setdefault(image_id, []).append((image_area_id, area_name))
 
         tasks_by_image = {}
-        for image_id, image_area_id, assignee_name, remarks in task_rows:
-            tasks_by_image.setdefault(image_id, []).append((image_area_id, assignee_name, remarks))
+        for image_id, image_area_id, assignee_name, remarks, priority_name in task_rows:
+            tasks_by_image.setdefault(image_id, []).append((image_area_id, assignee_name, remarks, priority_name))
 
         for image in images:
             areas = areas_by_image.get(image[0], [])
@@ -168,10 +168,12 @@ class TaskingService:
         return output
 
     def update_tasking_manager(self, payload):
-        for image_id in payload:
-            if "Priority" not in payload[image_id]:
+        for image_area_id in payload:
+            if "Priority" not in payload[image_area_id]:
                 continue      
-            self.tasking.updateTaskingManagerData(image_id, payload[image_id]["Priority"])
+            updated_count = self.tasking.updateTaskingManagerData(image_area_id, payload[image_area_id]["Priority"])
+            if not updated_count:
+                raise ValueError(f"No task found for SCVU Image Area ID {image_area_id}")
 
     def assign_task(self, payload):
         task_status_id = self.tasking.getTaskStatusID(TaskStatus.INCOMPLETE)
@@ -268,7 +270,10 @@ class TaskingService:
 
     def update_tasking_summary(self, payload):
         for image_id, image_data in payload.items():
-            if "Report" in image_data:
+            is_image_update = any(
+                key in image_data for key in ("Child ID", "Image Category", "Target Tracing")
+            )
+            if is_image_update:
                 self.tasking.updateTaskingSummaryImage(
                     image_id,
                     image_data.get("Report"),
@@ -277,12 +282,18 @@ class TaskingService:
                     image_data.get("Cloud Cover"),
                     image_data.get("Target Tracing"),
                 )
-            if "Remarks" in image_data or "IR Reported" in image_data or "SF Reported" in image_data:
+            if (not is_image_update) and (
+                "Remarks" in image_data
+                or "Report" in image_data
+                or "Cloud Cover" in image_data
+                or "Image Quality" in image_data
+            ):
                 self.tasking.updateTaskingSummaryTask(
                     image_id,
                     image_data.get("Remarks"),
-                    image_data.get("IR Reported"),
-                    image_data.get("SF Reported"),
+                    image_data.get("Report") if "Report" in image_data else None,
+                    image_data.get("Cloud Cover") if "Cloud Cover" in image_data else None,
+                    image_data.get("Image Quality") if "Image Quality" in image_data else None,
                 )
 
     def complete_images(self, payload, vetter_keycloak_id):

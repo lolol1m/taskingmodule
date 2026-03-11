@@ -113,6 +113,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       : Object.keys(inputData).map((key) => ({ key, entry: inputData[key] }))
 
     const entryMap = new Map(entries.map(({ key, entry }) => [String(key), entry]))
+    const passParentByImageId = new Map()
+    const passParentRows = new Map()
 
     const readValue = (entry, keys) => {
       if (!entry) return null
@@ -134,7 +136,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         const assigneeValue = normalizeAssigneeValue(readValue(entry, ['Assignee']))
 
         const parentIdValue = readValue(entry, ['Parent ID', 'ParentID', 'parent_id'])
-        const areaNameValue = readValue(entry, ['Area Name', 'Area', 'Area_Name'])
+        const areaNameValue = readValue(entry, ['imgName', 'Img Name', 'Area Name', 'Area', 'Area_Name'])
         const imageFileNameValue = normalizeImageName(
           readValue(entry, [
           'Image File Name',
@@ -148,45 +150,62 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         if (parentIdValue !== null && parentIdValue !== undefined && areaNameValue) {
           const parentId = Number.isNaN(Number(parentIdValue)) ? parentIdValue : Number(parentIdValue)
           const parent = entryMap.get(String(parentId)) || entryMap.get(String(parentIdValue))
+          const parentImageId = readValue(parent, ['Image ID', 'imageId', 'Image_Id']) || null
           const parentName = normalizeImageName(
             readValue(parent, ['Image File Name', 'Image Filename', 'Image Name', 'Image ID', 'Sensor Name']) ||
               `Image_${parentId}`,
           )
+          const mappedParentId = passParentByImageId.get(String(parentId)) ?? parentId
           const areaName = areaNameValue || `Area_${key}`
           const areaId = Number.isNaN(Number(key)) ? key : Number(key)
           return {
             id: areaId,
             groupName: [parentName, areaName],
-            treePath: [`img_${parentId}`, areaName],
+            treePath: [`pass_${parentName}_${mappedParentId}`, areaName],
             currentAssignee: assigneeValue,
             proposedAssignee: '',
             areaName,
-            parentId,
-            scvuImageAreaId: readValue(entry, ['Area ID', 'areaId', 'SCVU Image Area ID']) || null,
+            imgName: areaName,
+            parentId: mappedParentId,
+            parentImageId,
+            scvuImageAreaId: readValue(entry, ['SCVU Image Area ID']) || null,
             imageName: null,
-            imageDatetime: null,
+            imageDatetime: readValue(parent, ['Image Datetime', 'Image Date Time', 'Image DateTime']) || '—',
             sensorName: null,
-            uploadDate: null,
-            priority: null,
+            uploadDate: readValue(parent, ['Upload Date', 'UploadDate']) || '—',
+            priority: readValue(entry, ['Priority', 'priority', 'Priority Level']) || '—',
             ttg: null,
           }
         }
 
         const imageFileName = imageFileNameValue || `Image_${key}`
         const imageId = Number.isNaN(Number(key)) ? key : Number(key)
-        return {
-          id: imageId,
-          groupName: [imageFileName],
-          treePath: [`img_${imageId}`],
-          currentAssignee: assigneeValue,
-          proposedAssignee: '',
-          sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
-          imageName: imageFileName,
-          uploadDate: readValue(entry, ['Upload Date', 'UploadDate']) || null,
-          imageDatetime: readValue(entry, ['Image Datetime', 'Image Date Time', 'Image DateTime']) || null,
-          priority: readValue(entry, ['Priority', 'priority', 'Priority Level']) || null,
-          ttg: readValue(entry, ['TTG']) ?? null,
+        const existingParent = passParentRows.get(imageFileName)
+        const parentRowId = existingParent?.id ?? imageId
+        passParentByImageId.set(String(imageId), parentRowId)
+        if (!existingParent) {
+          const parentRow = {
+            id: parentRowId,
+            groupName: [imageFileName],
+            treePath: [`pass_${imageFileName}_${parentRowId}`],
+            currentAssignee: assigneeValue,
+            proposedAssignee: '',
+            sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
+            imageName: imageFileName,
+            uploadDate: '—',
+            imageDatetime: '—',
+            priority: '—',
+            ttg: readValue(entry, ['TTG']) ?? null,
+            childImageIds: [imageId],
+          }
+          passParentRows.set(imageFileName, parentRow)
+          return parentRow
         }
+        passParentRows.set(imageFileName, {
+          ...existingParent,
+          childImageIds: [...new Set([...(existingParent.childImageIds || []), imageId])],
+        })
+        return null
       })
       .filter(Boolean)
 
@@ -323,8 +342,10 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     if (!selectionModel.ids.size) return false
     return rows.some((row) => {
       if (!selectionModel.ids.has(row.id)) return false
-      const value = row.proposedAssignee
-      return value === null || value === undefined || value === ''
+      const proposed = row.proposedAssignee
+      const current = row.currentAssignee
+      const resolved = proposed === null || proposed === undefined || proposed === '' ? current : proposed
+      return resolved === null || resolved === undefined || resolved === '' || resolved === 'NIL'
     })
   }, [rows, selectionModel])
 
@@ -459,20 +480,28 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
 
   const renderPriority = (params) => {
     const options = ['Low', 'Medium', 'High']
-    const isImageRow = params?.row?.groupName?.length === 1
-    if (!isImageRow) return ''
+    const isChildRow = params?.row?.groupName?.length > 1
+    if (!isChildRow) return '—'
+    const currentValue = params?.row?.priority === '—' ? '' : params?.row?.priority || ''
     return (
       <TextField
         select
         size="small"
         fullWidth
-        value={params.row.priority || ''}
+        value={currentValue}
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
         onChange={(event) => {
+          const nextPriority = event.target.value || ''
           setHasPendingEdits(true)
-          updateRows(params.row.id, (row) => ({ ...row, priority: event.target.value }))
+          // Keep priority editing scoped to this child row's input.
+          setRows((prev) =>
+            prev.map((row) => {
+              if (row.id === params.row.id) return { ...row, priority: nextPriority }
+              return row
+            }),
+          )
         }}
         SelectProps={{
           displayEmpty: true,
@@ -527,10 +556,15 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
               if (!isEnabled) return
               try {
                 setError(null)
-                await api.postDeleteImage({ 'SCVU Image ID': params.id })
+                const imageIds = Array.isArray(params?.row?.childImageIds) && params.row.childImageIds.length
+                  ? params.row.childImageIds
+                  : [params.id]
+                for (const imageId of imageIds) {
+                  await api.postDeleteImage({ 'SCVU Image ID': imageId })
+                }
                 addNotification({
                   title: 'TTG deleted',
-                  meta: 'Just now · Image removed',
+                  meta: `Just now · ${imageIds.length} image(s) removed`,
                 })
                 setRefreshKey((prev) => prev + 1)
               } catch (err) {
@@ -566,10 +600,13 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     tasksToAssign.forEach((task) => {
       const areaId = task.scvuImageAreaId || task.id
       let assigneeId = task.proposedAssignee
+      if (assigneeId === null || assigneeId === undefined || assigneeId === '') {
+        assigneeId = task.currentAssignee
+      }
       if (typeof assigneeId === 'object' && assigneeId?.id) {
         assigneeId = assigneeId.id
       }
-      if (areaId && assigneeId && assigneeId !== 'Multiple') {
+      if (areaId && assigneeId && assigneeId !== 'Multiple' && assigneeId !== 'NIL') {
         output.Tasks.push({ 'SCVU Image Area ID': areaId, Assignee: assigneeId })
       }
     })
@@ -578,11 +615,18 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
 
   const updateTaskingManager = () => {
     const output = {}
+    const validPriorities = new Set(['Low', 'Medium', 'High'])
     rows
       .filter((row) => selectionModel.ids.has(row.id))
-      .filter((row) => row.groupName?.length === 1)
+      .filter((row) => row.groupName?.length > 1)
       .forEach((row) => {
-        output[row.id] = { Priority: row.priority }
+        const rawAreaId = row.scvuImageAreaId
+        if (rawAreaId === undefined || rawAreaId === null || rawAreaId === '') return
+        const imageAreaId = Number(rawAreaId)
+        if (!Number.isFinite(imageAreaId)) return
+        const normalizedPriority = row.priority === '—' ? '' : (row.priority || '')
+        if (!validPriorities.has(normalizedPriority)) return
+        output[imageAreaId] = { Priority: normalizedPriority }
       })
     return output
   }
@@ -617,7 +661,10 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         setRows((prev) =>
           prev.map((row) => ({
             ...row,
-            currentAssignee: row.proposedAssignee || '',
+            currentAssignee:
+              row.proposedAssignee === null || row.proposedAssignee === undefined || row.proposedAssignee === ''
+                ? row.currentAssignee
+                : row.proposedAssignee,
           })),
         )
       }
@@ -752,11 +799,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       const nameFromGroup =
         row?.groupName && Array.isArray(row.groupName) ? row.groupName[row.groupName.length - 1] : null
       if (row?.parentId) {
-        const derivedAreaId = extractAreaIdFromName(row?.areaName || nameFromGroup || '')
-        const subImageId = row?.scvuImageAreaId ?? derivedAreaId ?? row?.id
-        if (!canSeeSubImageName) return `${subImageId ?? ''}`
-        const subImageName = row?.areaName || nameFromGroup || ''
-        return subImageName || `${subImageId ?? ''}`
+        return row?.imgName || row?.areaName || nameFromGroup || ''
       }
       return nameFromGroup || row?.imageName || row?.id?.toString() || 'unknown'
     },
@@ -818,7 +861,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           treeData
           rows={rows}
           columns={columns}
-          disableColumnResize
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
           filterModel={filterModel}
@@ -910,7 +952,9 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnSeparator': {
-              display: 'none',
+              display: 'flex',
+              visibility: 'visible',
+              opacity: 1,
             },
             '& .MuiDataGrid-scrollbarFiller': {
               backgroundColor: 'transparent',

@@ -29,6 +29,12 @@ SQL_SELECT_PRESENT_USER_IDS = """
         AND is_present = True
 """
 
+SQL_SELECT_ALL_PRESENT_USER_IDS = """
+    SELECT keycloak_user_id
+    FROM user_cache
+    WHERE is_present = True
+"""
+
 SQL_RESET_RECENT_USERS = "UPDATE user_cache SET is_present = False, last_updated = NOW()"
 
 SQL_INSERT_USER_CACHE_WITH_TIMESTAMP = """
@@ -330,7 +336,15 @@ class KeycloakQueries:
         try:
             token = self.get_keycloak_admin_token()
         except (ValueError, requests.exceptions.RequestException):
-            return {role: [] for role in role_order}
+            # Fallback: if Keycloak is temporarily unavailable, still auto-assign
+            # from present users in cache.
+            present_ids = self.get_all_present_user_ids()
+            random.shuffle(present_ids)
+            return {
+                EnumClasses.Role.II.value: present_ids,
+                EnumClasses.Role.SENIOR_II.value: [],
+                EnumClasses.Role.IA.value: [],
+            }
 
         role_to_ids = {role: set() for role in role_order}
         for role in role_order:
@@ -342,7 +356,13 @@ class KeycloakQueries:
 
         all_ids = set().union(*role_to_ids.values()) if role_to_ids else set()
         if not all_ids:
-            return {role: [] for role in role_order}
+            present_ids = self.get_all_present_user_ids()
+            random.shuffle(present_ids)
+            return {
+                EnumClasses.Role.II.value: present_ids,
+                EnumClasses.Role.SENIOR_II.value: [],
+                EnumClasses.Role.IA.value: [],
+            }
 
         placeholders, values = build_in_clause(all_ids)
         query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
@@ -354,7 +374,20 @@ class KeycloakQueries:
             ids = list(role_to_ids[role].intersection(present_ids))
             random.shuffle(ids)
             prioritized[role] = ids
+        if not any(prioritized.values()):
+            fallback_ids = self.get_all_present_user_ids()
+            random.shuffle(fallback_ids)
+            prioritized[EnumClasses.Role.II.value] = fallback_ids
         return prioritized
+
+    def get_all_present_user_ids(self):
+        '''
+        Function:   Gets all present users from local cache without Keycloak calls.
+        Input:      None
+        Output:     list of keycloak_user_id
+        '''
+        result = self.db.executeSelect(SQL_SELECT_ALL_PRESENT_USER_IDS, ())
+        return [row[0] for row in result if row and row[0]]
 
     def resetRecentUsers(self):
         '''

@@ -71,12 +71,15 @@ def format_tasking_summary_area(area, parent_id):
         "Task Status": area[2],
         "Remarks": area[3],
         "Area ID": area[7],
-        "Color": area[8],
-        "Service": area[9],
-        "Exploit Start Time": area[10].strftime(datetime_format) if area[10] else None,
-        "Exploit End Time": area[11].strftime(datetime_format) if area[11] else None,
-        "IR Reported": area[12],
-        "SF Reported": area[13],
+        "Image ID": area[8],
+        "Color": area[9],
+        "Service": area[10],
+        "Report": area[11],
+        "Cloud Cover": area[12],
+        "Image Quality": area[13],
+        "Priority": area[14],
+        "Exploit Start Time": area[15].strftime(datetime_format) if area[15] else None,
+        "Exploit End Time": area[16].strftime(datetime_format) if area[16] else None,
         "SCVU Task ID": area[0],
         "Parent ID": parent_id
     }
@@ -104,14 +107,17 @@ def format_tasking_manager_image(image_data, image_areas_data):
 def format_tasking_manager_area(image_data, area_data, image_areas_data):
     assignee = None
     remarks = None
+    priority = None
     for image_area in image_areas_data:
         if area_data[0] == image_area[0]:
             assignee = image_area[1]
             remarks = image_area[2]
+            priority = image_area[3] if len(image_area) > 3 else None
     return {
         'Area Name': area_data[1],
         'Parent ID': image_data[0],
         'SCVU Image Area ID': area_data[0],
         'Assignee': assignee,
-        'Remarks': remarks
+        'Remarks': remarks,
+        'Priority': priority,
     }
