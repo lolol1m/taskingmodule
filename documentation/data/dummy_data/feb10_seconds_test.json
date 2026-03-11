@@ -4,8 +4,8 @@
       "imgId": 501,
       "imageFileName": "feb10_before_start.tif",
       "sensorName": "sensor16",
-      "uploadDate": "2025-02-10T09:59:59.000Z",
-      "imageDateTime": "2025-02-10T09:59:59.000Z",
+      "uploadDate": "2026-02-10T09:59:59.000Z",
+      "imageDateTime": "2026-02-10T09:59:59.000Z",
       "areas": [
         {
           "areaId": 51,
@@ -17,8 +17,8 @@
       "imgId": 502,
       "imageFileName": "feb10_at_start.tif",
       "sensorName": "sensor17",
-      "uploadDate": "2025-02-10T10:00:00.000Z",
-      "imageDateTime": "2025-02-10T10:00:00.000Z",
+      "uploadDate": "2026-02-10T10:00:00.000Z",
+      "imageDateTime": "2026-02-10T10:00:00.000Z",
       "areas": [
         {
           "areaId": 52,
@@ -30,8 +30,8 @@
       "imgId": 503,
       "imageFileName": "feb10_inside_range.tif",
       "sensorName": "sensor18",
-      "uploadDate": "2025-02-10T10:00:20.000Z",
-      "imageDateTime": "2025-02-10T10:00:20.000Z",
+      "uploadDate": "2026-02-10T10:00:20.000Z",
+      "imageDateTime": "2026-02-10T10:00:20.000Z",
       "areas": [
         {
           "areaId": 53,
@@ -43,8 +43,8 @@
       "imgId": 504,
       "imageFileName": "feb10_at_end.tif",
       "sensorName": "sensor19",
-      "uploadDate": "2025-02-10T10:00:30.000Z",
-      "imageDateTime": "2025-02-10T10:00:30.000Z",
+      "uploadDate": "2026-02-10T10:00:30.000Z",
+      "imageDateTime": "2026-02-10T10:00:30.000Z",
       "areas": [
         {
           "areaId": 54,
@@ -56,8 +56,8 @@
       "imgId": 505,
       "imageFileName": "feb10_after_end.tif",
       "sensorName": "sensor20",
-      "uploadDate": "2025-02-10T10:00:31.000Z",
-      "imageDateTime": "2025-02-10T10:00:31.000Z",
+      "uploadDate": "2026-02-10T10:00:31.000Z",
+      "imageDateTime": "2026-02-10T10:00:31.000Z",
       "areas": [
         {
           "areaId": 55,

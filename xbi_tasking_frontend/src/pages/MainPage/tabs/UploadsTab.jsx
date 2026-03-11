@@ -5,7 +5,6 @@ import useNotifications from '../../../components/notifications/useNotifications
 import '../styles/UploadsTab.css'
 
 const api = new API()
-const TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY = 'taskingManagerStagedAutoAssign'
 
 const getFileType = (fileName) => {
   const ext = fileName.toLowerCase().split('.').pop()
@@ -124,11 +123,6 @@ function UploadsTab({ userRole }) {
         metaParts.push('No new data (duplicates skipped)')
       }
       meta = `Just now · ${metaParts.join(', ')}`
-
-      if (totals.areas > 0) {
-        // Let Tasking Manager render freshly auto-assigned users as "proposed" until Apply Change is clicked.
-        localStorage.setItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY, '1')
-      }
 
       addNotification({ title: hasWarnings ? 'Upload completed with warnings' : 'Upload completed', meta })
       setTaskFiles([])

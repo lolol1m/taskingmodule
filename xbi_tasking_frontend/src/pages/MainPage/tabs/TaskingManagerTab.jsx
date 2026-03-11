@@ -13,7 +13,6 @@ import useNotifications from '../../../components/notifications/useNotifications
 
 const api = new API()
 const MAX_DATE_RANGE_DAYS = 90
-const TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY = 'taskingManagerStagedAutoAssign'
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
@@ -97,9 +96,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     })
   }
 
-  const formatData = (inputData, options = {}) => {
+  const formatData = (inputData) => {
     if (!inputData) return []
-    const showAsProposedOnly = Boolean(options.showAsProposedOnly)
 
     const entries = Array.isArray(inputData)
       ? inputData.map((entry, index) => {
@@ -160,8 +158,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             id: areaId,
             groupName: [parentName, areaName],
             treePath: [`img_${parentId}`, areaName],
-            currentAssignee: showAsProposedOnly ? '' : assigneeValue,
-            proposedAssignee: assigneeValue,
+            currentAssignee: assigneeValue,
+            proposedAssignee: '',
             areaName,
             parentId,
             scvuImageAreaId: readValue(entry, ['Area ID', 'areaId', 'SCVU Image Area ID']) || null,
@@ -180,8 +178,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           id: imageId,
           groupName: [imageFileName],
           treePath: [`img_${imageId}`],
-          currentAssignee: showAsProposedOnly ? '' : assigneeValue,
-          proposedAssignee: assigneeValue,
+          currentAssignee: assigneeValue,
+          proposedAssignee: '',
           sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
           imageName: imageFileName,
           uploadDate: readValue(entry, ['Upload Date', 'UploadDate']) || null,
@@ -255,8 +253,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         console.log('[TaskingManager] Raw response sample:', data)
         fetchTaskingManager.hasLogged = true
       }
-      const showAsProposedOnly = localStorage.getItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY) === '1'
-      setRows(formatData(data, { showAsProposedOnly }))
+      setRows(formatData(data))
       setHasPendingEdits(false)
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
@@ -609,7 +606,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       if (hasTasks) {
         await api.postAssignTask(tasksPayload)
         localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
-        localStorage.removeItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY)
       }
 
       if (hasPriority) {

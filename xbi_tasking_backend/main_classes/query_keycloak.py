@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import requests
 import main_classes.EnumClasses as EnumClasses
 from constants import AssigneeLabel
@@ -298,6 +299,48 @@ class KeycloakQueries:
             return set(row[0] for row in result)
         
         return set()
+
+    def get_prioritized_present_user_ids(self):
+        '''
+        Function:   Gets present Keycloak user IDs grouped by assignment priority.
+        Priority:   II first, then Senior II, then IA.
+        Input:      None
+        Output:     dict of role name -> list of keycloak_user_id
+        '''
+        role_order = [
+            EnumClasses.Role.II.value,
+            EnumClasses.Role.SENIOR_II.value,
+            EnumClasses.Role.IA.value,
+        ]
+
+        try:
+            token = self.get_keycloak_admin_token()
+        except (ValueError, requests.exceptions.RequestException):
+            return {role: [] for role in role_order}
+
+        role_to_ids = {role: set() for role in role_order}
+        for role in role_order:
+            try:
+                users = self.kc.get_users_for_role(token, role)
+                role_to_ids[role] = {user.get("id") for user in users if user.get("id")}
+            except requests.exceptions.RequestException:
+                role_to_ids[role] = set()
+
+        all_ids = set().union(*role_to_ids.values()) if role_to_ids else set()
+        if not all_ids:
+            return {role: [] for role in role_order}
+
+        placeholders, values = build_in_clause(all_ids)
+        query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
+        result = self.db.executeSelect(query, values)
+        present_ids = {row[0] for row in result}
+
+        prioritized = {}
+        for role in role_order:
+            ids = list(role_to_ids[role].intersection(present_ids))
+            random.shuffle(ids)
+            prioritized[role] = ids
+        return prioritized
 
     def resetRecentUsers(self):
         '''

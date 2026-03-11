@@ -1,6 +1,8 @@
 import logging
+import random
 from constants import AssigneeLabel, TaskStatus
 from main_classes.sql_utils import build_in_clause
+import main_classes.EnumClasses as EnumClasses
 
 
 logger = logging.getLogger("xbi_tasking_backend.query_tasking")
@@ -437,12 +439,25 @@ class TaskingQueries:
         Input:      area_id
         Output:     NIL
         '''
-        id_set = self.keycloak.getUserIds()
-        if not id_set:
+        prioritized_users = self.keycloak.get_prioritized_present_user_ids()
+        role_weights = {
+            EnumClasses.Role.II.value: 6,
+            EnumClasses.Role.SENIOR_II.value: 3,
+            EnumClasses.Role.IA.value: 1,
+        }
+
+        weighted_candidates = []
+        weighted_values = []
+        for role, weight in role_weights.items():
+            ids = prioritized_users.get(role, [])
+            if not ids or weight <= 0:
+                continue
+            weighted_candidates.extend(ids)
+            weighted_values.extend([weight] * len(ids))
+
+        if not weighted_candidates:
             logger.debug("autoAssign has no users to assign")
             return "unassigned"
-
-        id_dict = {u: 0 for u in id_set}
         
         # Obtain scvu_image_area_id
         result = self.db.executeSelect(SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN, (area_name, image_id))
@@ -455,14 +470,16 @@ class TaskingQueries:
             return "unassigned"
         scvu_image_area_id  = result[0][0]
 
-        counts = self.getActiveTaskCountsForUsers(id_dict.keys())
-        for keycloak_user_id, active_tasks in counts.items():
-            if active_tasks == 0:
-                self.assignTask(scvu_image_area_id, keycloak_user_id, 1)
-                return "assigned"
-            id_dict[keycloak_user_id] = active_tasks
+        # Keep role preference, but dampen users who already have many active tasks
+        # so assignments spread out instead of repeatedly picking one person.
+        active_counts = self.getActiveTaskCountsForUsers(weighted_candidates)
+        adjusted_weights = []
+        for idx, user_id in enumerate(weighted_candidates):
+            base_weight = float(weighted_values[idx])
+            load_penalty = 1.0 + float(active_counts.get(user_id, 0))
+            adjusted_weights.append(base_weight / load_penalty)
 
-        assignee_keycloak_id = min(id_dict, key=id_dict.get)
+        assignee_keycloak_id = random.choices(weighted_candidates, weights=adjusted_weights, k=1)[0]
         self.assignTask(scvu_image_area_id, assignee_keycloak_id, 1)
         return "assigned"
 
