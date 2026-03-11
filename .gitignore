@@ -10,3 +10,4 @@ xbi_tasking_backend/code/
 xbi_tasking_backend/dev_server.config
 mockui/
 dev_server.config
+keycloak_stuff/start_keycloak.bat

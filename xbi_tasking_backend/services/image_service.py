@@ -230,8 +230,12 @@ class ImageService:
         area_rows = self.images.getImageAreaDataForImages(image_ids)
         area_map = {}
         for row in area_rows:
-            image_id, task_id, area_name, remarks, assignee = row
-            area_map.setdefault(image_id, []).append((task_id, area_name, remarks, assignee))
+            # query_images.getImageAreaDataForImages returns:
+            # (image_id, task_id, area_name, remarks, assignee, ir_reported, sf_reported)
+            image_id, task_id, area_name, remarks, assignee, ir_reported, sf_reported = row
+            area_map.setdefault(image_id, []).append(
+                (task_id, area_name, remarks, assignee, ir_reported, sf_reported)
+            )
 
         for image in image_data:
             image_id = image[0]
