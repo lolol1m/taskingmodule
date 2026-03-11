@@ -179,6 +179,35 @@ class TaskingService:
             raise ValueError(f"Task status '{TaskStatus.INCOMPLETE}' not found in database. Please ensure task_status table is initialized.")
         tasks_processed = 0
         tasks = payload.get("Tasks", [])
+        resolved_tasks = []
+
+        # Resolve assignees first so we can validate presence in one DB check.
+        for task in tasks:
+            # Validate required fields
+            if "Assignee" not in task or task["Assignee"] is None or task["Assignee"] == "":
+                continue
+            if "SCVU Image Area ID" not in task or task["SCVU Image Area ID"] is None:
+                raise ValueError("Missing 'SCVU Image Area ID' in task")
+
+            assignee_keycloak_id = task["Assignee"]
+            if assignee_keycloak_id == AssigneeLabel.MULTIPLE:
+                continue
+
+            # If it's not UUID format, treat as username and resolve user id.
+            if len(assignee_keycloak_id) != 36 or assignee_keycloak_id.count('-') != 4:
+                resolved_id = self.keycloak.getKeycloakUserID(assignee_keycloak_id)
+                if resolved_id is None:
+                    raise ValueError(f"Assignee '{assignee_keycloak_id}' not found in Keycloak")
+                assignee_keycloak_id = resolved_id
+
+            resolved_tasks.append((task["SCVU Image Area ID"], assignee_keycloak_id))
+
+        present_ids = self.keycloak.get_present_user_ids([assignee_id for _, assignee_id in resolved_tasks])
+        for area_id, assignee_keycloak_id in resolved_tasks:
+            if assignee_keycloak_id not in present_ids:
+                assignee_name = self.keycloak.get_keycloak_username(assignee_keycloak_id)
+                raise ValueError(f"Cannot assign task to absent user '{assignee_name}'")
+
         for task in tasks:
             try:
                 # Validate required fields
@@ -202,8 +231,7 @@ class TaskingService:
                     # It's probably a username, try to get the Keycloak user ID
                     assignee_keycloak_id = self.keycloak.getKeycloakUserID(assignee_keycloak_id)
                     if assignee_keycloak_id is None:
-                        # Skip if assignee not found in Keycloak
-                        continue
+                        raise ValueError(f"Assignee '{task['Assignee']}' not found in Keycloak")
                 
                 area_id = task["SCVU Image Area ID"]
                 self.tasking.assignTask(area_id, assignee_keycloak_id, task_status_id)

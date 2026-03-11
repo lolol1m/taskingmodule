@@ -243,6 +243,8 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
                 ip_address=request.client.host if request.client else None,
             )
         return {"status": "success", "message": "Tasks assigned successfully", "tasks_processed": task_count}
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_assignee")
     except Exception:
         logger.exception("assignTask failed")
         return error_response(500, "Failed to assign tasks", "assign_task_failed")

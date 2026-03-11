@@ -300,6 +300,20 @@ class KeycloakQueries:
         
         return set()
 
+    def get_present_user_ids(self, keycloak_user_ids):
+        '''
+        Function:   Filters input Keycloak user IDs to only currently present users.
+        Input:      iterable of keycloak_user_id
+        Output:     set of present keycloak_user_id
+        '''
+        ids = {user_id for user_id in (keycloak_user_ids or []) if user_id}
+        if not ids:
+            return set()
+        placeholders, values = build_in_clause(ids)
+        query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
+        result = self.db.executeSelect(query, values)
+        return {row[0] for row in result}
+
     def get_prioritized_present_user_ids(self):
         '''
         Function:   Gets present Keycloak user IDs grouped by assignment priority.

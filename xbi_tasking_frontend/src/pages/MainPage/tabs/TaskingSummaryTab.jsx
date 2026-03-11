@@ -461,7 +461,7 @@ function TaskingSummaryTab({
     () => [
       {
         field: 'imageAreaName',
-        headerName: 'Image/Area Name',
+        headerName: 'Pass ID/Image',
         minWidth: 180,
         flex: 1.3,
         valueGetter: (params) => {
@@ -1493,7 +1493,7 @@ function TaskingSummaryTab({
           disableColumnResize
           getTreeDataPath={getTreeDataPath}
           groupingColDef={{
-            headerName: 'Image/Area Name',
+            headerName: 'Pass ID/Image',
             minWidth: 200,
             flex: 1.3,
             hideDescendantCount: true,

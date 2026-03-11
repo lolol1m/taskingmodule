@@ -744,7 +744,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   }
 
   const groupingColDef = {
-    headerName: 'Image/Area Name',
+    headerName: 'Pass ID/Image',
     minWidth: 200,
     flex: 1.3,
     hideDescendantCount: true,
