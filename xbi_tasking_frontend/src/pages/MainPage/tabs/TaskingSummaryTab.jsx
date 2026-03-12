@@ -575,7 +575,28 @@ function TaskingSummaryTab({
       { field: 'uploadDate', headerName: 'Upload Date', minWidth: 145, flex: 0.7, valueFormatter: dateFormatter },
       { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 145, flex: 0.7, valueFormatter: dateFormatter },
       { field: 'areaName', headerName: 'Area Name', minWidth: 110, flex: 0.6 },
-      { field: 'assignee', headerName: 'Assignee', minWidth: 110, flex: 0.6 },
+      {
+        field: 'assignee',
+        headerName: 'Assignee',
+        minWidth: 110,
+        flex: 0.6,
+        renderCell: (params) => {
+          if (!params?.row) return '—'
+          if (params.row.parentId !== undefined) {
+            return params.row.assignee || '—'
+          }
+          const parentKey = String(params.row.id)
+          const children = rows.filter((row) => String(row.parentId) === parentKey)
+          if (!children.length) return params.row.assignee || '—'
+          const normalized = children
+            .map((row) => String(row.assignee || '').trim())
+            .filter((value) => value && value !== '—' && value.toLowerCase() !== 'nil')
+          if (!normalized.length) return '—'
+          const first = normalized[0]
+          const allSame = normalized.every((value) => value === first)
+          return allSame ? first : 'Multiple'
+        },
+      },
       {
         field: 'report',
         headerName: 'Report',
@@ -922,7 +943,7 @@ function TaskingSummaryTab({
         },
       },
     ],
-    [readOnlyInputs, role],
+    [readOnlyInputs, role, rows],
   )
 
   useEffect(() => {

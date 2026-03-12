@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Autocomplete, Button, IconButton, MenuItem, TextField, Tooltip } from '@mui/material'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import { DataGridPro } from '@mui/x-data-grid-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import dayjs from 'dayjs'
+import editIcon from '../../../assets/edit.png'
+import binIcon from '../../../assets/bin.png'
 import API from '../../../api/api'
 import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
@@ -18,6 +18,7 @@ const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
 const TABLE_AUTO_REFRESH_MS = 5000
+const TASKING_COMMITTED_IDS_KEY = 'tasking_manager_committed_area_ids'
 
 const isDateRangeTooLarge = (range, maxDays) => {
   if (!range) return false
@@ -66,6 +67,15 @@ const normalizeAssigneeValue = (value) => {
 
 function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'Manage tasking priorities, assignees, and TTGs.' }) {
   const [rows, setRows] = useState([])
+  const [committedAreaIds, setCommittedAreaIds] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(TASKING_COMMITTED_IDS_KEY) || '[]')
+      if (!Array.isArray(raw)) return new Set()
+      return new Set(raw.map((id) => String(id)))
+    } catch {
+      return new Set()
+    }
+  })
   const [assignees, setAssignees] = useState([{ id: 'Multiple', name: 'Multiple' }])
   const [selectionModel, setSelectionModel] = useState(() => ({ type: 'include', ids: new Set() }))
   const [loading, setLoading] = useState(false)
@@ -74,7 +84,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   const [hasPendingEdits, setHasPendingEdits] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
-  const [actionsEnabled, setActionsEnabled] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [areaOptions, setAreaOptions] = useState([])
   const { addNotification } = useNotifications()
@@ -158,17 +167,25 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           const mappedParentId = passParentByImageId.get(String(parentId)) ?? parentId
           const areaName = areaNameValue || `Area_${key}`
           const areaId = Number.isNaN(Number(key)) ? key : Number(key)
+          const scvuImageAreaId = readValue(entry, ['SCVU Image Area ID']) || null
+          const effectiveAreaId = scvuImageAreaId || areaId
+          const isCommitted =
+            effectiveAreaId !== null &&
+            effectiveAreaId !== undefined &&
+            committedAreaIds.has(String(effectiveAreaId)) &&
+            !!assigneeValue
           return {
             id: areaId,
             groupName: [parentName, areaName],
             treePath: [`pass_${parentName}_${mappedParentId}`, areaName],
-            currentAssignee: assigneeValue,
-            proposedAssignee: '',
+            // New flow: keep current empty until Apply Change, show auto-suggestion in proposed.
+            currentAssignee: isCommitted ? assigneeValue : '',
+            proposedAssignee: isCommitted ? '' : assigneeValue,
             areaName,
             imgName: areaName,
             parentId: mappedParentId,
             parentImageId,
-            scvuImageAreaId: readValue(entry, ['SCVU Image Area ID']) || null,
+            scvuImageAreaId,
             imageName: null,
             imageDatetime: readValue(parent, ['Image Datetime', 'Image Date Time', 'Image DateTime']) || '—',
             sensorName: null,
@@ -188,7 +205,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             id: parentRowId,
             groupName: [imageFileName],
             treePath: [`pass_${imageFileName}_${parentRowId}`],
-            currentAssignee: assigneeValue,
+            currentAssignee: '',
             proposedAssignee: '',
             sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
             imageName: imageFileName,
@@ -272,7 +289,19 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         console.log('[TaskingManager] Raw response sample:', data)
         fetchTaskingManager.hasLogged = true
       }
-      setRows(formatData(data))
+      const nextRows = formatData(data)
+      setRows(nextRows)
+      setCommittedAreaIds((prev) => {
+        if (!nextRows.length || prev.size === 0) return nextRows.length ? prev : new Set()
+        const next = new Set()
+        nextRows.forEach((row) => {
+          const areaId = row?.scvuImageAreaId
+          if (areaId === null || areaId === undefined || areaId === '') return
+          const key = String(areaId)
+          if (prev.has(key)) next.add(key)
+        })
+        return next
+      })
       setHasPendingEdits(false)
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
@@ -310,6 +339,14 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   }, [])
 
   useEffect(() => {
+    try {
+      localStorage.setItem(TASKING_COMMITTED_IDS_KEY, JSON.stringify(Array.from(committedAreaIds)))
+    } catch {
+      // no-op: storage write failure should not block UI behavior
+    }
+  }, [committedAreaIds])
+
+  useEffect(() => {
     const timerId = window.setInterval(() => {
       if (!hasPendingEdits) {
         setRefreshKey((prev) => prev + 1)
@@ -338,21 +375,29 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     return { type: 'include', ids: new Set() }
   }
 
+  const normalizedSelectedIds = useMemo(
+    () => new Set(Array.from(selectionModel?.ids || []).map((id) => String(id))),
+    [selectionModel],
+  )
+
   const hasEmptyAssignee = useMemo(() => {
     if (!selectionModel.ids.size) return false
     return rows.some((row) => {
-      if (!selectionModel.ids.has(row.id)) return false
+      if (!normalizedSelectedIds.has(String(row.id))) return false
+      // Parent rows are display/group rows; validate only task (child) rows.
+      if (!row?.parentId) return false
       const proposed = row.proposedAssignee
       const current = row.currentAssignee
       const resolved = proposed === null || proposed === undefined || proposed === '' ? current : proposed
       return resolved === null || resolved === undefined || resolved === '' || resolved === 'NIL'
     })
-  }, [rows, selectionModel])
+  }, [rows, selectionModel, normalizedSelectedIds])
 
   const renderCurrentAssignee = (params) => {
     const isImageRow = params?.row?.groupName?.length === 1
     if (isImageRow) {
-      const children = rows.filter((row) => row.parentId === params.row.id)
+      const parentKey = String(params?.row?.id)
+      const children = rows.filter((row) => String(row.parentId) === parentKey)
       if (!children.length) return params.row.currentAssignee || 'NIL'
       const first = children[0]?.currentAssignee || ''
       const allSame = children.every((row) => (row.currentAssignee || '') === first)
@@ -363,65 +408,23 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   }
 
   const renderProposedAssignee = (params) => {
-    let imgProposedAssignee = ''
-    const rowNode = params.rowNode || { parent: null, children: [] }
-    if (rowNode.parent === null && rowNode.children?.length) {
-      const firstChildId = rowNode.children[0]
-      const firstChild = rows.find((row) => row.id === firstChildId)
-      const allMatch = rowNode.children.every((childId) => {
-        const child = rows.find((row) => row.id === childId)
-        return child?.proposedAssignee === firstChild?.proposedAssignee
-      })
-      imgProposedAssignee = allMatch ? firstChild?.proposedAssignee : 'Multiple'
-    }
-
+    const isImageRow = params?.row?.groupName?.length === 1
     const selectableAssignees = (assignees || []).filter((option) => option?.id && option.id !== 'Multiple')
+    const getAssigneeLabel = (value) => {
+      if (!value) return '—'
+      if (value === 'Multiple') return 'Multiple'
+      const matched = selectableAssignees.find((option) => option.id === value)
+      return matched?.name || value
+    }
+    if (isImageRow) return '—'
+
     const applyAssignee = (nextValue) => {
       const proposedAssigneeValue = nextValue || ''
-      if (isImageRow) {
-        setHasPendingEdits(true)
-        setRows((prev) =>
-          prev.map((row) => {
-            if (row.id === params.id || row.parentId === params.id) {
-              return { ...row, proposedAssignee: proposedAssigneeValue }
-            }
-            return row
-          }),
-        )
-        return
-      }
-
       setHasPendingEdits(true)
       updateRows(params.id, (row) => ({ ...row, proposedAssignee: proposedAssigneeValue }))
-      const parentId = params?.row?.parentId
-      if (parentId === undefined || parentId === null) return
-      setRows((prev) => {
-        const next = prev.map((row) => {
-          if (row.id === params.id) {
-            return {
-              ...row,
-              proposedAssignee: proposedAssigneeValue,
-            }
-          }
-          return row
-        })
-        const children = next.filter((row) => row.parentId === parentId)
-        if (!children.length) return next
-        const first = children[0]?.proposedAssignee
-        const allSame = children.every((row) => row.proposedAssignee === first)
-        return next.map((row) => {
-          if (row.id === parentId) {
-            return { ...row, proposedAssignee: allSame ? first : 'Multiple' }
-          }
-          return row
-        })
-      })
     }
 
-    const isImageRow = params?.row?.groupName?.length === 1
-    const currentValue = isImageRow
-      ? imgProposedAssignee || params?.row?.proposedAssignee || params.value || ''
-      : params?.row?.proposedAssignee || params.value || ''
+    const currentValue = params?.row?.proposedAssignee || params.value || ''
     return (
       <TextField
         select
@@ -436,9 +439,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           displayEmpty: true,
           renderValue: (selected) => {
             if (!selected) return 'Proposed assignee'
-            if (selected === 'Multiple') return 'Multiple'
-            const matched = selectableAssignees.find((option) => option.id === selected)
-            return matched?.name || selected
+            return getAssigneeLabel(selected)
           },
         }}
         sx={{
@@ -540,76 +541,95 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   }
 
   const renderTTG = (params) => {
-    const isImageRow = params?.row?.groupName?.length === 1
-    if (!isImageRow) return null
-    const isEnabled = actionsEnabled
+    const resolveDeleteImageIds = () => {
+      const row = params?.row || {}
+      if (Array.isArray(row.childImageIds) && row.childImageIds.length) {
+        return [...new Set(row.childImageIds)]
+      }
+      if (row.parentImageId !== null && row.parentImageId !== undefined && row.parentImageId !== '') {
+        return [row.parentImageId]
+      }
+      if (row.parentId !== null && row.parentId !== undefined && row.parentId !== '') {
+        return [row.parentId]
+      }
+      return [params.id]
+    }
     return (
-      <Tooltip title={isEnabled ? '' : 'Enable actions to delete'}>
-        <span className="tasking-manager__ttg">
-          <Button
-            className="tasking-manager__button tasking-manager__button--danger"
-            size="small"
-            variant={isEnabled ? 'outlined' : 'text'}
-            disabled={!isEnabled}
-            startIcon={isEnabled ? <DeleteOutlineIcon fontSize="small" /> : <LockOutlinedIcon fontSize="small" />}
-            onClick={async () => {
-              if (!isEnabled) return
-              try {
-                setError(null)
-                const imageIds = Array.isArray(params?.row?.childImageIds) && params.row.childImageIds.length
-                  ? params.row.childImageIds
-                  : [params.id]
-                for (const imageId of imageIds) {
-                  await api.postDeleteImage({ 'SCVU Image ID': imageId })
+      <div className="tasking-manager__ttg-actions">
+        <Tooltip title="Edit">
+          <span className="tasking-manager__ttg">
+            <Button
+              className="tasking-manager__action-btn tasking-manager__action-btn--icon"
+              size="small"
+              aria-label="Edit"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <img src={editIcon} alt="" className="tasking-manager__action-icon" />
+            </Button>
+          </span>
+        </Tooltip>
+        <Tooltip title="Delete">
+          <span className="tasking-manager__ttg">
+            <Button
+              className="tasking-manager__action-btn tasking-manager__action-btn--icon"
+              size="small"
+              aria-label="Delete"
+              onClick={async () => {
+                try {
+                  setError(null)
+                  const imageIds = resolveDeleteImageIds()
+                  for (const imageId of imageIds) {
+                    await api.postDeleteImage({ 'SCVU Image ID': imageId })
+                  }
+                  addNotification({
+                    title: 'TTG deleted',
+                    meta: `Just now · ${imageIds.length} image(s) removed`,
+                  })
+                  setRefreshKey((prev) => prev + 1)
+                } catch (err) {
+                  console.error('TTG delete failed', err)
+                  const message = getErrorMessage(err, 'Unable to delete TTG.')
+                  setError(message)
+                  addNotification({
+                    title: 'TTG delete failed',
+                    meta: 'Just now · Please try again',
+                  })
                 }
-                addNotification({
-                  title: 'TTG deleted',
-                  meta: `Just now · ${imageIds.length} image(s) removed`,
-                })
-                setRefreshKey((prev) => prev + 1)
-              } catch (err) {
-                console.error('TTG delete failed', err)
-                const message = getErrorMessage(err, 'Unable to delete TTG.')
-                setError(message)
-                addNotification({
-                  title: 'TTG delete failed',
-                  meta: 'Just now · Please try again',
-                })
-              }
-            }}
-          >
-            Delete TTG
-          </Button>
-        </span>
-      </Tooltip>
+              }}
+            >
+              <img src={binIcon} alt="" className="tasking-manager__action-icon" />
+            </Button>
+          </span>
+        </Tooltip>
+      </div>
     )
   }
 
   const assignTasks = () => {
     const output = { Tasks: [] }
-    const selectedRows = rows.filter((row) => selectionModel.ids.has(row.id))
-    const tasksToAssign = []
+    const selectedRows = rows.filter((row) => normalizedSelectedIds.has(String(row.id)))
+    const taskByAreaId = new Map()
     selectedRows.forEach((row) => {
-      if (row.parentId) {
-        tasksToAssign.push(row)
-      } else {
-        const childAreas = rows.filter((child) => child.parentId === row.id)
-        tasksToAssign.push(...childAreas)
-      }
+      const isChildRow = row?.parentId !== undefined && row?.parentId !== null
+      const candidates = isChildRow
+        ? [row]
+        : rows.filter((child) => String(child.parentId) === String(row.id))
+
+      candidates.forEach((task) => {
+        const areaId = task.scvuImageAreaId || task.id
+        let assigneeId = task.proposedAssignee
+        if (assigneeId === null || assigneeId === undefined || assigneeId === '') {
+          assigneeId = task.currentAssignee
+        }
+        if (typeof assigneeId === 'object' && assigneeId?.id) {
+          assigneeId = assigneeId.id
+        }
+        if (areaId && assigneeId && assigneeId !== 'Multiple' && assigneeId !== 'NIL') {
+          taskByAreaId.set(String(areaId), { 'SCVU Image Area ID': areaId, Assignee: assigneeId })
+        }
+      })
     })
-    tasksToAssign.forEach((task) => {
-      const areaId = task.scvuImageAreaId || task.id
-      let assigneeId = task.proposedAssignee
-      if (assigneeId === null || assigneeId === undefined || assigneeId === '') {
-        assigneeId = task.currentAssignee
-      }
-      if (typeof assigneeId === 'object' && assigneeId?.id) {
-        assigneeId = assigneeId.id
-      }
-      if (areaId && assigneeId && assigneeId !== 'Multiple' && assigneeId !== 'NIL') {
-        output.Tasks.push({ 'SCVU Image Area ID': areaId, Assignee: assigneeId })
-      }
-    })
+    output.Tasks = Array.from(taskByAreaId.values())
     return output
   }
 
@@ -617,7 +637,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     const output = {}
     const validPriorities = new Set(['Low', 'Medium', 'High'])
     rows
-      .filter((row) => selectionModel.ids.has(row.id))
+      .filter((row) => normalizedSelectedIds.has(String(row.id)))
       .filter((row) => row.groupName?.length > 1)
       .forEach((row) => {
         const rawAreaId = row.scvuImageAreaId
@@ -657,15 +677,25 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       }
 
       if (hasTasks) {
+        const committedSet = new Set(tasksPayload.Tasks.map((task) => String(task['SCVU Image Area ID'])))
+        setCommittedAreaIds((prev) => new Set([...prev, ...committedSet]))
         // Promote proposed assignments to current assignments after confirmation.
         setRows((prev) =>
-          prev.map((row) => ({
-            ...row,
-            currentAssignee:
+          prev.map((row) => {
+            const areaId = row?.scvuImageAreaId
+            const isCommittedRow =
+              areaId !== null && areaId !== undefined && areaId !== '' && committedSet.has(String(areaId))
+            if (!isCommittedRow) return row
+            const nextCurrent =
               row.proposedAssignee === null || row.proposedAssignee === undefined || row.proposedAssignee === ''
                 ? row.currentAssignee
-                : row.proposedAssignee,
-          })),
+                : row.proposedAssignee
+            return {
+              ...row,
+              currentAssignee: nextCurrent,
+              proposedAssignee: '',
+            }
+          }),
         )
       }
       setHasPendingEdits(false)
@@ -767,13 +797,13 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       },
       {
         field: 'ttg',
-        headerName: 'Action',
-        minWidth: 140,
-        flex: 0.7,
+        headerName: 'Actions',
+        minWidth: 108,
+        flex: 0.45,
         renderCell: renderTTG,
       },
     ],
-    [rows, assignees, actionsEnabled],
+    [rows, assignees],
   )
 
   const getTreeDataPath = (row) => {
@@ -847,11 +877,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             disabled={!selectionModel.ids.size || hasEmptyAssignee}
           >
             Apply Change
-          </Button>
-        </div>
-        <div className="tasking-manager__actions-right">
-          <Button className="tasking-manager__button" onClick={() => setActionsEnabled((prev) => !prev)}>
-            {actionsEnabled ? 'Disable Actions' : 'Enable Actions'}
           </Button>
         </div>
       </div>

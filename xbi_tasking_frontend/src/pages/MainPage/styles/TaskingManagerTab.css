@@ -152,6 +152,57 @@
   display: inline-flex;
 }
 
+.tasking-manager__ttg-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tasking-manager__action-btn {
+  min-width: 78px !important;
+  height: 34px !important;
+  text-transform: none !important;
+  font-family: inherit !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border-radius: 12px !important;
+  padding: 0 14px !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong) !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.tasking-manager__action-btn--icon {
+  min-width: 34px !important;
+  width: 34px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.tasking-manager__action-btn:hover {
+  background: var(--hover) !important;
+}
+
+.tasking-manager__action-btn.Mui-disabled {
+  opacity: 0.5;
+  color: var(--muted) !important;
+}
+
+.tasking-manager__action-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.app-shell.is-light .tasking-manager__action-icon {
+  filter: brightness(0) invert(0);
+}
+
 .tasking-manager__modal {
   position: fixed;
   inset: 0;
