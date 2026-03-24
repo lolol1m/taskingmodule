@@ -106,18 +106,21 @@ def format_tasking_manager_image(image_data, image_areas_data):
 
 def format_tasking_manager_area(image_data, area_data, image_areas_data):
     assignee = None
+    proposed_assignee = None
     remarks = None
     priority = None
     for image_area in image_areas_data:
         if area_data[0] == image_area[0]:
             assignee = image_area[1]
-            remarks = image_area[2]
-            priority = image_area[3] if len(image_area) > 3 else None
+            proposed_assignee = image_area[2] if len(image_area) > 2 else None
+            remarks = image_area[3] if len(image_area) > 3 else None
+            priority = image_area[4] if len(image_area) > 4 else None
     return {
         'Area Name': area_data[1],
         'Parent ID': image_data[0],
         'SCVU Image Area ID': area_data[0],
         'Assignee': assignee,
+        'Proposed Assignee': proposed_assignee,
         'Remarks': remarks,
         'Priority': priority,
     }

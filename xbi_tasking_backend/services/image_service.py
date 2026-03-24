@@ -370,3 +370,10 @@ class ImageService:
             self.images.deleteImageAreasForImage(scvu_image_id)
             self.images.deleteImage(scvu_image_id)
         return {"success": True}
+
+    def delete_image_area(self, payload):
+        scvu_image_area_id = payload["SCVU Image Area ID"]
+        with self.db.transaction():
+            self.images.deleteTaskForImageArea(scvu_image_area_id)
+            self.images.deleteImageArea(scvu_image_area_id)
+        return {"success": True}

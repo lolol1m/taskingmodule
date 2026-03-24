@@ -18,7 +18,6 @@ const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
 const TABLE_AUTO_REFRESH_MS = 5000
-const TASKING_COMMITTED_IDS_KEY = 'tasking_manager_committed_area_ids'
 
 const isDateRangeTooLarge = (range, maxDays) => {
   if (!range) return false
@@ -67,15 +66,6 @@ const normalizeAssigneeValue = (value) => {
 
 function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'Manage tasking priorities, assignees, and TTGs.' }) {
   const [rows, setRows] = useState([])
-  const [committedAreaIds, setCommittedAreaIds] = useState(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(TASKING_COMMITTED_IDS_KEY) || '[]')
-      if (!Array.isArray(raw)) return new Set()
-      return new Set(raw.map((id) => String(id)))
-    } catch {
-      return new Set()
-    }
-  })
   const [assignees, setAssignees] = useState([{ id: 'Multiple', name: 'Multiple' }])
   const [selectionModel, setSelectionModel] = useState(() => ({ type: 'include', ids: new Set() }))
   const [loading, setLoading] = useState(false)
@@ -142,7 +132,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     const formatted = entries
       .map(({ key, entry }) => {
         if (!entry) return null
-        const assigneeValue = normalizeAssigneeValue(readValue(entry, ['Assignee']))
+        const currentAssigneeValue = normalizeAssigneeValue(readValue(entry, ['Assignee']))
+        const proposedAssigneeValue = normalizeAssigneeValue(readValue(entry, ['Proposed Assignee']))
 
         const parentIdValue = readValue(entry, ['Parent ID', 'ParentID', 'parent_id'])
         const areaNameValue = readValue(entry, ['imgName', 'Img Name', 'Area Name', 'Area', 'Area_Name'])
@@ -159,7 +150,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
         if (parentIdValue !== null && parentIdValue !== undefined && areaNameValue) {
           const parentId = Number.isNaN(Number(parentIdValue)) ? parentIdValue : Number(parentIdValue)
           const parent = entryMap.get(String(parentId)) || entryMap.get(String(parentIdValue))
-          const parentImageId = readValue(parent, ['Image ID', 'imageId', 'Image_Id']) || null
+          const parentImageId = parentId
           const parentName = normalizeImageName(
             readValue(parent, ['Image File Name', 'Image Filename', 'Image Name', 'Image ID', 'Sensor Name']) ||
               `Image_${parentId}`,
@@ -168,19 +159,12 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           const areaName = areaNameValue || `Area_${key}`
           const areaId = Number.isNaN(Number(key)) ? key : Number(key)
           const scvuImageAreaId = readValue(entry, ['SCVU Image Area ID']) || null
-          const effectiveAreaId = scvuImageAreaId || areaId
-          const isCommitted =
-            effectiveAreaId !== null &&
-            effectiveAreaId !== undefined &&
-            committedAreaIds.has(String(effectiveAreaId)) &&
-            !!assigneeValue
           return {
             id: areaId,
             groupName: [parentName, areaName],
             treePath: [`pass_${parentName}_${mappedParentId}`, areaName],
-            // New flow: keep current empty until Apply Change, show auto-suggestion in proposed.
-            currentAssignee: isCommitted ? assigneeValue : '',
-            proposedAssignee: isCommitted ? '' : assigneeValue,
+            currentAssignee: currentAssigneeValue,
+            proposedAssignee: proposedAssigneeValue,
             areaName,
             imgName: areaName,
             parentId: mappedParentId,
@@ -218,10 +202,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           passParentRows.set(imageFileName, parentRow)
           return parentRow
         }
-        passParentRows.set(imageFileName, {
-          ...existingParent,
-          childImageIds: [...new Set([...(existingParent.childImageIds || []), imageId])],
-        })
+        existingParent.childImageIds = [...new Set([...(existingParent.childImageIds || []), imageId])]
+        passParentRows.set(imageFileName, existingParent)
         return null
       })
       .filter(Boolean)
@@ -291,17 +273,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       }
       const nextRows = formatData(data)
       setRows(nextRows)
-      setCommittedAreaIds((prev) => {
-        if (!nextRows.length || prev.size === 0) return nextRows.length ? prev : new Set()
-        const next = new Set()
-        nextRows.forEach((row) => {
-          const areaId = row?.scvuImageAreaId
-          if (areaId === null || areaId === undefined || areaId === '') return
-          const key = String(areaId)
-          if (prev.has(key)) next.add(key)
-        })
-        return next
-      })
       setHasPendingEdits(false)
     } catch (err) {
       console.error('Tasking Manager fetch failed:', err)
@@ -337,14 +308,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   useEffect(() => {
     fetchUsers()
   }, [])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TASKING_COMMITTED_IDS_KEY, JSON.stringify(Array.from(committedAreaIds)))
-    } catch {
-      // no-op: storage write failure should not block UI behavior
-    }
-  }, [committedAreaIds])
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -546,11 +509,15 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       if (Array.isArray(row.childImageIds) && row.childImageIds.length) {
         return [...new Set(row.childImageIds)]
       }
+      if (row.parentId !== null && row.parentId !== undefined && row.parentId !== '') {
+        const parentRow = rows.find((candidate) => String(candidate.id) === String(row.parentId))
+        if (Array.isArray(parentRow?.childImageIds) && parentRow.childImageIds.length) {
+          return [...new Set(parentRow.childImageIds)]
+        }
+        return [row.parentId]
+      }
       if (row.parentImageId !== null && row.parentImageId !== undefined && row.parentImageId !== '') {
         return [row.parentImageId]
-      }
-      if (row.parentId !== null && row.parentId !== undefined && row.parentId !== '') {
-        return [row.parentId]
       }
       return [params.id]
     }
@@ -577,13 +544,38 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
               onClick={async () => {
                 try {
                   setError(null)
-                  const imageIds = resolveDeleteImageIds()
-                  for (const imageId of imageIds) {
-                    await api.postDeleteImage({ 'SCVU Image ID': imageId })
+                  const isChildRow = params?.row?.groupName?.length > 1
+                  const deleteCount = isChildRow ? 1 : resolveDeleteImageIds().length
+                  const shouldDelete = window.confirm(
+                    `Delete ${deleteCount} ${isChildRow ? 'child row' : 'image(s)'}? This action cannot be undone.`,
+                  )
+                  if (!shouldDelete) return
+                  if (isChildRow) {
+                    const imageAreaId = params?.row?.scvuImageAreaId
+                    if (!imageAreaId) {
+                      addNotification({
+                        title: 'Delete failed',
+                        meta: 'Unable to resolve image area ID for this row',
+                      })
+                      return
+                    }
+                    await api.postDeleteImageArea({ 'SCVU Image Area ID': imageAreaId })
+                  } else {
+                    const imageIds = resolveDeleteImageIds()
+                    if (!imageIds.length) {
+                      addNotification({
+                        title: 'Delete failed',
+                        meta: 'Unable to resolve image ID for this row',
+                      })
+                      return
+                    }
+                    for (const imageId of imageIds) {
+                      await api.postDeleteImage({ 'SCVU Image ID': imageId })
+                    }
                   }
                   addNotification({
-                    title: 'TTG deleted',
-                    meta: `Just now · ${imageIds.length} image(s) removed`,
+                    title: isChildRow ? 'Child row deleted' : 'TTG deleted',
+                    meta: isChildRow ? 'Just now · 1 row removed' : `Just now · ${deleteCount} image(s) removed`,
                   })
                   setRefreshKey((prev) => prev + 1)
                 } catch (err) {
@@ -678,7 +670,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
 
       if (hasTasks) {
         const committedSet = new Set(tasksPayload.Tasks.map((task) => String(task['SCVU Image Area ID'])))
-        setCommittedAreaIds((prev) => new Set([...prev, ...committedSet]))
         // Promote proposed assignments to current assignments after confirmation.
         setRows((prev) =>
           prev.map((row) => {

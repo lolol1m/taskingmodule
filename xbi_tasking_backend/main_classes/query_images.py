@@ -145,6 +145,8 @@ SQL_DELETE_TASKS_FOR_IMAGE = (
 )
 SQL_DELETE_IMAGE_AREAS_FOR_IMAGE = "DELETE FROM image_area WHERE scvu_image_id = %s"
 SQL_DELETE_IMAGE = "DELETE FROM image WHERE scvu_image_id = %s"
+SQL_DELETE_TASK_FOR_IMAGE_AREA = "DELETE FROM task WHERE scvu_image_area_id = %s"
+SQL_DELETE_IMAGE_AREA = "DELETE FROM image_area WHERE scvu_image_area_id = %s"
 
 
 class ImageQueries:
@@ -408,3 +410,19 @@ class ImageQueries:
         Output: NIL
         '''
         self.db.executeDelete(SQL_DELETE_IMAGE, (scvu_image_id,))
+
+    def deleteTaskForImageArea(self, scvu_image_area_id):
+        '''
+        Function: Deletes task for a specific image_area
+        Input: scvu_image_area_id
+        Output: NIL
+        '''
+        self.db.executeDelete(SQL_DELETE_TASK_FOR_IMAGE_AREA, (scvu_image_area_id,))
+
+    def deleteImageArea(self, scvu_image_area_id):
+        '''
+        Function: Deletes a specific image_area
+        Input: scvu_image_area_id
+        Output: NIL
+        '''
+        self.db.executeDelete(SQL_DELETE_IMAGE_AREA, (scvu_image_area_id,))

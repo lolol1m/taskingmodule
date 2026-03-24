@@ -86,6 +86,12 @@ class DeleteImagePayload(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class DeleteImageAreaPayload(BaseModel):
+    image_area_id: int = Field(..., alias="SCVU Image Area ID")
+
+    model_config = {"populate_by_name": True}
+
+
 class SensorCategoryUpdate(BaseModel):
     name: str = Field(..., alias="Name")
     category: str = Field(..., alias="Category")

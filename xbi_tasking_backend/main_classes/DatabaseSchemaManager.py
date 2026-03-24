@@ -117,6 +117,7 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS child_image_id BIGINT")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_start_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS proposed_assignee_keycloak_id VARCHAR(255)")
                 cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS ir_reported")
                 cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS sf_reported")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS priority_id INTEGER REFERENCES priority(id)")
@@ -289,6 +290,7 @@ class DatabaseSchemaManager:
                     scvu_task_id SERIAL PRIMARY KEY,
                     scvu_image_area_id INTEGER UNIQUE REFERENCES image_area(scvu_image_area_id),
                     assignee_keycloak_id VARCHAR(255),
+                    proposed_assignee_keycloak_id VARCHAR(255),
                     task_status_id INTEGER REFERENCES task_status(id),
                     priority_id INTEGER REFERENCES priority(id),
                     report_id INTEGER REFERENCES report(id),

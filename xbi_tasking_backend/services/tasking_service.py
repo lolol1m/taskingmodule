@@ -153,8 +153,10 @@ class TaskingService:
             areas_by_image.setdefault(image_id, []).append((image_area_id, area_name))
 
         tasks_by_image = {}
-        for image_id, image_area_id, assignee_name, remarks, priority_name in task_rows:
-            tasks_by_image.setdefault(image_id, []).append((image_area_id, assignee_name, remarks, priority_name))
+        for image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name in task_rows:
+            tasks_by_image.setdefault(image_id, []).append(
+                (image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name)
+            )
 
         for image in images:
             areas = areas_by_image.get(image[0], [])

@@ -119,6 +119,11 @@ class API {
 
     }
 
+    async postDeleteImageArea(body){
+        const response = await this.client.post("/images/deleteImageArea", body)
+        return response.data
+    }
+
     async postAssignTask(body){ 
               const response = await this.client.post("/tasking/assignTask",  body)
         return response.data

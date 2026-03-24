@@ -68,7 +68,10 @@ SQL_GET_TASKING_MANAGER_IMAGE_FOR_IMAGES = """
 """
 
 SQL_GET_TASKING_MANAGER_TASK = (
-    "SELECT image_area.scvu_image_area_id, COALESCE(task.assignee_keycloak_id, %s), task.remarks, "
+    "SELECT image_area.scvu_image_area_id, "
+    "COALESCE(task.assignee_keycloak_id, %s) as current_assignee_keycloak_id, "
+    "COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id, "
+    "task.remarks, "
     "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
@@ -80,7 +83,9 @@ SQL_GET_TASKING_MANAGER_TASK = (
 
 SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES = """
     SELECT image_area.scvu_image_id, image_area.scvu_image_area_id,
-        COALESCE(task.assignee_keycloak_id, %s), task.remarks,
+        COALESCE(task.assignee_keycloak_id, %s) as current_assignee_keycloak_id,
+        COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id,
+        task.remarks,
         COALESCE(task_priority.name, image_priority.name, NULL) as priority_name
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
@@ -96,10 +101,19 @@ SQL_UPDATE_TASKING_MANAGER_PRIORITY = (
 )
 
 SQL_ASSIGN_TASK = (
-    "INSERT INTO task (assignee_keycloak_id, scvu_image_area_id, task_status_id) "
-    "VALUES (%s, %s, %s) "
+    "INSERT INTO task (assignee_keycloak_id, proposed_assignee_keycloak_id, scvu_image_area_id, task_status_id) "
+    "VALUES (%s, NULL, %s, %s) "
     "ON CONFLICT (scvu_image_area_id) "
-    "DO UPDATE SET assignee_keycloak_id = EXCLUDED.assignee_keycloak_id, task_status_id = EXCLUDED.task_status_id"
+    "DO UPDATE SET assignee_keycloak_id = EXCLUDED.assignee_keycloak_id, "
+    "proposed_assignee_keycloak_id = NULL, "
+    "task_status_id = EXCLUDED.task_status_id"
+)
+
+SQL_SET_PROPOSED_ASSIGNEE = (
+    "INSERT INTO task (assignee_keycloak_id, proposed_assignee_keycloak_id, scvu_image_area_id, task_status_id) "
+    "VALUES (NULL, %s, %s, %s) "
+    "ON CONFLICT (scvu_image_area_id) "
+    "DO UPDATE SET proposed_assignee_keycloak_id = EXCLUDED.proposed_assignee_keycloak_id"
 )
 
 SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN = """
@@ -131,6 +145,8 @@ SQL_GET_TASKING_SUMMARY_IMAGE = """
     JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id
     WHERE image.completed_date IS NULL
         AND (image.upload_date >= %s AND image.upload_date <= %s)
+        AND task.assignee_keycloak_id IS NOT NULL
+        AND task.assignee_keycloak_id <> ''
 """
 
 SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
@@ -177,6 +193,8 @@ SQL_GET_TASKING_SUMMARY_AREA = (
     "LEFT JOIN priority task_priority ON task_priority.id = task.priority_id "
     "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "WHERE image.scvu_image_id = %s "
+    "AND task.assignee_keycloak_id IS NOT NULL "
+    "AND task.assignee_keycloak_id <> '' "
     "ORDER BY area.area_name"
 )
 
@@ -203,6 +221,8 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
     LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
     LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image.scvu_image_id IN ({placeholders})
+        AND task.assignee_keycloak_id IS NOT NULL
+        AND task.assignee_keycloak_id <> ''
     ORDER BY image.scvu_image_id, area.area_name
 """
 
@@ -405,21 +425,31 @@ class TaskingQueries:
         '''
         results = self.db.executeSelect(
             SQL_GET_TASKING_MANAGER_TASK,
-            (AssigneeLabel.UNASSIGNED, scvu_image_id),
+            (AssigneeLabel.UNASSIGNED, "", scvu_image_id),
         )
         if not results:
             return results
 
-        assignee_ids = [row[1] for row in results if row[1] and row[1] != 'Unassigned']
+        assignee_ids = []
+        for row in results:
+            if row[1] and row[1] != AssigneeLabel.UNASSIGNED:
+                assignee_ids.append(row[1])
+            if row[2]:
+                assignee_ids.append(row[2])
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
 
         formatted = []
-        for image_area_id, assignee_keycloak_id, remarks, priority_name in results:
-            if assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not assignee_keycloak_id:
-                assignee_name = AssigneeLabel.UNASSIGNED
+        for image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name in results:
+            if current_assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not current_assignee_keycloak_id:
+                current_assignee_name = AssigneeLabel.UNASSIGNED
             else:
-                assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
-            formatted.append((image_area_id, assignee_name, remarks, priority_name))
+                current_assignee_name = usernames.get(current_assignee_keycloak_id, current_assignee_keycloak_id)
+            proposed_assignee_name = (
+                usernames.get(proposed_assignee_keycloak_id, proposed_assignee_keycloak_id)
+                if proposed_assignee_keycloak_id
+                else ""
+            )
+            formatted.append((image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name))
         return formatted
 
     def getTaskingManagerDataForTasks(self, scvu_image_ids):
@@ -432,18 +462,28 @@ class TaskingQueries:
             return []
         placeholders, values = build_in_clause(scvu_image_ids)
         query = SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES.format(placeholders=placeholders)
-        results = self.db.executeSelect(query, (AssigneeLabel.UNASSIGNED,) + values)
+        results = self.db.executeSelect(query, (AssigneeLabel.UNASSIGNED, "") + values)
         if not results:
             return results
-        assignee_ids = [row[2] for row in results if row[2] and row[2] != AssigneeLabel.UNASSIGNED]
+        assignee_ids = []
+        for row in results:
+            if row[2] and row[2] != AssigneeLabel.UNASSIGNED:
+                assignee_ids.append(row[2])
+            if row[3]:
+                assignee_ids.append(row[3])
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
-        for scvu_image_id, image_area_id, assignee_keycloak_id, remarks, priority_name in results:
-            if assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not assignee_keycloak_id:
-                assignee_name = AssigneeLabel.UNASSIGNED
+        for scvu_image_id, image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name in results:
+            if current_assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not current_assignee_keycloak_id:
+                current_assignee_name = AssigneeLabel.UNASSIGNED
             else:
-                assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
-            formatted.append((scvu_image_id, image_area_id, assignee_name, remarks, priority_name))
+                current_assignee_name = usernames.get(current_assignee_keycloak_id, current_assignee_keycloak_id)
+            proposed_assignee_name = (
+                usernames.get(proposed_assignee_keycloak_id, proposed_assignee_keycloak_id)
+                if proposed_assignee_keycloak_id
+                else ""
+            )
+            formatted.append((scvu_image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name))
         return formatted
 
     def updateTaskingManagerData(self, scvu_image_area_id, priority_name):
@@ -518,7 +558,10 @@ class TaskingQueries:
                 load_penalty = 1.0 + float(active_counts.get(user_id, 0))
                 adjusted_weights.append(base_weight / load_penalty)
             assignee_keycloak_id = random.choices(weighted_candidates, weights=adjusted_weights, k=1)[0]
-        self.assignTask(scvu_image_area_id, assignee_keycloak_id, 1)
+        self.db.executeInsert(
+            SQL_SET_PROPOSED_ASSIGNEE,
+            (assignee_keycloak_id, scvu_image_area_id, 1),
+        )
         return assignee_keycloak_id
 
     def getTaskingSummaryImageData(self, start_date, end_date, limit=None, offset=None):
