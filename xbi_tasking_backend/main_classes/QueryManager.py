@@ -33,6 +33,12 @@ class QueryManager():
     def createKeycloakUser(self, username, password, role_name):
         return self._keycloak.createKeycloakUser(username, password, role_name)
 
+    def deleteKeycloakUser(self, user_id):
+        return self._keycloak.deleteKeycloakUser(user_id)
+
+    def editKeycloakUser(self, user_id, new_username, new_role, new_status):
+        return self._keycloak.editKeycloakUser(user_id, new_username, new_role, new_status)
+
     def get_keycloak_admin_token(self):
         '''
         Obtain Keycloak admin token of xbi-tasking-admin client
@@ -45,6 +51,9 @@ class QueryManager():
     
     def getUserActiveTasks(self, keycloak_user_id):
         return self._tasking.getUserActiveTasks(keycloak_user_id)
+
+    def getUserAnyTaskCount(self, keycloak_user_id):
+        return self._tasking.getUserAnyTaskCount(keycloak_user_id)
 
     def getActiveTaskCountsForUsers(self, keycloak_user_ids):
         return self._tasking.getActiveTaskCountsForUsers(keycloak_user_ids)

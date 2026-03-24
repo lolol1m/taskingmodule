@@ -70,16 +70,18 @@ def format_tasking_summary_area(area, parent_id):
         "Assignee": area[4],
         "Task Status": area[2],
         "Remarks": area[3],
-        "Area ID": area[7],
-        "Image ID": area[8],
-        "Color": area[9],
-        "Service": area[10],
-        "Report": area[11],
-        "Cloud Cover": area[12],
-        "Image Quality": area[13],
-        "Priority": area[14],
-        "Exploit Start Time": area[15].strftime(datetime_format) if area[15] else None,
-        "Exploit End Time": area[16].strftime(datetime_format) if area[16] else None,
+        "SF Reported": bool(area[5]),
+        "IIR Reported": bool(area[6]),
+        "Area ID": area[9],
+        "Image ID": area[10],
+        "Color": area[11],
+        "Service": area[12],
+        "Report": area[13],
+        "Cloud Cover": area[14],
+        "Image Quality": area[15],
+        "Priority": area[16],
+        "Exploit Start Time": area[17].strftime(datetime_format) if area[17] else None,
+        "Exploit End Time": area[18].strftime(datetime_format) if area[18] else None,
         "SCVU Task ID": area[0],
         "Parent ID": parent_id
     }
@@ -109,12 +111,14 @@ def format_tasking_manager_area(image_data, area_data, image_areas_data):
     proposed_assignee = None
     remarks = None
     priority = None
+    task_status = None
     for image_area in image_areas_data:
         if area_data[0] == image_area[0]:
             assignee = image_area[1]
             proposed_assignee = image_area[2] if len(image_area) > 2 else None
             remarks = image_area[3] if len(image_area) > 3 else None
             priority = image_area[4] if len(image_area) > 4 else None
+            task_status = image_area[5] if len(image_area) > 5 else None
     return {
         'Area Name': area_data[1],
         'Parent ID': image_data[0],
@@ -123,4 +127,5 @@ def format_tasking_manager_area(image_data, area_data, image_areas_data):
         'Proposed Assignee': proposed_assignee,
         'Remarks': remarks,
         'Priority': priority,
+        'Task Status': task_status,
     }

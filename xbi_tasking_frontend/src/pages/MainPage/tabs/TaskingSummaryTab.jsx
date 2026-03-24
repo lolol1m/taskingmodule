@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material'
 import { DataGridPro } from '@mui/x-data-grid-pro'
+import truePng from '../../../assets/true.png'
 import API from '../../../api/api'
 import { ToastContainer, toast} from 'react-toastify';
 import UserService from '../../../auth/UserService';
@@ -181,6 +182,8 @@ const buildRows = (inputData) => {
         parentId: parentPassId,
         areaId: entry['Area ID'] ?? entry['areaId'] ?? entry['SCVU Image Area ID'] ?? null,
         scvuTaskId: entry['SCVU Task ID'] || null,
+        sfReported: Boolean(entry['SF Reported'] ?? entry['sfReported'] ?? false),
+        iirReported: Boolean(entry['IIR Reported'] ?? entry['iirReported'] ?? false),
       })
     }
   })
@@ -276,7 +279,44 @@ function TaskingSummaryTab({
     return new Set(normalized)
   }, [taskStatusFilter])
   const displayedRows = useMemo(() => {
-    if (!normalizedStatusFilters) return rows
+    const reportPriority = (report) => {
+      const r = String(report || '').trim().toUpperCase()
+      if (r === 'IIR') return 0
+      if (r === 'DS(SF)') return 1
+      return 2
+    }
+
+    const sortByReport = (list) => {
+      // Separate parent and child rows, sort children by report priority, then
+      // re-attach parents in the order their highest-priority child dictates.
+      const parents = list.filter((row) => row?.parentId === undefined)
+      const children = list.filter((row) => row?.parentId !== undefined)
+      children.sort((a, b) => reportPriority(a.report) - reportPriority(b.report))
+      // Build parent priority: minimum (best) child report priority per parent id.
+      const parentPriority = new Map()
+      children.forEach((row) => {
+        const key = String(row.parentId)
+        const prev = parentPriority.get(key) ?? 99
+        parentPriority.set(key, Math.min(prev, reportPriority(row.report)))
+      })
+      parents.sort((a, b) => {
+        const pa = parentPriority.get(String(a.id)) ?? 99
+        const pb = parentPriority.get(String(b.id)) ?? 99
+        return pa - pb
+      })
+      // Interleave: parent followed by its children in report-priority order.
+      const result = []
+      parents.forEach((parent) => {
+        result.push(parent)
+        children.filter((c) => String(c.parentId) === String(parent.id)).forEach((c) => result.push(c))
+      })
+      // Append any orphan children (shouldn't normally exist).
+      const addedIds = new Set(result.map((r) => r.id))
+      children.filter((c) => !addedIds.has(c.id)).forEach((c) => result.push(c))
+      return result
+    }
+
+    if (!normalizedStatusFilters) return sortByReport(rows)
     const includedChildIds = new Set(
       rows
         .filter((row) => row?.parentId !== undefined)
@@ -289,7 +329,8 @@ function TaskingSummaryTab({
         .map((row) => row.parentId)
         .filter((value) => value !== undefined && value !== null),
     )
-    return rows.filter((row) => parentIds.has(row.id) || includedChildIds.has(row.id))
+    const filtered = rows.filter((row) => parentIds.has(row.id) || includedChildIds.has(row.id))
+    return sortByReport(filtered)
   }, [rows, normalizedStatusFilters])
 
   const reportColor = (value) => {
@@ -942,8 +983,66 @@ function TaskingSummaryTab({
           )
         },
       },
+      ...(verificationOnlyActions
+        ? [
+            {
+              field: 'sfReported',
+              headerName: 'SF Reported',
+              minWidth: 110,
+              flex: 0.55,
+              renderCell: (params) => {
+                if (params?.row?.parentId === undefined) return '—'
+                const report = String(params?.row?.report || '').trim().toUpperCase()
+                if (report !== 'DS(SF)' && report !== 'IIR') return '—'
+                return params?.row?.sfReported ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img
+                      src={truePng}
+                      alt="reported"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        filter:
+                          'brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(189deg) brightness(118%)',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ color: 'var(--muted)' }}>—</Box>
+                )
+              },
+            },
+            {
+              field: 'iirReported',
+              headerName: 'IIR Reported',
+              minWidth: 110,
+              flex: 0.55,
+              renderCell: (params) => {
+                if (params?.row?.parentId === undefined) return '—'
+                const report = String(params?.row?.report || '').trim().toUpperCase()
+                if (report !== 'IIR') return '—'
+                return params?.row?.iirReported ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img
+                      src={truePng}
+                      alt="reported"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        filter:
+                          'brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(189deg) brightness(118%)',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ color: 'var(--muted)' }}>—</Box>
+                )
+              },
+            },
+          ]
+        : []),
     ],
-    [readOnlyInputs, role, rows],
+    [readOnlyInputs, role, rows, verificationOnlyActions],
   )
 
   useEffect(() => {
@@ -1241,6 +1340,7 @@ function TaskingSummaryTab({
       await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
       const nextStatusByPath = {
         '/tasking/startTasks': 'In Progress',
+        '/tasking/endTasks': 'Incomplete',
         '/tasking/completeTasks': 'Verifying',
         '/tasking/verifyPass': 'Completed',
         '/tasking/verifyFail': 'Incomplete',
@@ -1286,7 +1386,9 @@ function TaskingSummaryTab({
         })
       }
       const actionTitle =
-        apiPath === '/tasking/startTasks' ? 'Tasks started' : apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+        apiPath === '/tasking/startTasks' ? 'Tasks started' :
+        apiPath === '/tasking/endTasks' ? 'Tasks ended' :
+        apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
       addNotification({
         title: actionTitle,
         meta: `Just now · ${taskIds.length} tasks`,
@@ -1295,10 +1397,12 @@ function TaskingSummaryTab({
     } catch (err) {
       console.error('Tasking Summary task update failed:', err)
       const message = getErrorMessage(err, 'Unable to update tasks.')
-      setError(message)
+      if (!verificationOnlyActions) {
+        setError(message)
+      }
       addNotification({
         title: 'Task update failed',
-        meta: 'Just now · Please try again',
+        meta: `Just now · ${message}`,
       })
     }
   }
@@ -1720,6 +1824,15 @@ function TaskingSummaryTab({
                   </Button>
                 </Tooltip>
               </ClickAwayListener>
+            ) : null}
+            {!verificationOnlyActions ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/tasking/endTasks')}
+                disabled={!selection.length}
+              >
+                End Task
+              </Button>
             ) : null}
             {!verificationOnlyActions && isShow.CT ? (
               <Button

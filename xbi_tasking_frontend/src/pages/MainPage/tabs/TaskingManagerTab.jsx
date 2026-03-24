@@ -159,6 +159,8 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
           const areaName = areaNameValue || `Area_${key}`
           const areaId = Number.isNaN(Number(key)) ? key : Number(key)
           const scvuImageAreaId = readValue(entry, ['SCVU Image Area ID']) || null
+          const rawTaskStatus = readValue(entry, ['Task Status', 'taskStatus', 'task_status']) || null
+          const taskStatus = rawTaskStatus ? String(rawTaskStatus).trim().toLowerCase() : null
           return {
             id: areaId,
             groupName: [parentName, areaName],
@@ -175,6 +177,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             sensorName: null,
             uploadDate: readValue(parent, ['Upload Date', 'UploadDate']) || '—',
             priority: readValue(entry, ['Priority', 'priority', 'Priority Level']) || '—',
+            taskStatus,
             ttg: null,
           }
         }
@@ -381,6 +384,21 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     }
     if (isImageRow) return '—'
 
+    // Lock assignee editing once a task has been started (anything past incomplete / not-started)
+    const taskStatus = params?.row?.taskStatus
+    const isAssigneeLocked = taskStatus && !['', 'incomplete'].includes(String(taskStatus).trim().toLowerCase())
+    if (isAssigneeLocked) {
+      const currentValue = params?.row?.currentAssignee || params?.row?.proposedAssignee || ''
+      const statusLabel = String(taskStatus).trim()
+      return (
+        <Tooltip title={`Assignee cannot be changed — task is ${statusLabel}`}>
+          <span style={{ fontSize: 13, color: 'var(--muted)', paddingLeft: 10, userSelect: 'none' }}>
+            {getAssigneeLabel(currentValue) || '—'}
+          </span>
+        </Tooltip>
+      )
+    }
+
     const applyAssignee = (nextValue) => {
       const proposedAssigneeValue = nextValue || ''
       setHasPendingEdits(true)
@@ -521,6 +539,24 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
       }
       return [params.id]
     }
+
+    const isStatusDeletable = (status) => {
+      if (!status) return true
+      const s = String(status).trim().toLowerCase()
+      return s === '' || s === 'incomplete'
+    }
+
+    const isChildRow = params?.row?.groupName?.length > 1
+    let canDelete = true
+    if (isChildRow) {
+      canDelete = isStatusDeletable(params?.row?.taskStatus)
+    } else {
+      // Parent row: deletable only if every child task is incomplete / not started
+      const children = rows.filter((r) => String(r.parentId) === String(params?.row?.id))
+      canDelete = children.length === 0 || children.every((c) => isStatusDeletable(c.taskStatus))
+    }
+    const deleteTooltip = canDelete ? 'Delete' : 'Cannot delete — task has been started'
+
     return (
       <div className="tasking-manager__ttg-actions">
         <Tooltip title="Edit">
@@ -535,16 +571,17 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             </Button>
           </span>
         </Tooltip>
-        <Tooltip title="Delete">
+        <Tooltip title={deleteTooltip}>
           <span className="tasking-manager__ttg">
             <Button
               className="tasking-manager__action-btn tasking-manager__action-btn--icon"
               size="small"
               aria-label="Delete"
+              disabled={!canDelete}
               onClick={async () => {
+                if (!canDelete) return
                 try {
                   setError(null)
-                  const isChildRow = params?.row?.groupName?.length > 1
                   const deleteCount = isChildRow ? 1 : resolveDeleteImageIds().length
                   const shouldDelete = window.confirm(
                     `Delete ${deleteCount} ${isChildRow ? 'child row' : 'image(s)'}? This action cannot be undone.`,
@@ -658,7 +695,6 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     }
 
     try {
-      setError(null)
       if (hasTasks) {
         await api.postAssignTask(tasksPayload)
         localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
@@ -702,10 +738,9 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     } catch (err) {
       console.error('Tasking Manager update failed', err)
       const message = getErrorMessage(err, 'Unable to apply changes.')
-      setError(message)
       addNotification({
         title: 'Update failed',
-        meta: 'Just now · Please try again',
+        meta: message,
       })
     }
   }

@@ -45,6 +45,10 @@ SQL_INSERT_USER_CACHE_WITH_TIMESTAMP = """
 
 SQL_UPDATE_USER_CACHE_PRESENT = "UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
 
+SQL_UPDATE_USER_CACHE_PRESENCE = "UPDATE user_cache SET is_present = %s, last_updated = NOW() WHERE keycloak_user_id = %s"
+
+SQL_DELETE_USER_CACHE = "DELETE FROM user_cache WHERE keycloak_user_id = %s"
+
 
 class KeycloakQueries:
     def __init__(self, db, keycloak_user_cache, keycloak_service=None):
@@ -179,6 +183,47 @@ class KeycloakQueries:
         # Ensure user exists in cache (default to not present)
         self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (user_id,))
         return {"id": user_id, "username": username, "role": role_name}
+
+    def deleteKeycloakUser(self, user_id):
+        token = self.get_keycloak_admin_token()
+        self.kc.delete_user(token, user_id)
+        self.db.executeDelete(SQL_DELETE_USER_CACHE, (user_id,))
+
+    def editKeycloakUser(self, user_id, new_username, new_role, new_status):
+        token = self.get_keycloak_admin_token()
+        warnings = []
+
+        if new_username:
+            try:
+                self.kc.update_user_info(token, user_id, new_username)
+            except requests.exceptions.HTTPError as e:
+                response_text = ""
+                if getattr(e, "response", None) is not None:
+                    response_text = e.response.text or ""
+                if "error-user-attribute-read-only" in response_text:
+                    warnings.append("Username is managed by Keycloak federation and cannot be changed.")
+                else:
+                    raise
+
+        if new_role:
+            valid_roles = {r.value for r in EnumClasses.Role}
+            if new_role not in valid_roles:
+                raise ValueError(f"Invalid role: {new_role}. Must be one of: {', '.join(sorted(valid_roles))}")
+            current_roles = self.kc.get_user_realm_roles(token, user_id)
+            for role_rep in current_roles:
+                if role_rep.get("name") in valid_roles:
+                    try:
+                        self.kc.remove_realm_role(token, user_id, role_rep)
+                    except requests.exceptions.RequestException as e:
+                        logger.warning("Could not remove role %s from user %s: %s", role_rep.get("name"), user_id, e)
+            new_role_rep = self.kc.get_role(token, new_role)
+            self.kc.assign_realm_role(token, user_id, new_role_rep)
+
+        if new_status is not None:
+            is_present = new_status.lower() == "present"
+            self.db.executeUpdate(SQL_UPDATE_USER_CACHE_PRESENCE, (is_present, user_id))
+
+        return {"warnings": warnings}
 
     def get_keycloak_admin_token(self):
         '''

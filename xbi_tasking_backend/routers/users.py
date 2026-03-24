@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, UploadFile
 
 from api_utils import error_response, model_to_dict, run_blocking
 from constants import ContentType, MAX_UPLOAD_BYTES
-from schemas import AdminResetPasswordPayload, ChangePasswordPayload, CreateUserPayload, StatusResponse, UsersResponse
+from schemas import AdminResetPasswordPayload, ChangePasswordPayload, CreateUserPayload, DeleteUserPayload, EditUserPayload, StatusResponse, UsersResponse
 from security import can_upload_parade_state, get_current_user, is_admin_user
 
 
@@ -37,7 +37,7 @@ async def create_user(request: Request, payload: CreateUserPayload, user: dict =
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
 
-    if not can_upload_parade_state(user):
+    if not is_admin_user(user):
         return error_response(403, "Insufficient permissions", "insufficient_permissions")
 
     try:
@@ -64,6 +64,40 @@ async def create_user(request: Request, payload: CreateUserPayload, user: dict =
     except Exception as e:
         logger.exception("createUser failed")
         return error_response(500, "Failed to create user", "create_user_failed", {"error": str(e)})
+
+
+@router.post("/deleteUser")
+async def delete_user(request: Request, payload: DeleteUserPayload, user: dict = Depends(get_current_user)):
+    if not user:
+        return error_response(401, "Not authenticated", "not_authenticated")
+    if not is_admin_user(user):
+        return error_response(403, "Insufficient permissions", "insufficient_permissions")
+    try:
+        result = await run_blocking(request.app.state.user_service.delete_user, model_to_dict(payload))
+        if "error" in result:
+            return error_response(400, result["error"], "delete_user_failed")
+        return result
+    except Exception as e:
+        logger.exception("deleteUser failed")
+        return error_response(500, "Failed to delete user", "delete_user_failed", {"error": str(e)})
+
+
+@router.post("/editUser")
+async def edit_user(request: Request, payload: EditUserPayload, user: dict = Depends(get_current_user)):
+    if not user:
+        return error_response(401, "Not authenticated", "not_authenticated")
+    if not is_admin_user(user):
+        return error_response(403, "Insufficient permissions", "insufficient_permissions")
+    try:
+        result = await run_blocking(request.app.state.user_service.edit_user, model_to_dict(payload))
+        if "error" in result:
+            return error_response(400, result["error"], "edit_user_failed")
+        return result
+    except ValueError as e:
+        return error_response(400, str(e), "edit_user_failed")
+    except Exception as e:
+        logger.exception("editUser failed")
+        return error_response(500, "Failed to edit user", "edit_user_failed", {"error": str(e)})
 
 
 @router.post("/updateUsers")

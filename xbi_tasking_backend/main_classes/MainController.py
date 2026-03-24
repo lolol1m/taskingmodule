@@ -18,7 +18,7 @@ class MainController():
         self.image_service = ImageService(self.qm.db, self.qm._images, self.qm._tasking)
         self.tasking_service = TaskingService(self.qm._tasking, self.qm._keycloak, image_service=self.image_service)
         self.lookup_service = LookupService(self.qm._lookup)
-        self.user_service = UserService(self.qm.db, self.qm._keycloak, KeycloakClient())
+        self.user_service = UserService(self.qm.db, self.qm._keycloak, KeycloakClient(), tasking_queries=self.qm._tasking)
         self.report_service = ReportService(self.qm._reports, self.qm._lookup, self.eg)
     
     def insertDSTAData(self, json, auto_assign = True):

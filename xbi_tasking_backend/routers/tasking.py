@@ -228,7 +228,7 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
         }
     '''
     try:
-        if not is_admin_user(user):
+        if not can_assign_tasks(user):
             return error_response(403, "Insufficient permissions", "insufficient_permissions")
         data = model_to_dict(payload)
         tasks = data.get("Tasks", [])
@@ -285,6 +285,35 @@ async def start_tasks(request: Request, payload: TaskIdsPayload, user: dict = De
     except Exception:
         logger.exception("startTasks failed")
         return error_response(500, "Failed to start tasks", "start_tasks_failed")
+
+
+@router.post("/endTasks")
+async def end_tasks(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
+    '''
+    Function: Ends the Tasks by reverting task status from In Progress back to Incomplete
+    
+    Input:
+
+        {
+            'SCVU Task ID': <list of int>
+        }
+    '''
+    try:
+        result = await run_blocking(request.app.state.tasking_service.end_tasks, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "task_end",
+                    user,
+                    details={"task_count": len(payload.task_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasks ended")
+        return result
+    except Exception:
+        logger.exception("endTasks failed")
+        return error_response(500, "Failed to end tasks", "end_tasks_failed")
 
 
 @router.post("/completeTasks")
@@ -356,6 +385,8 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
                 )
             return StatusResponse(status="success", message="Tasks verified")
         return result
+    except ValueError as e:
+        return error_response(400, str(e), "verify_pass_validation_failed")
     except Exception:
         logger.exception("verifyPass failed")
         return error_response(500, "Failed to verify tasks", "verify_pass_failed")

@@ -118,8 +118,8 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_start_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS proposed_assignee_keycloak_id VARCHAR(255)")
-                cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS ir_reported")
-                cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS sf_reported")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS sf_reported BOOLEAN DEFAULT FALSE")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS iir_reported BOOLEAN DEFAULT FALSE")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS priority_id INTEGER REFERENCES priority(id)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS report_id INTEGER REFERENCES report(id)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS cloud_cover_id INTEGER REFERENCES cloud_cover(id)")
@@ -291,6 +291,8 @@ class DatabaseSchemaManager:
                     scvu_image_area_id INTEGER UNIQUE REFERENCES image_area(scvu_image_area_id),
                     assignee_keycloak_id VARCHAR(255),
                     proposed_assignee_keycloak_id VARCHAR(255),
+                    sf_reported BOOLEAN DEFAULT FALSE,
+                    iir_reported BOOLEAN DEFAULT FALSE,
                     task_status_id INTEGER REFERENCES task_status(id),
                     priority_id INTEGER REFERENCES priority(id),
                     report_id INTEGER REFERENCES report(id),

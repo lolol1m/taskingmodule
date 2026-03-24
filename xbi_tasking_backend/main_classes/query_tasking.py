@@ -16,6 +16,13 @@ SQL_GET_USER_ACTIVE_TASKS = """
         AND ts.name != %s;
 """
 
+SQL_GET_USER_ANY_TASK_COUNT = """
+    SELECT COUNT(*)
+    FROM task
+    WHERE assignee_keycloak_id = %s
+       OR proposed_assignee_keycloak_id = %s;
+"""
+
 SQL_GET_ACTIVE_TASK_COUNTS = """
     SELECT t.assignee_keycloak_id, COUNT(*)
     FROM task t
@@ -72,10 +79,12 @@ SQL_GET_TASKING_MANAGER_TASK = (
     "COALESCE(task.assignee_keycloak_id, %s) as current_assignee_keycloak_id, "
     "COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id, "
     "task.remarks, "
-    "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name "
+    "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name, "
+    "task_status.name as task_status_name "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN image ON image.scvu_image_id = image_area.scvu_image_id "
+    "JOIN task_status ON task_status.id = task.task_status_id "
     "LEFT JOIN priority task_priority ON task_priority.id = task.priority_id "
     "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "WHERE image_area.scvu_image_id = %s"
@@ -86,10 +95,12 @@ SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES = """
         COALESCE(task.assignee_keycloak_id, %s) as current_assignee_keycloak_id,
         COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id,
         task.remarks,
-        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name
+        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
+        task_status.name as task_status_name
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN image ON image.scvu_image_id = image_area.scvu_image_id
+    JOIN task_status ON task_status.id = task.task_status_id
     LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
     LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image_area.scvu_image_id IN ({placeholders})
@@ -172,7 +183,7 @@ SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
 
 SQL_GET_TASKING_SUMMARY_AREA = (
     "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, "
-    "task.assignee_keycloak_id, area.v10, area.opsv, "
+    "task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv, "
     "COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id, "
     "COALESCE(image_area.child_image_id, image.image_id) as child_image_id, "
     "image_area.color, image_area.service, "
@@ -200,7 +211,7 @@ SQL_GET_TASKING_SUMMARY_AREA = (
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv,
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv,
         COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id,
         COALESCE(image_area.child_image_id, image.image_id) as child_image_id,
         image_area.color, image_area.service,
@@ -228,7 +239,7 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv,
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv,
         COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id,
         COALESCE(image_area.child_image_id, image.image_id) as child_image_id,
         image_area.color, image_area.service,
@@ -267,6 +278,14 @@ SQL_UPDATE_TASK_STATUS_START = (
     "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
 )
 
+SQL_UPDATE_TASK_STATUS_END = (
+    "UPDATE task SET "
+    "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "exploit_start_time = NULL "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
+)
+
 SQL_UPDATE_TASK_STATUS_COMPLETE = (
     "UPDATE task SET "
     "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
@@ -282,6 +301,8 @@ SQL_UPDATE_TASK_STATUS_VERIFY_FAIL = (
     "report_id = NULL, "
     "cloud_cover_id = NULL, "
     "image_quality = NULL, "
+    "sf_reported = FALSE, "
+    "iir_reported = FALSE, "
     "exploit_start_time = NULL, "
     "exploit_end_time = NULL "
     "WHERE scvu_task_id = %s "
@@ -295,6 +316,8 @@ SQL_RESET_IMAGE_TASKS_FROM_COMPLETED = (
     "report_id = NULL, "
     "cloud_cover_id = NULL, "
     "image_quality = NULL, "
+    "sf_reported = FALSE, "
+    "iir_reported = FALSE, "
     "exploit_start_time = NULL, "
     "exploit_end_time = NULL "
     "WHERE task_status_id = (SELECT id FROM task_status WHERE name = %s) "
@@ -314,6 +337,20 @@ SQL_UPDATE_TASKING_SUMMARY_IMAGE = (
     "WHERE scvu_image_id = %s"
 )
 
+SQL_GET_TASK_SUBMISSION_STATUS_BY_IDS = """
+    SELECT
+        task.scvu_task_id,
+        COALESCE(task_report.name, image_report.name, '') as effective_report,
+        COALESCE(task.sf_reported, FALSE) as sf_reported,
+        COALESCE(task.iir_reported, FALSE) as iir_reported
+    FROM task
+    JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
+    JOIN image ON image_area.scvu_image_id = image.scvu_image_id
+    LEFT JOIN report task_report ON task_report.id = task.report_id
+    LEFT JOIN report image_report ON image_report.id = image.report_id
+    WHERE task.scvu_task_id IN ({placeholders})
+"""
+
 class TaskingQueries:
     def __init__(self, db, keycloak_queries):
         self.db = db
@@ -326,6 +363,15 @@ class TaskingQueries:
         Output: integer value of unfinished tasks
         '''
         result = self.db.executeSelect(SQL_GET_USER_ACTIVE_TASKS, (keycloak_user_id, TaskStatus.COMPLETED))
+        return result[0][0]
+
+    def getUserAnyTaskCount(self, keycloak_user_id):
+        '''
+        Counts all tasks where user appears as assignee or proposed assignee, regardless of status.
+        Input: keycloak_user_id
+        Output: integer count
+        '''
+        result = self.db.executeSelect(SQL_GET_USER_ANY_TASK_COUNT, (keycloak_user_id, keycloak_user_id))
         return result[0][0]
 
     def getActiveTaskCountsForUsers(self, keycloak_user_ids):
@@ -473,7 +519,7 @@ class TaskingQueries:
                 assignee_ids.append(row[3])
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
-        for scvu_image_id, image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name in results:
+        for scvu_image_id, image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name, task_status_name in results:
             if current_assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not current_assignee_keycloak_id:
                 current_assignee_name = AssigneeLabel.UNASSIGNED
             else:
@@ -483,7 +529,7 @@ class TaskingQueries:
                 if proposed_assignee_keycloak_id
                 else ""
             )
-            formatted.append((scvu_image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name))
+            formatted.append((scvu_image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name))
         return formatted
 
     def updateTaskingManagerData(self, scvu_image_area_id, priority_name):
@@ -610,6 +656,8 @@ class TaskingQueries:
                 task_status,
                 remarks,
                 assignee_keycloak_id,
+                sf_reported,
+                iir_reported,
                 v10,
                 opsv,
                 area_id,
@@ -631,6 +679,8 @@ class TaskingQueries:
                     task_status,
                     remarks,
                     username,
+                    sf_reported,
+                    iir_reported,
                     v10,
                     opsv,
                     area_id,
@@ -673,6 +723,8 @@ class TaskingQueries:
                 task_status,
                 remarks,
                 assignee_keycloak_id,
+                sf_reported,
+                iir_reported,
                 v10,
                 opsv,
                 area_id,
@@ -695,6 +747,8 @@ class TaskingQueries:
                     task_status,
                     remarks,
                     username,
+                    sf_reported,
+                    iir_reported,
                     v10,
                     opsv,
                     area_id,
@@ -736,6 +790,8 @@ class TaskingQueries:
                 task_status,
                 remarks,
                 assignee_kc_id,
+                sf_reported,
+                iir_reported,
                 v10,
                 opsv,
                 area_id,
@@ -758,6 +814,8 @@ class TaskingQueries:
                     task_status,
                     remarks,
                     username,
+                    sf_reported,
+                    iir_reported,
                     v10,
                     opsv,
                     area_id,
@@ -781,6 +839,15 @@ class TaskingQueries:
         Output:     NIL
         '''
         self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_START, (TaskStatus.IN_PROGRESS, task_id, TaskStatus.INCOMPLETE))
+
+    def endTask(self, task_id):
+        '''
+        Function:   Reverts task status to Incomplete if it is currently In Progress,
+                    and clears exploit_start_time.
+        Input:      task_id is the id of the task to be updated
+        Output:     NIL
+        '''
+        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_END, (TaskStatus.INCOMPLETE, task_id, TaskStatus.IN_PROGRESS))
 
     def completeTask(self, task_id):
         '''
@@ -843,10 +910,19 @@ class TaskingQueries:
             ),
         )
 
-    def updateTaskingSummaryTask(self, scvu_task_id, remarks=None, report_name=None, cloud_cover_name=None, image_quality_name=None):
+    def updateTaskingSummaryTask(
+        self,
+        scvu_task_id,
+        remarks=None,
+        report_name=None,
+        cloud_cover_name=None,
+        image_quality_name=None,
+        sf_reported=None,
+        iir_reported=None,
+    ):
         '''
         Function:   Updates editable tasking summary fields on task row
-        Input:      scvu_task_id, remarks, report_name, cloud_cover_name, image_quality_name
+        Input:      scvu_task_id, remarks, report_name, cloud_cover_name, image_quality_name, sf_reported, iir_reported
         Output:     NIL
         '''
         set_clauses = []
@@ -868,6 +944,12 @@ class TaskingQueries:
         if image_quality_name is not None:
             set_clauses.append("image_quality = %s")
             values.append(image_quality_name)
+        if sf_reported is not None:
+            set_clauses.append("sf_reported = %s")
+            values.append(bool(sf_reported))
+        if iir_reported is not None:
+            set_clauses.append("iir_reported = %s")
+            values.append(bool(iir_reported))
 
         if not set_clauses:
             return
@@ -875,3 +957,24 @@ class TaskingQueries:
         query = f"UPDATE task SET {', '.join(set_clauses)} WHERE scvu_task_id = %s"
         values.append(scvu_task_id)
         self.db.executeUpdate(query, tuple(values))
+
+    def getTaskSubmissionStatusByIds(self, task_ids):
+        '''
+        Function:   Gets effective report and submission flags for tasks
+        Input:      iterable of task IDs
+        Output:     dict of task_id -> {report, sf_reported, iir_reported}
+        '''
+        ids = list(task_ids or [])
+        if not ids:
+            return {}
+        placeholders, values = build_in_clause(ids)
+        query = SQL_GET_TASK_SUBMISSION_STATUS_BY_IDS.format(placeholders=placeholders)
+        rows = self.db.executeSelect(query, values)
+        return {
+            row[0]: {
+                "report": (row[1] or "").strip(),
+                "sf_reported": bool(row[2]),
+                "iir_reported": bool(row[3]),
+            }
+            for row in rows
+        }

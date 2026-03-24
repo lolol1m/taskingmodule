@@ -72,6 +72,17 @@ class CreateUserPayload(BaseModel):
     role: str
 
 
+class DeleteUserPayload(BaseModel):
+    user_id: str
+
+
+class EditUserPayload(BaseModel):
+    user_id: str
+    username: str | None = None
+    role: str | None = None
+    status: str | None = None
+
+
 class InsertTTGPayload(BaseModel):
     imageFileName: str
     sensorName: str

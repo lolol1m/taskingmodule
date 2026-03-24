@@ -153,9 +153,9 @@ class TaskingService:
             areas_by_image.setdefault(image_id, []).append((image_area_id, area_name))
 
         tasks_by_image = {}
-        for image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name in task_rows:
+        for image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name in task_rows:
             tasks_by_image.setdefault(image_id, []).append(
-                (image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name)
+                (image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name)
             )
 
         for image in images:
@@ -248,13 +248,34 @@ class TaskingService:
     def start_tasks(self, payload):
         for task_id in payload["SCVU Task ID"]:
             self.tasking.startTask(task_id)
-    
+
+    def end_tasks(self, payload):
+        for task_id in payload["SCVU Task ID"]:
+            self.tasking.endTask(task_id)
+
     def complete_tasks(self, payload):
         for task_id in payload["SCVU Task ID"]:
             self.tasking.completeTask(task_id)
     
     def verify_pass(self, payload, vetter_keycloak_id=None):
         task_ids = payload.get("SCVU Task ID", [])
+        submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
+        for task_id in task_ids:
+            state = submission_state.get(task_id)
+            if not state:
+                continue
+            report = (state.get("report") or "").strip().upper()
+            sf_reported = bool(state.get("sf_reported"))
+            iir_reported = bool(state.get("iir_reported"))
+            if report == "IIR" and not iir_reported:
+                raise ValueError(
+                    f"Task {task_id} requires IIR Reported to be checked in Submission before Verify Pass."
+                )
+            if report == "DS(SF)" and not sf_reported:
+                raise ValueError(
+                    f"Task {task_id} requires SF Reported to be checked in Submission before Verify Pass."
+                )
+
         for task_id in task_ids:
             self.tasking.verifyPass(task_id)
 
@@ -289,6 +310,8 @@ class TaskingService:
                 or "Report" in image_data
                 or "Cloud Cover" in image_data
                 or "Image Quality" in image_data
+                or "SF Reported" in image_data
+                or "IIR Reported" in image_data
             ):
                 self.tasking.updateTaskingSummaryTask(
                     image_id,
@@ -296,6 +319,8 @@ class TaskingService:
                     image_data.get("Report") if "Report" in image_data else None,
                     image_data.get("Cloud Cover") if "Cloud Cover" in image_data else None,
                     image_data.get("Image Quality") if "Image Quality" in image_data else None,
+                    image_data.get("SF Reported") if "SF Reported" in image_data else None,
+                    image_data.get("IIR Reported") if "IIR Reported" in image_data else None,
                 )
 
     def complete_images(self, payload, vetter_keycloak_id):

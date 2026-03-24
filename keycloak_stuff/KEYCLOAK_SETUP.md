@@ -116,6 +116,9 @@ If you don't need Keycloak user listing, you can skip this section and leave `ad
    - `view-realm` (to access realm info)
    - `manage-users` (to manage users info)
 
+##5. Edit Username Settings
+1. Realm Settings -> Login -> Enable Edit Username
+
    
    
 ## Backend Configuration
