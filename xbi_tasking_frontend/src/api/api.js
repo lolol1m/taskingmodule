@@ -158,6 +158,7 @@ class API {
         const response = await this.client.post("/images/insertDSTAData", formData, {
             headers: { "Content-Type": "multipart/form-data" },
             params: { auto_assign: autoAssign },
+            timeout: 120000,
         })
         return response.data
     }

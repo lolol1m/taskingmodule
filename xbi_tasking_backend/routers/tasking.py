@@ -597,8 +597,6 @@ async def update_tasking_summary_data(request: Request, payload: UpdateTaskingSu
         
     '''
     try:
-        if not is_admin_user(user):
-            return error_response(403, "Insufficient permissions", "insufficient_permissions")
         result = await run_blocking(request.app.state.tasking_service.update_tasking_summary, model_to_dict(payload))
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)

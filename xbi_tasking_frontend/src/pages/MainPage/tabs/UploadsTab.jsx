@@ -128,9 +128,12 @@ function UploadsTab({ userRole }) {
       setTaskFiles([])
       setInputKey((prev) => prev + 1)
     } catch (error) {
+      const timeout = error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')
       addNotification({
         title: 'Upload failed',
-        meta: error?.response?.data?.detail || error?.message || 'Please try again',
+        meta: timeout
+          ? 'Upload timed out. Server may still be processing; try again with fewer files.'
+          : (error?.response?.data?.detail || error?.message || 'Please try again'),
       })
     } finally {
       setLoading(false)
