@@ -14,6 +14,7 @@ import '../styles/TaskingManagerTab.css'
 const api = new API()
 
 const ROLES = ['II', 'Senior II', 'IA']
+const TABLE_AUTO_REFRESH_MS = 5000
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
@@ -347,6 +348,15 @@ function UserPresenceTab({ userRole }) {
     }
     fetchUsers()
   }, [refreshKey])
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      if (!hasPendingEdits) {
+        setRefreshKey((prev) => prev + 1)
+      }
+    }, TABLE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timerId)
+  }, [hasPendingEdits])
 
   const handleDelete = async (row) => {
     if (!row.keycloakId) {
