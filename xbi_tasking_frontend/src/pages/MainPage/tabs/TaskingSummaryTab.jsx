@@ -1924,6 +1924,7 @@ function TaskingSummaryTab({
             setSelection([])
           }}
           rowHeight={56}
+          getRowHeight={() => 'auto'}
           columnHeaderHeight={40}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
