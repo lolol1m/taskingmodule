@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, Button, Checkbox, Typography } from '@mui/material'
+import { Button, Typography } from '@mui/material'
 import { DataGridPro } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
-import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
+import truePng from '../../../assets/true.png'
+import '../styles/UploadsTab.css'
 
 const api = new API()
 const TABLE_AUTO_REFRESH_MS = 5000
+
+const ACCENT_FILTER =
+  'brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(189deg) brightness(118%)'
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
@@ -16,250 +20,366 @@ const normalizeImageName = (value) => {
   return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
 }
 
-const normalizeRemarks = (value) => {
-  if (typeof value !== 'string') return ''
-  return value.replace(/\\n/g, '\n').trim()
-}
-
-const readRow = (entry, keys, fallback = '') => {
+const readField = (entry, keys, fallback = '') => {
   if (!entry) return fallback
   for (const key of keys) {
-    if (entry[key] !== undefined && entry[key] !== null) return entry[key]
+    if (entry[key] !== undefined && entry[key] !== null) {
+      return entry[key]
+    }
   }
   return fallback
 }
 
+// A task is "submitted" when its primary reporting checkbox is checked.
+// IIR tasks → iirReported; DS(SF) tasks → sfReported.
+const isSubmitted = (row) => {
+  if (row.report === 'IIR') return Boolean(row.iirReported)
+  if (row.report === 'DS(SF)') return Boolean(row.sfReported)
+  return false
+}
+
 const buildRows = (inputData) => {
   if (!inputData) return []
-  const rows = []
 
+  // Build parent image lookup: scvu_image_id (positive key) -> image entry
+  const parentMap = {}
   Object.keys(inputData).forEach((key) => {
     const entry = inputData[key]
     if (!entry || entry['Parent ID'] !== undefined) return
-    const imageId = Number(key)
-    if (!Number.isFinite(imageId)) return
-
-    const childTaskIds = (entry['Child ID'] || [])
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value))
-    const childEntries = childTaskIds
-      .map((taskId) => inputData[String(-Math.abs(taskId))] || inputData[String(taskId)])
-      .filter(Boolean)
-
-    const hasIr = childEntries.some((child) => Boolean(readRow(child, ['IR Reported', 'irReported'], false)))
-    const hasSf = childEntries.some((child) => Boolean(readRow(child, ['SF Reported', 'sfReported'], false)))
-    if (!hasIr && !hasSf) return
-
-    const remarks = childEntries
-      .map((child) => normalizeRemarks(readRow(child, ['Remarks', 'remarks'], '')))
-      .filter((value) => value.length > 0)
-      .join('\n')
-
-    rows.push({
-      id: imageId,
-      imageFileName: normalizeImageName(entry['Image File Name'] || `Image_${key}`),
-      sensorName: readRow(entry, ['Sensor Name', 'sensorName']),
-      imageRef: readRow(entry, ['Image ID', 'imageId']),
-      uploadDate: readRow(entry, ['Upload Date', 'uploadDate']),
-      imageDateTime: readRow(entry, ['Image Datetime', 'imageDateTime']),
-      assignee: readRow(entry, ['Assignee', 'assignee']),
-      vetter: readRow(entry, ['Vetter', 'vetter']),
-      irReported: hasIr,
-      sfReported: hasSf,
-      baseIrReported: hasIr,
-      baseSfReported: hasSf,
-      remarks,
-      taskIds: childTaskIds,
-    })
+    parentMap[Number(key)] = entry
   })
 
+  const rows = []
+  Object.keys(inputData).forEach((key) => {
+    const entry = inputData[key]
+    if (!entry || entry['Parent ID'] === undefined) return
+    const taskStatus = String(readField(entry, ['Task Status', 'taskStatus'], '')).trim().toLowerCase()
+    if (taskStatus !== 'verifying' && taskStatus !== 'completed') return
+    const report = String(readField(entry, ['Report', 'report'], '')).trim()
+    if (!report) return
+    if (report !== 'IIR' && report !== 'DS(SF)') return
+
+    const parentId = readField(entry, ['Parent ID'])
+    const parentEntry = parentMap[Number(parentId)] || null
+
+    const taskId = readField(entry, ['SCVU Task ID', 'scvuTaskId'], Number(key) < 0 ? Math.abs(Number(key)) : Number(key))
+    rows.push({
+      id: Number.isFinite(Number(taskId)) ? Number(taskId) : String(taskId),
+      taskId: Number.isFinite(Number(taskId)) ? Number(taskId) : String(taskId),
+      // Pass ID = parent's Image File Name (COALESCE(pass.pass_id_file_name, image.image_file_name))
+      passId: parentEntry
+        ? normalizeImageName(readField(parentEntry, ['Image File Name', 'imageFileName']))
+        : parentId,
+      // Image = area.area_name (named after the child image, e.g. img_52)
+      image: readField(entry, ['Area Name', 'areaName'], ''),
+      sensorName: parentEntry ? readField(parentEntry, ['Sensor Name', 'sensorName'], '') : '',
+      // Image ID = COALESCE(image_area.child_image_id, image.image_id)
+      imageId: readField(entry, ['Image ID', 'imageId'], ''),
+      uploadDate: parentEntry ? readField(parentEntry, ['Upload Date', 'uploadDate'], '') : '',
+      imageDatetime: parentEntry ? readField(parentEntry, ['Image Datetime', 'imageDatetime'], '') : '',
+      // Area Name = external_area_id (e.g. B52), fallback to Area Name
+      areaName: readField(entry, ['Area ID', 'areaId']) || readField(entry, ['Area Name', 'areaName'], ''),
+      assignee: readField(entry, ['Assignee', 'assignee'], ''),
+      report,
+      remarks: readField(entry, ['Remarks', 'remarks'], ''),
+      imageStatus: readField(entry, ['Task Status', 'taskStatus'], ''),
+      priority: readField(entry, ['Priority', 'priority'], ''),
+      color: readField(entry, ['Color', 'color'], ''),
+      service: readField(entry, ['Service', 'service'], ''),
+      exploitStartTime: readField(entry, ['Exploit Start Time', 'exploitStartTime'], ''),
+      exploitEndTime: readField(entry, ['Exploit End Time', 'exploitEndTime'], ''),
+      imageQuality: readField(entry, ['Image Quality', 'imageQuality'], ''),
+      cloudCover: readField(entry, ['Cloud Cover', 'cloudCover'], ''),
+      sfReported: Boolean(readField(entry, ['SF Reported', 'sfReported'], false)),
+      iirReported: Boolean(readField(entry, ['IIR Reported', 'iirReported'], false)),
+    })
+  })
   return rows
 }
 
 function SubmissionTab({
-  title = 'Submission',
-  subtitle = 'Images flagged IR/SF for submission review.',
   dateRange,
+  userRole,
+  title = 'Submission',
+  subtitle = 'Track SF and IIR reporting before verification.',
 }) {
-  const role = UserService.readUserRoleSingle()
-  const isIaUser = role === 'IA'
-  const [rows, setRows] = useState([])
+  const canViewIIR = userRole === 'IA'
+  const [tab, setTab] = useState(canViewIIR ? 'iir' : 'sf')
+  const [allRows, setAllRows] = useState([])
+  const [editingRows, setEditingRows] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selection, setSelection] = useState([])
-  const [searchText, setSearchText] = useState('')
-  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
-  const [isDirty, setIsDirty] = useState(false)
   const { addNotification } = useNotifications()
+  const hasPendingEdits = useMemo(() => Object.keys(editingRows).length > 0, [editingRows])
 
-  useEffect(() => {
-    setFilterModel((prev) => ({
-      ...prev,
-      quickFilterValues: searchText ? [searchText] : [],
-    }))
-  }, [searchText])
+  const displayedRows = useMemo(() => {
+    if (tab === 'submitted') {
+      return allRows.filter((row) => {
+        if (!isSubmitted(row)) return false
+        // Senior II only sees SF submitted tasks
+        if (!canViewIIR && row.report === 'IIR') return false
+        return true
+      })
+    }
+    if (tab === 'iir') return allRows.filter((row) => row.report === 'IIR' && !isSubmitted(row))
+    // SF tab: only unsubmitted DS(SF) tasks
+    return allRows.filter((row) => row.report === 'DS(SF)' && !isSubmitted(row))
+  }, [allRows, tab, canViewIIR])
 
-  useEffect(() => {
-    const timerId = window.setInterval(() => {
-      if (!isDirty) {
-        setRefreshKey((prev) => prev + 1)
-      }
-    }, TABLE_AUTO_REFRESH_MS)
-    return () => window.clearInterval(timerId)
-  }, [isDirty])
+  const columns = useMemo(() => {
+    const baseColumns = [
+      { field: 'passId', headerName: 'Pass ID', minWidth: 130, flex: 0.7 },
+      { field: 'image', headerName: 'Image', minWidth: 140, flex: 0.8 },
+      { field: 'sensorName', headerName: 'Sensor Name', minWidth: 130, flex: 0.7 },
+      { field: 'imageId', headerName: 'Image ID', minWidth: 100, flex: 0.6 },
+      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 160, flex: 0.9 },
+      { field: 'imageDatetime', headerName: 'Image Date Time', minWidth: 160, flex: 0.9 },
+      { field: 'areaName', headerName: 'Area Name', minWidth: 110, flex: 0.6 },
+      { field: 'assignee', headerName: 'Assignee', minWidth: 120, flex: 0.7 },
+      { field: 'report', headerName: 'Report', minWidth: 100, flex: 0.6 },
+      { field: 'remarks', headerName: 'Remarks', minWidth: 130, flex: 0.7 },
+      { field: 'imageStatus', headerName: 'Image Status', minWidth: 120, flex: 0.7 },
+      { field: 'priority', headerName: 'Priority', minWidth: 100, flex: 0.6 },
+      { field: 'color', headerName: 'Color', minWidth: 90, flex: 0.5 },
+      { field: 'service', headerName: 'Service', minWidth: 90, flex: 0.5 },
+      { field: 'exploitStartTime', headerName: 'Exploit Start Time', minWidth: 160, flex: 0.9 },
+      { field: 'exploitEndTime', headerName: 'Exploit End Time', minWidth: 160, flex: 0.9 },
+      { field: 'imageQuality', headerName: 'Image Quality', minWidth: 120, flex: 0.7 },
+      { field: 'cloudCover', headerName: 'Cloud Cover', minWidth: 110, flex: 0.6 },
+    ]
+
+    // Submitted tab: read-only tick indicators, no editable checkboxes
+    if (tab === 'submitted') {
+      const makeReadonlyCheck = (field, header) => ({
+        field,
+        headerName: header,
+        minWidth: 120,
+        flex: 0.6,
+        renderCell: (params) =>
+          params.value ? (
+            <img src={truePng} alt="✓" style={{ width: 16, height: 16, filter: ACCENT_FILTER }} />
+          ) : null,
+      })
+      const submittedCols = [...baseColumns, makeReadonlyCheck('sfReported', 'SF Reported')]
+      if (canViewIIR) submittedCols.push(makeReadonlyCheck('iirReported', 'IIR Reported'))
+      return submittedCols
+    }
+
+    const isLocked = (row) =>
+      String(row?.imageStatus || '').trim().toLowerCase() === 'completed'
+
+    const sfColumn = {
+      field: 'sfReported',
+      headerName: 'SF Reported',
+      minWidth: 120,
+      flex: 0.6,
+      renderCell: (params) => {
+        const locked = isLocked(params.row)
+        const pending = editingRows[params.row.taskId]
+        const checked = pending?.sfReported !== undefined ? pending.sfReported : Boolean(params.value)
+        return (
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={locked}
+            title={locked ? 'Task is verified — uncomplete to edit' : undefined}
+            style={{ cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.45 : 1 }}
+            onChange={(event) => {
+              if (locked) return
+              const next = Boolean(event.target.checked)
+              setEditingRows((prev) => ({ ...prev, [params.row.taskId]: { ...(prev[params.row.taskId] || {}), sfReported: next } }))
+            }}
+          />
+        )
+      },
+    }
+
+    const iirColumn = {
+      field: 'iirReported',
+      headerName: 'IIR Reported',
+      minWidth: 120,
+      flex: 0.6,
+      renderCell: (params) => {
+        const locked = isLocked(params.row)
+        const pending = editingRows[params.row.taskId]
+        const checked = pending?.iirReported !== undefined ? pending.iirReported : Boolean(params.value)
+        return (
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={locked}
+            title={locked ? 'Task is verified — uncomplete to edit' : undefined}
+            style={{ cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.45 : 1 }}
+            onChange={(event) => {
+              if (locked) return
+              const next = Boolean(event.target.checked)
+              setEditingRows((prev) => ({ ...prev, [params.row.taskId]: { ...(prev[params.row.taskId] || {}), iirReported: next } }))
+            }}
+          />
+        )
+      },
+    }
+
+    if (tab === 'iir') return [...baseColumns, sfColumn, iirColumn]
+    // SF tab: IA sees both checkboxes, Senior II only sees SF checkbox
+    return canViewIIR ? [...baseColumns, sfColumn, iirColumn] : [...baseColumns, sfColumn]
+  }, [tab, canViewIIR, editingRows])
 
   useEffect(() => {
     if (!dateRange) return
-    const fetchSubmissionRows = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true)
         setError(null)
-        const [summaryData, completedData] = await Promise.all([
-          api.postTaskingSummaryData(dateRange),
-          api.getCompleteImageData(dateRange),
-        ])
-        const mergedData = {
-          ...(summaryData || {}),
-          ...(completedData || {}),
-        }
-        setRows(buildRows(mergedData))
-        setIsDirty(false)
+        const data = await api.postTaskingSummaryData(dateRange)
+        setAllRows(buildRows(data))
+        setEditingRows({})
+        setSelection([])
       } catch (err) {
         const message = getErrorMessage(err, 'Unable to load submission data.')
         setError(message)
-        addNotification({
-          title: 'Load failed',
-          meta: 'Just now · Submission data unavailable',
-        })
       } finally {
         setLoading(false)
       }
     }
-
-    fetchSubmissionRows()
+    fetchData()
   }, [dateRange, refreshKey])
 
-  const hasChanges = useMemo(
-    () => rows.some((row) => row.irReported !== row.baseIrReported || row.sfReported !== row.baseSfReported),
-    [rows],
-  )
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      const hasSelection = selection.length > 0
+      // Pause auto-refresh while user is selecting rows or editing checkboxes.
+      if (hasPendingEdits || hasSelection) return
+      setRefreshKey((prev) => prev + 1)
+    }, TABLE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timerId)
+  }, [hasPendingEdits, selection])
 
-  const handleApplyChange = async () => {
-    if (!isIaUser) return
-    if (!selection.length) {
-      addNotification({
-        title: 'Selection required',
-        meta: 'Select image rows to apply changes',
-      })
-      return
-    }
-
+  const applyChanges = async () => {
+    const selectedSet = new Set(selection.map((id) => String(id)))
     const payload = {}
-    rows
-      .filter((row) => selection.includes(row.id))
+    displayedRows
+      .filter((row) => selectedSet.has(String(row.id)))
+      .filter((row) => String(row.imageStatus || '').trim().toLowerCase() !== 'completed')
       .forEach((row) => {
-        if (row.irReported === row.baseIrReported && row.sfReported === row.baseSfReported) return
-        row.taskIds.forEach((taskId) => {
-          payload[taskId] = {
-            ...(payload[taskId] || {}),
-            'IR Reported': Boolean(row.irReported),
-            'SF Reported': Boolean(row.sfReported),
-          }
-        })
+        const patch = editingRows[row.taskId]
+        if (!patch) return
+        payload[row.taskId] = {}
+        if (patch.sfReported !== undefined) payload[row.taskId]['SF Reported'] = Boolean(patch.sfReported)
+        if (patch.iirReported !== undefined) payload[row.taskId]['IIR Reported'] = Boolean(patch.iirReported)
+        if (Object.keys(payload[row.taskId]).length === 0) delete payload[row.taskId]
       })
 
-    if (Object.keys(payload).length === 0) {
+    if (!Object.keys(payload).length) {
       addNotification({
         title: 'Nothing to update',
-        meta: 'No IR/SF changes detected for selected rows',
+        meta: 'Select row(s) and toggle checkbox values first',
       })
       return
     }
 
     try {
-      setError(null)
       await api.postUpdateTaskingSummaryData(payload)
       addNotification({
-        title: 'Submission flags updated',
-        meta: `Just now · ${Object.keys(payload).length} task updates`,
+        title: 'Submission updated',
+        meta: `Just now · ${Object.keys(payload).length} task(s)`,
       })
-      localStorage.setItem('taskingSummaryRefresh', Date.now().toString())
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
-      const message = getErrorMessage(err, 'Unable to save submission flag changes.')
+      const message = getErrorMessage(err, 'Unable to save submission updates.')
       setError(message)
       addNotification({
-        title: 'Save failed',
-        meta: 'Just now · Please try again',
+        title: 'Submission update failed',
+        meta: 'Please try again',
       })
     }
   }
 
-  const columns = useMemo(
-    () => [
-      { field: 'imageFileName', headerName: 'Image File Name', minWidth: 180, flex: 1.1 },
-      { field: 'sensorName', headerName: 'Sensor Name', minWidth: 110, flex: 0.6 },
-      { field: 'imageRef', headerName: 'Image ID', minWidth: 90, flex: 0.45 },
-      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 125, flex: 0.7 },
-      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 130, flex: 0.75 },
-      { field: 'assignee', headerName: 'Assignee', minWidth: 110, flex: 0.6 },
-      { field: 'vetter', headerName: 'Vetter', minWidth: 110, flex: 0.6 },
-      {
-        field: 'irReported',
-        headerName: 'IR Reported',
-        minWidth: 95,
-        flex: 0.5,
-        renderCell: (params) => {
-          const rowId = params.row.id
-          if (!isIaUser) return params.row.irReported ? 'Yes' : 'No'
-          return (
-            <Checkbox
-              checked={Boolean(params.row.irReported)}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(_, checked) => {
-                setRows((prev) => prev.map((row) => (row.id === rowId ? { ...row, irReported: checked } : row)))
-                setIsDirty(true)
-              }}
-            />
-          )
-        },
-      },
-      {
-        field: 'sfReported',
-        headerName: 'SF Reported',
-        minWidth: 95,
-        flex: 0.5,
-        renderCell: (params) => {
-          const rowId = params.row.id
-          if (!isIaUser) return params.row.sfReported ? 'Yes' : 'No'
-          return (
-            <Checkbox
-              checked={Boolean(params.row.sfReported)}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(_, checked) => {
-                setRows((prev) => prev.map((row) => (row.id === rowId ? { ...row, sfReported: checked } : row)))
-                setIsDirty(true)
-              }}
-            />
-          )
-        },
-      },
-      {
-        field: 'remarks',
-        headerName: 'Remarks',
-        minWidth: 160,
-        flex: 1,
-        renderCell: (params) => (
-          <Box sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.2 }}>{params?.row?.remarks || '—'}</Box>
-        ),
-      },
-    ],
-    [isIaUser],
-  )
+  const unsubmit = async () => {
+    const selectedSet = new Set(selection.map((id) => String(id)))
+    const payload = {}
+    displayedRows
+      .filter((row) => selectedSet.has(String(row.id)))
+      .forEach((row) => {
+        payload[row.taskId] = {}
+        if (row.report === 'IIR') payload[row.taskId]['IIR Reported'] = false
+        if (row.report === 'DS(SF)') payload[row.taskId]['SF Reported'] = false
+      })
+
+    if (!Object.keys(payload).length) {
+      addNotification({ title: 'Nothing to unsubmit', meta: 'Select row(s) first' })
+      return
+    }
+
+    try {
+      await api.postUpdateTaskingSummaryData(payload)
+      addNotification({
+        title: 'Tasks unsubmitted',
+        meta: `Just now · ${Object.keys(payload).length} task(s) moved back to pending`,
+      })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      const message = getErrorMessage(err, 'Unable to unsubmit tasks.')
+      setError(message)
+      addNotification({ title: 'Unsubmit failed', meta: 'Please try again' })
+    }
+  }
+
+  const gridSx = {
+    width: '100%',
+    height: '100%',
+    flex: 1,
+    border: 'none',
+    color: 'var(--text)',
+    backgroundColor: 'transparent',
+    '& .MuiDataGrid-columnHeaderTitle': {
+      paddingLeft: 0,
+      color: 'var(--muted)',
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: '0.06em',
+    },
+    '& .MuiDataGrid-cell': {
+      display: 'flex',
+      alignItems: 'center',
+      borderColor: 'var(--border-strong)',
+      paddingTop: 0,
+      paddingBottom: 0,
+      fontSize: 13,
+    },
+    '& .MuiDataGrid-cellContent': { width: '100%' },
+    '& .MuiDataGrid-cellCheckbox': { justifyContent: 'center', paddingLeft: 0 },
+    '& .MuiDataGrid-virtualScroller': { overflowX: 'auto', backgroundColor: 'transparent' },
+    '& .MuiDataGrid-overlay': { backgroundColor: 'transparent' },
+    '& .MuiDataGrid-columnHeaders': {
+      backgroundColor: 'transparent',
+      color: 'var(--muted)',
+      textTransform: 'uppercase',
+      fontSize: '11px',
+      letterSpacing: '0.04em',
+      borderBottom: '1px solid var(--border-strong)',
+    },
+    '& .MuiDataGrid-columnHeader': { backgroundColor: 'transparent' },
+    '& .MuiDataGrid-columnSeparator': { display: 'flex', visibility: 'visible', opacity: 1 },
+    '& .MuiDataGrid-scrollbarFiller': { backgroundColor: 'transparent' },
+    '& .MuiDataGrid-scrollbarFiller--header': { backgroundColor: 'transparent' },
+    '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
+      color: 'var(--muted)',
+    },
+    '& .MuiDataGrid-row': { backgroundColor: 'var(--table-bg)' },
+    '& .MuiDataGrid-row:hover': { backgroundColor: 'var(--hover)' },
+    '& .MuiDataGrid-row.Mui-selected': { backgroundColor: '#333f4f' },
+    '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
+      color: 'var(--muted)',
+    },
+    '& .MuiCheckbox-root': { color: 'var(--muted)' },
+    '& .MuiCheckbox-root.Mui-checked': { color: 'var(--accent)' },
+  }
 
   return (
-    <div className="completed-images">
+    <div className="admin-tab uploads-tab">
       <div className="content__topbar">
         <div className="content__heading">
           <div className="content__title">{title}</div>
@@ -267,14 +387,6 @@ function SubmissionTab({
         </div>
         <div className="content__controls">
           <div className="action-bar">
-            <div className="search">
-              <input
-                type="text"
-                placeholder="Search submission items"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-              />
-            </div>
             <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
               Refresh
             </Button>
@@ -282,128 +394,81 @@ function SubmissionTab({
         </div>
       </div>
 
-      <div className="completed-images__actions">
-        {isIaUser ? (
-          <Button
-            className="tasking-summary__button"
-            onClick={handleApplyChange}
-            disabled={!selection.length || !hasChanges}
+      <div className="uploads-main">
+        <div className="uploads-sections">
+          {canViewIIR && (
+            <button
+              type="button"
+              className={`uploads-section-tab ${tab === 'iir' ? 'is-active' : ''}`}
+              onClick={() => setTab('iir')}
+              disabled={loading}
+            >
+              IIR
+            </button>
+          )}
+          <button
+            type="button"
+            className={`uploads-section-tab ${tab === 'sf' ? 'is-active' : ''}`}
+            onClick={() => setTab('sf')}
+            disabled={loading}
           >
-            Apply Change
-          </Button>
-        ) : null}
-        {error ? <Typography className="completed-images__error">{error}</Typography> : null}
-      </div>
-
-      <div className="completed-images__grid">
-        <DataGridPro
-          rows={rows}
-          columns={columns}
-          disableColumnResize
-          checkboxSelection={isIaUser}
-          disableRowSelectionOnClick
-          filterModel={filterModel}
-          onFilterModelChange={setFilterModel}
-          onRowSelectionModelChange={(model) => {
-            if (Array.isArray(model)) {
-              setSelection(model)
-              return
-            }
-            if (model?.ids instanceof Set) {
-              setSelection(Array.from(model.ids))
-              return
-            }
-            setSelection([])
-          }}
-          rowHeight={56}
-          columnHeaderHeight={40}
-          hideFooter
-          loading={loading}
-          sx={{
-            width: '100%',
-            height: '100%',
-            flex: 1,
-            border: 'none',
-            color: 'var(--text)',
-            backgroundColor: 'transparent',
-            '& .MuiDataGrid-columnHeaderTitle': {
-              paddingLeft: 0,
-              color: 'var(--muted)',
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-            },
-            '& .MuiDataGrid-cell': {
-              display: 'flex',
-              alignItems: 'center',
-              borderColor: 'var(--border-strong)',
-              paddingTop: 0,
-              paddingBottom: 0,
-              fontSize: 13,
-            },
-            '& .MuiDataGrid-cellContent': {
-              width: '100%',
-            },
-            '& .MuiDataGrid-cellCheckbox': {
-              justifyContent: 'center',
-              paddingLeft: 0,
-            },
-            '& .MuiDataGrid-virtualScroller': {
-              overflowX: 'hidden',
-              backgroundColor: 'transparent',
-            },
-            '& .MuiDataGrid-overlay': {
-              backgroundColor: 'transparent',
-            },
-            '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'transparent',
-              color: 'var(--muted)',
-              textTransform: 'uppercase',
-              fontSize: '11px',
-              letterSpacing: '0.04em',
-              borderBottom: '1px solid var(--border-strong)',
-            },
-            '& .MuiDataGrid-columnHeader': {
-              backgroundColor: 'transparent',
-            },
-            '& .MuiDataGrid-columnSeparator': {
-              display: 'none',
-            },
-            '& .MuiDataGrid-scrollbarFiller': {
-              backgroundColor: 'transparent',
-            },
-            '& .MuiDataGrid-scrollbarFiller--header': {
-              backgroundColor: 'transparent',
-            },
-            '& .MuiDataGrid-columnHeaderTitleContainer, & .MuiDataGrid-columnHeaderTitleContainerContent': {
-              color: 'var(--muted)',
-            },
-            '& .MuiDataGrid-row': {
-              backgroundColor: 'var(--table-bg)',
-            },
-            '& .MuiDataGrid-row:hover': {
-              backgroundColor: 'var(--hover)',
-            },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: '#333f4f',
-            },
-            '& .MuiDataGrid-iconButtonContainer button, & .MuiDataGrid-menuIconButton, & .MuiDataGrid-sortIcon': {
-              color: 'var(--muted)',
-            },
-            '& .MuiCheckbox-root': {
-              color: 'var(--muted)',
-            },
-            '& .MuiCheckbox-root.Mui-checked': {
-              color: 'var(--accent)',
-            },
-          }}
-        />
-        <div className="completed-images__total-rows">
-          <div className="completed-images__total-rows-left">
-            {isIaUser && selection.length > 0 ? `${selection.length} row(s) selected` : ''}
-          </div>
-          <div className="completed-images__total-rows-right">Total Rows: {rows.length}</div>
+            SF
+          </button>
+          <button
+            type="button"
+            className={`uploads-section-tab ${tab === 'submitted' ? 'is-active' : ''}`}
+            onClick={() => setTab('submitted')}
+            disabled={loading}
+          >
+            Submitted
+          </button>
         </div>
+
+        <div>
+          {tab === 'submitted' ? (
+            <Button
+              className="tasking-summary__button"
+              disabled={!selection.length}
+              onClick={unsubmit}
+            >
+              Unsubmit
+            </Button>
+          ) : (
+            <Button
+              className="tasking-summary__button"
+              disabled={!selection.length}
+              onClick={applyChanges}
+            >
+              Apply Change
+            </Button>
+          )}
+        </div>
+
+        <div className="completed-images__grid">
+          <DataGridPro
+            rows={displayedRows}
+            columns={columns}
+            checkboxSelection
+            disableRowSelectionOnClick
+            onRowSelectionModelChange={(model) => {
+              if (Array.isArray(model)) {
+                setSelection(model)
+                return
+              }
+              if (model?.ids instanceof Set) {
+                setSelection(Array.from(model.ids))
+                return
+              }
+              setSelection([])
+            }}
+            rowHeight={52}
+            columnHeaderHeight={40}
+            loading={loading}
+            hideFooter
+            sx={gridSx}
+          />
+        </div>
+        {error ? <Typography className="completed-images__error">{error}</Typography> : null}
       </div>
     </div>
   )

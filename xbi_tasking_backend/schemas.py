@@ -72,6 +72,17 @@ class CreateUserPayload(BaseModel):
     role: str
 
 
+class DeleteUserPayload(BaseModel):
+    user_id: str
+
+
+class EditUserPayload(BaseModel):
+    user_id: str
+    username: str | None = None
+    role: str | None = None
+    status: str | None = None
+
+
 class InsertTTGPayload(BaseModel):
     imageFileName: str
     sensorName: str
@@ -82,6 +93,12 @@ class InsertTTGPayload(BaseModel):
 
 class DeleteImagePayload(BaseModel):
     image_id: int = Field(..., alias="SCVU Image ID")
+
+    model_config = {"populate_by_name": True}
+
+
+class DeleteImageAreaPayload(BaseModel):
+    image_area_id: int = Field(..., alias="SCVU Image Area ID")
 
     model_config = {"populate_by_name": True}
 

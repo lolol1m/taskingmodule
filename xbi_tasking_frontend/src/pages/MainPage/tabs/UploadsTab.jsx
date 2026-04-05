@@ -5,7 +5,6 @@ import useNotifications from '../../../components/notifications/useNotifications
 import '../styles/UploadsTab.css'
 
 const api = new API()
-const TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY = 'taskingManagerStagedAutoAssign'
 
 const getFileType = (fileName) => {
   const ext = fileName.toLowerCase().split('.').pop()
@@ -125,18 +124,16 @@ function UploadsTab({ userRole }) {
       }
       meta = `Just now · ${metaParts.join(', ')}`
 
-      if (totals.areas > 0) {
-        // Let Tasking Manager render freshly auto-assigned users as "proposed" until Apply Change is clicked.
-        localStorage.setItem(TASKING_MANAGER_STAGED_AUTO_ASSIGN_KEY, '1')
-      }
-
       addNotification({ title: hasWarnings ? 'Upload completed with warnings' : 'Upload completed', meta })
       setTaskFiles([])
       setInputKey((prev) => prev + 1)
     } catch (error) {
+      const timeout = error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')
       addNotification({
         title: 'Upload failed',
-        meta: error?.response?.data?.detail || error?.message || 'Please try again',
+        meta: timeout
+          ? 'Upload timed out. Server may still be processing; try again with fewer files.'
+          : (error?.response?.data?.detail || error?.message || 'Please try again'),
       })
     } finally {
       setLoading(false)

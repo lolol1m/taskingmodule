@@ -43,3 +43,18 @@ class KeycloakService:
 
     def create_user(self, token, username, password):
         return self.client.create_user(token, username, password)
+
+    def delete_user(self, token, user_id):
+        return self.client.delete_user(token, user_id)
+
+    def get_user_realm_roles(self, token, user_id):
+        return self.client.get_user_realm_roles(token, user_id)
+
+    def remove_realm_role(self, token, user_id, role_representation):
+        return self.client.remove_realm_role(token, user_id, role_representation)
+
+    def get_user(self, token, user_id):
+        return self.client.get_user(token, user_id)
+
+    def update_user_info(self, token, user_id, username):
+        return self.client.update_user_info(token, user_id, username)

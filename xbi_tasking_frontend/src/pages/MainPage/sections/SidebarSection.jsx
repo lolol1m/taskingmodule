@@ -31,6 +31,7 @@ function SidebarSection({
   // II role has limited access - no Tasking Assignments or Admin
   const isBasicUser = userRole === 'II'
   const isIaUser = userRole === 'IA'
+  const isSeniorIIUser = userRole === 'Senior II'
   // Only IA can create users
   const canCreateUsers = userRole === 'IA'
   const settingsButtonRef = useRef(null)
@@ -182,7 +183,7 @@ function SidebarSection({
               <span className="sidebar__text">Tasking Assignments</span>
             </button>
           )}
-          {isIaUser && (
+          {(isIaUser || isSeniorIIUser) && (
             <button
               className={`sidebar__item ${activeTab === 'submission' ? 'is-active' : ''}`}
               onClick={() => setActiveTab('submission')}
@@ -207,7 +208,7 @@ function SidebarSection({
               <span className="sidebar__icon">
                 <img src={checkIcon} alt="" />
               </span>
-              <span className="sidebar__text">User Presence</span>
+              <span className="sidebar__text">Users</span>
             </button>
             <button
               className={`sidebar__item ${activeTab === 'admin-bin' ? 'is-active' : ''}`}
@@ -236,17 +237,6 @@ function SidebarSection({
               </span>
               <span className="sidebar__text">Uploads</span>
             </button>
-            {canCreateUsers && (
-              <button
-                className={`sidebar__item ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-create-user')}
-              >
-                <span className="sidebar__icon">
-                  <img src={addUserIcon} alt="" />
-                </span>
-                <span className="sidebar__text">Create User</span>
-              </button>
-            )}
           </div>
         )}
         <div className="sidebar__section sidebar__section--bottom">

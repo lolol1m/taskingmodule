@@ -9,9 +9,10 @@ logger = logging.getLogger("xbi_tasking_backend.user_service")
 
 
 class UserService:
-    def __init__(self, db, keycloak_queries, keycloak_client=None):
+    def __init__(self, db, keycloak_queries, keycloak_client=None, tasking_queries=None):
         self.db = db
         self.keycloak = keycloak_queries
+        self.tasking = tasking_queries
         self.kc = keycloak_client or KeycloakClient()
 
     def get_users(self):
@@ -40,6 +41,45 @@ class UserService:
 
         result = self.keycloak.createKeycloakUser(username, password, role)
         return {"success": True, "user": result}
+
+    def delete_user(self, payload):
+        user_id = payload.get("user_id", "").strip()
+        if not user_id:
+            return {"error": "user_id is required"}
+        if self.tasking is not None:
+            try:
+                task_count = self.tasking.getUserAnyTaskCount(user_id)
+                if task_count and task_count > 0:
+                    return {"error": f"Cannot delete user: they are assigned to {task_count} task(s). Reassign all tasks before deleting this user."}
+            except Exception as e:
+                logger.exception("Could not check tasks for user_id=%s", user_id)
+                return {"error": "Failed to verify task assignments before deletion."}
+        try:
+            self.keycloak.deleteKeycloakUser(user_id)
+            return {"success": True}
+        except Exception as e:
+            logger.exception("deleteKeycloakUser failed for user_id=%s", user_id)
+            return {"error": str(e)}
+
+    def edit_user(self, payload):
+        user_id = payload.get("user_id", "").strip()
+        if not user_id:
+            return {"error": "user_id is required"}
+        new_username = payload.get("username") or None
+        new_role = payload.get("role") or None
+        new_status = payload.get("status") or None
+        try:
+            result = self.keycloak.editKeycloakUser(user_id, new_username, new_role, new_status) or {}
+            response = {"success": True}
+            warnings = result.get("warnings")
+            if warnings:
+                response["warning"] = "; ".join(warnings)
+            return response
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            logger.exception("editKeycloakUser failed for user_id=%s", user_id)
+            return {"error": str(e)}
 
     def update_users(self, csv_text):
         user_list = []

@@ -408,7 +408,6 @@ function CompletedImagesTab({
           columns={orderedColumns}
           columnVisibilityModel={columnVisibilityModel}
           onColumnVisibilityModelChange={setColumnVisibilityModel}
-          disableColumnResize
           checkboxSelection
           disableRowSelectionOnClick
           filterModel={filterModel}
@@ -481,7 +480,9 @@ function CompletedImagesTab({
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnSeparator': {
-              display: 'none',
+              display: 'flex',
+              visibility: 'visible',
+              opacity: 1,
             },
             '& .MuiDataGrid-scrollbarFiller': {
               backgroundColor: 'transparent',

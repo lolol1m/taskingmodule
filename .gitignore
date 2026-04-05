@@ -12,3 +12,4 @@ mockui/
 dev_server.config
 docker-compose.yml
 .env
+keycloak_stuff/start_keycloak.bat

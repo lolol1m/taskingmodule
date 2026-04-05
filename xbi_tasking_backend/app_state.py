@@ -32,7 +32,7 @@ def init_app_state(app, config):
     app.state.tasking_service = TaskingService(tasking_queries, keycloak_queries, image_service=app.state.image_service)
     app.state.lookup_service = LookupService(lookup_queries)
     app.state.report_service = ReportService(report_queries, lookup_queries, eg)
-    app.state.user_service = UserService(db, keycloak_queries, KeycloakClient())
+    app.state.user_service = UserService(db, keycloak_queries, KeycloakClient(), tasking_queries=tasking_queries)
     app.state.notification_service = NotificationService()
     app.state.audit_service = AuditService()
     app.state.rate_limit_service = RateLimitService()

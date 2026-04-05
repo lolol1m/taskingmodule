@@ -1,6 +1,8 @@
 import logging
+import random
 from constants import AssigneeLabel, TaskStatus
 from main_classes.sql_utils import build_in_clause
+import main_classes.EnumClasses as EnumClasses
 
 
 logger = logging.getLogger("xbi_tasking_backend.query_tasking")
@@ -12,6 +14,13 @@ SQL_GET_USER_ACTIVE_TASKS = """
         ON t.task_status_id = ts.id
     WHERE t.assignee_keycloak_id = %s
         AND ts.name != %s;
+"""
+
+SQL_GET_USER_ANY_TASK_COUNT = """
+    SELECT COUNT(*)
+    FROM task
+    WHERE assignee_keycloak_id = %s
+       OR proposed_assignee_keycloak_id = %s;
 """
 
 SQL_GET_ACTIVE_TASK_COUNTS = """
@@ -40,9 +49,10 @@ SQL_GET_IMAGE_IDS_FOR_TASKS = """
 SQL_GET_TASK_STATUS_ID = "SELECT id FROM task_status WHERE name = %s"
 
 SQL_GET_INCOMPLETE_IMAGES = (
-    "SELECT image.scvu_image_id, COALESCE(sensor.name, 'Unknown') as sensor_name, image.image_file_name, image.image_id, "
+    "SELECT image.scvu_image_id, COALESCE(sensor.name, 'Unknown') as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id, "
     "image.upload_date, image.image_datetime, COALESCE(priority.name, NULL) as priority_name "
     "FROM image "
+    "LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id "
     "LEFT JOIN sensor ON sensor.id = image.sensor_id "
     "LEFT JOIN priority ON priority.id = image.priority_id "
     "WHERE image.completed_date IS NULL "
@@ -65,32 +75,56 @@ SQL_GET_TASKING_MANAGER_IMAGE_FOR_IMAGES = """
 """
 
 SQL_GET_TASKING_MANAGER_TASK = (
-    "SELECT image_area.scvu_image_area_id, COALESCE(task.assignee_keycloak_id, %s), task.remarks "
+    "SELECT image_area.scvu_image_area_id, "
+    "COALESCE(task.assignee_keycloak_id, %s) as current_assignee_keycloak_id, "
+    "COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id, "
+    "task.remarks, "
+    "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name, "
+    "task_status.name as task_status_name "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN image ON image.scvu_image_id = image_area.scvu_image_id "
+    "JOIN task_status ON task_status.id = task.task_status_id "
+    "LEFT JOIN priority task_priority ON task_priority.id = task.priority_id "
+    "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "WHERE image_area.scvu_image_id = %s"
 )
 
 SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES = """
     SELECT image_area.scvu_image_id, image_area.scvu_image_area_id,
-        COALESCE(task.assignee_keycloak_id, %s), task.remarks
+        COALESCE(task.assignee_keycloak_id, %s) as current_assignee_keycloak_id,
+        COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id,
+        task.remarks,
+        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
+        task_status.name as task_status_name
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN image ON image.scvu_image_id = image_area.scvu_image_id
+    JOIN task_status ON task_status.id = task.task_status_id
+    LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
+    LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image_area.scvu_image_id IN ({placeholders})
 """
 
 SQL_UPDATE_TASKING_MANAGER_PRIORITY = (
-    "UPDATE image SET priority_id = (SELECT id FROM priority WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)) "
-    "WHERE scvu_image_id = %s"
+    "UPDATE task SET priority_id = (SELECT id FROM priority WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null)) "
+    "WHERE scvu_image_area_id = %s"
 )
 
 SQL_ASSIGN_TASK = (
-    "INSERT INTO task (assignee_keycloak_id, scvu_image_area_id, task_status_id) "
-    "VALUES (%s, %s, %s) "
+    "INSERT INTO task (assignee_keycloak_id, proposed_assignee_keycloak_id, scvu_image_area_id, task_status_id) "
+    "VALUES (%s, NULL, %s, %s) "
     "ON CONFLICT (scvu_image_area_id) "
-    "DO UPDATE SET assignee_keycloak_id = EXCLUDED.assignee_keycloak_id, task_status_id = EXCLUDED.task_status_id"
+    "DO UPDATE SET assignee_keycloak_id = EXCLUDED.assignee_keycloak_id, "
+    "proposed_assignee_keycloak_id = NULL, "
+    "task_status_id = EXCLUDED.task_status_id"
+)
+
+SQL_SET_PROPOSED_ASSIGNEE = (
+    "INSERT INTO task (assignee_keycloak_id, proposed_assignee_keycloak_id, scvu_image_area_id, task_status_id) "
+    "VALUES (NULL, %s, %s, %s) "
+    "ON CONFLICT (scvu_image_area_id) "
+    "DO UPDATE SET proposed_assignee_keycloak_id = EXCLUDED.proposed_assignee_keycloak_id"
 )
 
 SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN = """
@@ -105,12 +139,13 @@ SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN = """
 """
 
 SQL_GET_TASKING_SUMMARY_IMAGE = """
-    SELECT DISTINCT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id,
+    SELECT DISTINCT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id,
         image.upload_date, image.image_datetime,
         COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
         COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, COALESCE(cloud_cover.name, NULL) as cloud_cover_name,
         COALESCE(ew_status.name, NULL) as ew_status_name, image.target_tracing
     FROM image
+    LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id
     LEFT JOIN sensor ON sensor.id = image.sensor_id
     LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
     LEFT JOIN report ON report.id = image.report_id
@@ -121,15 +156,18 @@ SQL_GET_TASKING_SUMMARY_IMAGE = """
     JOIN task ON image_area.scvu_image_area_id = task.scvu_image_area_id
     WHERE image.completed_date IS NULL
         AND (image.upload_date >= %s AND image.upload_date <= %s)
+        AND task.assignee_keycloak_id IS NOT NULL
+        AND task.assignee_keycloak_id <> ''
 """
 
 SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
-    SELECT DISTINCT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id,
+    SELECT DISTINCT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id,
         image.upload_date, image.image_datetime,
         COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
         COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, COALESCE(cloud_cover.name, NULL) as cloud_cover_name,
         COALESCE(ew_status.name, NULL) as ew_status_name, image.target_tracing
     FROM image
+    LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id
     LEFT JOIN sensor ON sensor.id = image.sensor_id
     LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
     LEFT JOIN report ON report.id = image.report_id
@@ -145,51 +183,82 @@ SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
 
 SQL_GET_TASKING_SUMMARY_AREA = (
     "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, "
-    "task.assignee_keycloak_id, area.v10, area.opsv, "
-    "COALESCE(image_area.external_area_id, image_area.scvu_image_area_id) as area_id, "
+    "task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv, "
+    "COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id, "
+    "COALESCE(image_area.child_image_id, image.image_id) as child_image_id, "
     "image_area.color, image_area.service, "
-    "task.exploit_start_time, task.exploit_end_time, "
-    "COALESCE(task.ir_reported, false) as ir_reported, "
-    "COALESCE(task.sf_reported, false) as sf_reported "
+    "COALESCE(task_report.name, image_report.name, NULL) as report_name, "
+    "COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name, "
+    "COALESCE(task.image_quality, image.image_quality, NULL) as image_quality_name, "
+    "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name, "
+    "task.exploit_start_time, task.exploit_end_time "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN area ON image_area.scvu_area_id = area.scvu_area_id "
     "JOIN image ON image_area.scvu_image_id = image.scvu_image_id "
     "JOIN task_status ON task.task_status_id = task_status.id "
+    "LEFT JOIN report task_report ON task_report.id = task.report_id "
+    "LEFT JOIN report image_report ON image_report.id = image.report_id "
+    "LEFT JOIN cloud_cover task_cloud_cover ON task_cloud_cover.id = task.cloud_cover_id "
+    "LEFT JOIN cloud_cover image_cloud_cover ON image_cloud_cover.id = image.cloud_cover_id "
+    "LEFT JOIN priority task_priority ON task_priority.id = task.priority_id "
+    "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "WHERE image.scvu_image_id = %s "
+    "AND task.assignee_keycloak_id IS NOT NULL "
+    "AND task.assignee_keycloak_id <> '' "
     "ORDER BY area.area_name"
 )
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv,
-        COALESCE(image_area.external_area_id, image_area.scvu_image_area_id) as area_id,
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv,
+        COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id,
+        COALESCE(image_area.child_image_id, image.image_id) as child_image_id,
         image_area.color, image_area.service,
-        task.exploit_start_time, task.exploit_end_time,
-        COALESCE(task.ir_reported, false) as ir_reported,
-        COALESCE(task.sf_reported, false) as sf_reported
+        COALESCE(task_report.name, image_report.name, NULL) as report_name,
+        COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name,
+        COALESCE(task.image_quality, image.image_quality, NULL) as image_quality_name,
+        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
+        task.exploit_start_time, task.exploit_end_time
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
     JOIN image ON image_area.scvu_image_id = image.scvu_image_id
     JOIN task_status ON task.task_status_id = task_status.id
+    LEFT JOIN report task_report ON task_report.id = task.report_id
+    LEFT JOIN report image_report ON image_report.id = image.report_id
+    LEFT JOIN cloud_cover task_cloud_cover ON task_cloud_cover.id = task.cloud_cover_id
+    LEFT JOIN cloud_cover image_cloud_cover ON image_cloud_cover.id = image.cloud_cover_id
+    LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
+    LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image.scvu_image_id IN ({placeholders})
+        AND task.assignee_keycloak_id IS NOT NULL
+        AND task.assignee_keycloak_id <> ''
     ORDER BY image.scvu_image_id, area.area_name
 """
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, area.v10, area.opsv,
-        COALESCE(image_area.external_area_id, image_area.scvu_image_area_id) as area_id,
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv,
+        COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id,
+        COALESCE(image_area.child_image_id, image.image_id) as child_image_id,
         image_area.color, image_area.service,
-        task.exploit_start_time, task.exploit_end_time,
-        COALESCE(task.ir_reported, false) as ir_reported,
-        COALESCE(task.sf_reported, false) as sf_reported
+        COALESCE(task_report.name, image_report.name, NULL) as report_name,
+        COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name,
+        COALESCE(task.image_quality, image.image_quality, NULL) as image_quality_name,
+        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
+        task.exploit_start_time, task.exploit_end_time
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
     JOIN image ON image_area.scvu_image_id = image.scvu_image_id
     JOIN task_status ON task.task_status_id = task_status.id
+    LEFT JOIN report task_report ON task_report.id = task.report_id
+    LEFT JOIN report image_report ON image_report.id = image.report_id
+    LEFT JOIN cloud_cover task_cloud_cover ON task_cloud_cover.id = task.cloud_cover_id
+    LEFT JOIN cloud_cover image_cloud_cover ON image_cloud_cover.id = image.cloud_cover_id
+    LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
+    LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image.scvu_image_id IN ({placeholders})
         AND task.assignee_keycloak_id = %s
     ORDER BY image.scvu_image_id, area.area_name
@@ -209,6 +278,14 @@ SQL_UPDATE_TASK_STATUS_START = (
     "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
 )
 
+SQL_UPDATE_TASK_STATUS_END = (
+    "UPDATE task SET "
+    "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "exploit_start_time = NULL "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
+)
+
 SQL_UPDATE_TASK_STATUS_COMPLETE = (
     "UPDATE task SET "
     "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
@@ -220,6 +297,12 @@ SQL_UPDATE_TASK_STATUS_COMPLETE = (
 SQL_UPDATE_TASK_STATUS_VERIFY_FAIL = (
     "UPDATE task SET "
     "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "remarks = NULL, "
+    "report_id = NULL, "
+    "cloud_cover_id = NULL, "
+    "image_quality = NULL, "
+    "sf_reported = FALSE, "
+    "iir_reported = FALSE, "
     "exploit_start_time = NULL, "
     "exploit_end_time = NULL "
     "WHERE scvu_task_id = %s "
@@ -229,6 +312,12 @@ SQL_UPDATE_TASK_STATUS_VERIFY_FAIL = (
 SQL_RESET_IMAGE_TASKS_FROM_COMPLETED = (
     "UPDATE task "
     "SET task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "remarks = NULL, "
+    "report_id = NULL, "
+    "cloud_cover_id = NULL, "
+    "image_quality = NULL, "
+    "sf_reported = FALSE, "
+    "iir_reported = FALSE, "
     "exploit_start_time = NULL, "
     "exploit_end_time = NULL "
     "WHERE task_status_id = (SELECT id FROM task_status WHERE name = %s) "
@@ -248,14 +337,19 @@ SQL_UPDATE_TASKING_SUMMARY_IMAGE = (
     "WHERE scvu_image_id = %s"
 )
 
-SQL_UPDATE_TASKING_SUMMARY_TASK = (
-    "UPDATE task SET "
-    "remarks = COALESCE(%s, remarks), "
-    "ir_reported = COALESCE(%s, ir_reported), "
-    "sf_reported = COALESCE(%s, sf_reported) "
-    "WHERE scvu_task_id = %s"
-)
-
+SQL_GET_TASK_SUBMISSION_STATUS_BY_IDS = """
+    SELECT
+        task.scvu_task_id,
+        COALESCE(task_report.name, image_report.name, '') as effective_report,
+        COALESCE(task.sf_reported, FALSE) as sf_reported,
+        COALESCE(task.iir_reported, FALSE) as iir_reported
+    FROM task
+    JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
+    JOIN image ON image_area.scvu_image_id = image.scvu_image_id
+    LEFT JOIN report task_report ON task_report.id = task.report_id
+    LEFT JOIN report image_report ON image_report.id = image.report_id
+    WHERE task.scvu_task_id IN ({placeholders})
+"""
 
 class TaskingQueries:
     def __init__(self, db, keycloak_queries):
@@ -269,6 +363,15 @@ class TaskingQueries:
         Output: integer value of unfinished tasks
         '''
         result = self.db.executeSelect(SQL_GET_USER_ACTIVE_TASKS, (keycloak_user_id, TaskStatus.COMPLETED))
+        return result[0][0]
+
+    def getUserAnyTaskCount(self, keycloak_user_id):
+        '''
+        Counts all tasks where user appears as assignee or proposed assignee, regardless of status.
+        Input: keycloak_user_id
+        Output: integer count
+        '''
+        result = self.db.executeSelect(SQL_GET_USER_ANY_TASK_COUNT, (keycloak_user_id, keycloak_user_id))
         return result[0][0]
 
     def getActiveTaskCountsForUsers(self, keycloak_user_ids):
@@ -368,21 +471,31 @@ class TaskingQueries:
         '''
         results = self.db.executeSelect(
             SQL_GET_TASKING_MANAGER_TASK,
-            (AssigneeLabel.UNASSIGNED, scvu_image_id),
+            (AssigneeLabel.UNASSIGNED, "", scvu_image_id),
         )
         if not results:
             return results
 
-        assignee_ids = [row[1] for row in results if row[1] and row[1] != 'Unassigned']
+        assignee_ids = []
+        for row in results:
+            if row[1] and row[1] != AssigneeLabel.UNASSIGNED:
+                assignee_ids.append(row[1])
+            if row[2]:
+                assignee_ids.append(row[2])
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
 
         formatted = []
-        for image_area_id, assignee_keycloak_id, remarks in results:
-            if assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not assignee_keycloak_id:
-                assignee_name = AssigneeLabel.UNASSIGNED
+        for image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name in results:
+            if current_assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not current_assignee_keycloak_id:
+                current_assignee_name = AssigneeLabel.UNASSIGNED
             else:
-                assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
-            formatted.append((image_area_id, assignee_name, remarks))
+                current_assignee_name = usernames.get(current_assignee_keycloak_id, current_assignee_keycloak_id)
+            proposed_assignee_name = (
+                usernames.get(proposed_assignee_keycloak_id, proposed_assignee_keycloak_id)
+                if proposed_assignee_keycloak_id
+                else ""
+            )
+            formatted.append((image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name))
         return formatted
 
     def getTaskingManagerDataForTasks(self, scvu_image_ids):
@@ -395,29 +508,39 @@ class TaskingQueries:
             return []
         placeholders, values = build_in_clause(scvu_image_ids)
         query = SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES.format(placeholders=placeholders)
-        results = self.db.executeSelect(query, (AssigneeLabel.UNASSIGNED,) + values)
+        results = self.db.executeSelect(query, (AssigneeLabel.UNASSIGNED, "") + values)
         if not results:
             return results
-        assignee_ids = [row[2] for row in results if row[2] and row[2] != AssigneeLabel.UNASSIGNED]
+        assignee_ids = []
+        for row in results:
+            if row[2] and row[2] != AssigneeLabel.UNASSIGNED:
+                assignee_ids.append(row[2])
+            if row[3]:
+                assignee_ids.append(row[3])
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
-        for scvu_image_id, image_area_id, assignee_keycloak_id, remarks in results:
-            if assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not assignee_keycloak_id:
-                assignee_name = AssigneeLabel.UNASSIGNED
+        for scvu_image_id, image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name, task_status_name in results:
+            if current_assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not current_assignee_keycloak_id:
+                current_assignee_name = AssigneeLabel.UNASSIGNED
             else:
-                assignee_name = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
-            formatted.append((scvu_image_id, image_area_id, assignee_name, remarks))
+                current_assignee_name = usernames.get(current_assignee_keycloak_id, current_assignee_keycloak_id)
+            proposed_assignee_name = (
+                usernames.get(proposed_assignee_keycloak_id, proposed_assignee_keycloak_id)
+                if proposed_assignee_keycloak_id
+                else ""
+            )
+            formatted.append((scvu_image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name))
         return formatted
 
-    def updateTaskingManagerData(self, scvu_image_id, priority_name):
+    def updateTaskingManagerData(self, scvu_image_area_id, priority_name):
         '''
-        Function:   Updates priority_id of image
-        Input:      scvu_image_id, priority.name
+        Function:   Updates priority_id of task by image area
+        Input:      scvu_image_area_id, priority.name
         Output:     NIL
         '''
-        self.db.executeUpdate(
+        return self.db.executeUpdate(
             SQL_UPDATE_TASKING_MANAGER_PRIORITY,
-            (priority_name, priority_name, scvu_image_id),
+            (priority_name, priority_name, scvu_image_area_id),
         )
 
     def assignTask(self, image_area_id, assignee_keycloak_id, task_status_id):
@@ -431,18 +554,32 @@ class TaskingQueries:
             (assignee_keycloak_id, image_area_id, task_status_id),
         )
 
-    def autoAssign(self, area_name, image_id):
+    def autoAssign(self, area_name, image_id, preferred_assignee_keycloak_id=None):
         '''
         Function:   Creates and inserts a task into the database as well as initialise that task with the automatically designated assignee 
         Input:      area_id
         Output:     NIL
         '''
-        id_set = self.keycloak.getUserIds()
-        if not id_set:
-            logger.debug("autoAssign has no users to assign")
-            return "unassigned"
+        prioritized_users = self.keycloak.get_prioritized_present_user_ids()
+        # Strong preference for II, but still allow Senior II / IA via weighted random.
+        role_weights = {
+            EnumClasses.Role.II.value: 10,
+            EnumClasses.Role.SENIOR_II.value: 3,
+            EnumClasses.Role.IA.value: 1,
+        }
 
-        id_dict = {u: 0 for u in id_set}
+        weighted_candidates = []
+        weighted_values = []
+        for role, weight in role_weights.items():
+            ids = prioritized_users.get(role, [])
+            if not ids or weight <= 0:
+                continue
+            weighted_candidates.extend(ids)
+            weighted_values.extend([weight] * len(ids))
+
+        if not weighted_candidates:
+            logger.debug("autoAssign has no users to assign")
+            return None
         
         # Obtain scvu_image_area_id
         result = self.db.executeSelect(SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN, (area_name, image_id))
@@ -452,19 +589,26 @@ class TaskingQueries:
                 area_name,
                 image_id,
             )
-            return "unassigned"
+            return None
         scvu_image_area_id  = result[0][0]
 
-        counts = self.getActiveTaskCountsForUsers(id_dict.keys())
-        for keycloak_user_id, active_tasks in counts.items():
-            if active_tasks == 0:
-                self.assignTask(scvu_image_area_id, keycloak_user_id, 1)
-                return "assigned"
-            id_dict[keycloak_user_id] = active_tasks
-
-        assignee_keycloak_id = min(id_dict, key=id_dict.get)
-        self.assignTask(scvu_image_area_id, assignee_keycloak_id, 1)
-        return "assigned"
+        if preferred_assignee_keycloak_id and preferred_assignee_keycloak_id in set(weighted_candidates):
+            assignee_keycloak_id = preferred_assignee_keycloak_id
+        else:
+            # Keep role preference, but dampen users who already have many active tasks
+            # so assignments spread out instead of repeatedly picking one person.
+            active_counts = self.getActiveTaskCountsForUsers(weighted_candidates)
+            adjusted_weights = []
+            for idx, user_id in enumerate(weighted_candidates):
+                base_weight = float(weighted_values[idx])
+                load_penalty = 1.0 + float(active_counts.get(user_id, 0))
+                adjusted_weights.append(base_weight / load_penalty)
+            assignee_keycloak_id = random.choices(weighted_candidates, weights=adjusted_weights, k=1)[0]
+        self.db.executeInsert(
+            SQL_SET_PROPOSED_ASSIGNEE,
+            (assignee_keycloak_id, scvu_image_area_id, 1),
+        )
+        return assignee_keycloak_id
 
     def getTaskingSummaryImageData(self, start_date, end_date, limit=None, offset=None):
         '''
@@ -512,15 +656,20 @@ class TaskingQueries:
                 task_status,
                 remarks,
                 assignee_keycloak_id,
+                sf_reported,
+                iir_reported,
                 v10,
                 opsv,
                 area_id,
+                child_image_id,
                 color,
                 service,
+                report_name,
+                cloud_cover_name,
+                image_quality_name,
+                priority_name,
                 exploit_start_time,
                 exploit_end_time,
-                ir_reported,
-                sf_reported,
             ) = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted_results.append(
@@ -530,15 +679,20 @@ class TaskingQueries:
                     task_status,
                     remarks,
                     username,
+                    sf_reported,
+                    iir_reported,
                     v10,
                     opsv,
                     area_id,
+                    child_image_id,
                     color,
                     service,
+                    report_name,
+                    cloud_cover_name,
+                    image_quality_name,
+                    priority_name,
                     exploit_start_time,
                     exploit_end_time,
-                    ir_reported,
-                    sf_reported,
                 )
             )
 
@@ -569,15 +723,20 @@ class TaskingQueries:
                 task_status,
                 remarks,
                 assignee_keycloak_id,
+                sf_reported,
+                iir_reported,
                 v10,
                 opsv,
                 area_id,
+                child_image_id,
                 color,
                 service,
+                report_name,
+                cloud_cover_name,
+                image_quality_name,
+                priority_name,
                 exploit_start_time,
                 exploit_end_time,
-                ir_reported,
-                sf_reported,
             ) = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
             formatted_results.append(
@@ -588,15 +747,20 @@ class TaskingQueries:
                     task_status,
                     remarks,
                     username,
+                    sf_reported,
+                    iir_reported,
                     v10,
                     opsv,
                     area_id,
+                    child_image_id,
                     color,
                     service,
+                    report_name,
+                    cloud_cover_name,
+                    image_quality_name,
+                    priority_name,
                     exploit_start_time,
                     exploit_end_time,
-                    ir_reported,
-                    sf_reported,
                 )
             )
         return formatted_results
@@ -626,15 +790,20 @@ class TaskingQueries:
                 task_status,
                 remarks,
                 assignee_kc_id,
+                sf_reported,
+                iir_reported,
                 v10,
                 opsv,
                 area_id,
+                child_image_id,
                 color,
                 service,
+                report_name,
+                cloud_cover_name,
+                image_quality_name,
+                priority_name,
                 exploit_start_time,
                 exploit_end_time,
-                ir_reported,
-                sf_reported,
             ) = row
             username = usernames.get(assignee_kc_id) if assignee_kc_id else AssigneeLabel.UNASSIGNED
             formatted_results.append(
@@ -645,15 +814,20 @@ class TaskingQueries:
                     task_status,
                     remarks,
                     username,
+                    sf_reported,
+                    iir_reported,
                     v10,
                     opsv,
                     area_id,
+                    child_image_id,
                     color,
                     service,
+                    report_name,
+                    cloud_cover_name,
+                    image_quality_name,
+                    priority_name,
                     exploit_start_time,
                     exploit_end_time,
-                    ir_reported,
-                    sf_reported,
                 )
             )
         return formatted_results
@@ -665,6 +839,15 @@ class TaskingQueries:
         Output:     NIL
         '''
         self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_START, (TaskStatus.IN_PROGRESS, task_id, TaskStatus.INCOMPLETE))
+
+    def endTask(self, task_id):
+        '''
+        Function:   Reverts task status to Incomplete if it is currently In Progress,
+                    and clears exploit_start_time.
+        Input:      task_id is the id of the task to be updated
+        Output:     NIL
+        '''
+        self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_END, (TaskStatus.INCOMPLETE, task_id, TaskStatus.IN_PROGRESS))
 
     def completeTask(self, task_id):
         '''
@@ -727,10 +910,71 @@ class TaskingQueries:
             ),
         )
 
-    def updateTaskingSummaryTask(self, scvu_task_id, remarks=None, ir_reported=None, sf_reported=None):
+    def updateTaskingSummaryTask(
+        self,
+        scvu_task_id,
+        remarks=None,
+        report_name=None,
+        cloud_cover_name=None,
+        image_quality_name=None,
+        sf_reported=None,
+        iir_reported=None,
+    ):
         '''
         Function:   Updates editable tasking summary fields on task row
-        Input:      scvu_task_id, remarks, ir_reported, sf_reported
+        Input:      scvu_task_id, remarks, report_name, cloud_cover_name, image_quality_name, sf_reported, iir_reported
         Output:     NIL
         '''
-        self.db.executeUpdate(SQL_UPDATE_TASKING_SUMMARY_TASK, (remarks, ir_reported, sf_reported, scvu_task_id))
+        set_clauses = []
+        values = []
+
+        if remarks is not None:
+            set_clauses.append("remarks = %s")
+            values.append(remarks)
+        if report_name is not None:
+            set_clauses.append(
+                "report_id = (SELECT id FROM report WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null))"
+            )
+            values.extend([report_name, report_name])
+        if cloud_cover_name is not None:
+            set_clauses.append(
+                "cloud_cover_id = (SELECT id FROM cloud_cover WHERE name = %s OR (COALESCE(%s,'') = '' AND name is null))"
+            )
+            values.extend([cloud_cover_name, cloud_cover_name])
+        if image_quality_name is not None:
+            set_clauses.append("image_quality = %s")
+            values.append(image_quality_name)
+        if sf_reported is not None:
+            set_clauses.append("sf_reported = %s")
+            values.append(bool(sf_reported))
+        if iir_reported is not None:
+            set_clauses.append("iir_reported = %s")
+            values.append(bool(iir_reported))
+
+        if not set_clauses:
+            return
+
+        query = f"UPDATE task SET {', '.join(set_clauses)} WHERE scvu_task_id = %s"
+        values.append(scvu_task_id)
+        self.db.executeUpdate(query, tuple(values))
+
+    def getTaskSubmissionStatusByIds(self, task_ids):
+        '''
+        Function:   Gets effective report and submission flags for tasks
+        Input:      iterable of task IDs
+        Output:     dict of task_id -> {report, sf_reported, iir_reported}
+        '''
+        ids = list(task_ids or [])
+        if not ids:
+            return {}
+        placeholders, values = build_in_clause(ids)
+        query = SQL_GET_TASK_SUBMISSION_STATUS_BY_IDS.format(placeholders=placeholders)
+        rows = self.db.executeSelect(query, values)
+        return {
+            row[0]: {
+                "report": (row[1] or "").strip(),
+                "sf_reported": bool(row[2]),
+                "iir_reported": bool(row[3]),
+            }
+            for row in rows
+        }

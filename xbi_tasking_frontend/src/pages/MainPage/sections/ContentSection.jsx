@@ -2,7 +2,6 @@ import TaskingSummaryTab from '../tabs/TaskingSummaryTab.jsx'
 import TaskingManagerTab from '../tabs/TaskingManagerTab.jsx'
 import TabPlaceholder from '../tabs/TabPlaceholder.jsx'
 import CompletedImagesTab from '../tabs/CompletedImagesTab.jsx'
-import CreateUserTab from '../tabs/CreateUserTab.jsx'
 import UserPresenceTab from '../tabs/UserPresenceTab.jsx'
 import UploadsTab from '../tabs/UploadsTab.jsx'
 import GenerateBinCountTab from '../tabs/GenerateBinCountTab.jsx'
@@ -17,7 +16,6 @@ const tabMap = {
   'completed-unverified': TaskingSummaryTab,
   'completed-verified': CompletedImagesTab,
   submission: SubmissionTab,
-  "admin-create-user": CreateUserTab,
   "admin-presence": UserPresenceTab,
   "admin-uploads": UploadsTab,
   "admin-bin": GenerateBinCountTab,
@@ -31,8 +29,7 @@ const tabLabelMap = {
   'completed-unverified': 'Unverified Tasks',
   'completed-verified': 'Verified Tasks',
   submission: 'Submission',
-  'admin-create-user': 'Create User',
-  'admin-presence': 'User Presence',
+  'admin-presence': 'Users',
   'admin-uploads': 'Uploads',
   'admin-bin': 'Generate Bin Count',
   'admin-sensor': 'Update Sensor Category',

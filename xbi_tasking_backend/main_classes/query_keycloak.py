@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import requests
 import main_classes.EnumClasses as EnumClasses
 from constants import AssigneeLabel
@@ -28,6 +29,12 @@ SQL_SELECT_PRESENT_USER_IDS = """
         AND is_present = True
 """
 
+SQL_SELECT_ALL_PRESENT_USER_IDS = """
+    SELECT keycloak_user_id
+    FROM user_cache
+    WHERE is_present = True
+"""
+
 SQL_RESET_RECENT_USERS = "UPDATE user_cache SET is_present = False, last_updated = NOW()"
 
 SQL_INSERT_USER_CACHE_WITH_TIMESTAMP = """
@@ -37,6 +44,10 @@ SQL_INSERT_USER_CACHE_WITH_TIMESTAMP = """
 """
 
 SQL_UPDATE_USER_CACHE_PRESENT = "UPDATE user_cache SET is_present = True WHERE keycloak_user_id = %s"
+
+SQL_UPDATE_USER_CACHE_PRESENCE = "UPDATE user_cache SET is_present = %s, last_updated = NOW() WHERE keycloak_user_id = %s"
+
+SQL_DELETE_USER_CACHE = "DELETE FROM user_cache WHERE keycloak_user_id = %s"
 
 
 class KeycloakQueries:
@@ -173,6 +184,47 @@ class KeycloakQueries:
         self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (user_id,))
         return {"id": user_id, "username": username, "role": role_name}
 
+    def deleteKeycloakUser(self, user_id):
+        token = self.get_keycloak_admin_token()
+        self.kc.delete_user(token, user_id)
+        self.db.executeDelete(SQL_DELETE_USER_CACHE, (user_id,))
+
+    def editKeycloakUser(self, user_id, new_username, new_role, new_status):
+        token = self.get_keycloak_admin_token()
+        warnings = []
+
+        if new_username:
+            try:
+                self.kc.update_user_info(token, user_id, new_username)
+            except requests.exceptions.HTTPError as e:
+                response_text = ""
+                if getattr(e, "response", None) is not None:
+                    response_text = e.response.text or ""
+                if "error-user-attribute-read-only" in response_text:
+                    warnings.append("Username is managed by Keycloak federation and cannot be changed.")
+                else:
+                    raise
+
+        if new_role:
+            valid_roles = {r.value for r in EnumClasses.Role}
+            if new_role not in valid_roles:
+                raise ValueError(f"Invalid role: {new_role}. Must be one of: {', '.join(sorted(valid_roles))}")
+            current_roles = self.kc.get_user_realm_roles(token, user_id)
+            for role_rep in current_roles:
+                if role_rep.get("name") in valid_roles:
+                    try:
+                        self.kc.remove_realm_role(token, user_id, role_rep)
+                    except requests.exceptions.RequestException as e:
+                        logger.warning("Could not remove role %s from user %s: %s", role_rep.get("name"), user_id, e)
+            new_role_rep = self.kc.get_role(token, new_role)
+            self.kc.assign_realm_role(token, user_id, new_role_rep)
+
+        if new_status is not None:
+            is_present = new_status.lower() == "present"
+            self.db.executeUpdate(SQL_UPDATE_USER_CACHE_PRESENCE, (is_present, user_id))
+
+        return {"warnings": warnings}
+
     def get_keycloak_admin_token(self):
         '''
         Obtain Keycloak admin token of xbi-tasking-admin client
@@ -298,6 +350,89 @@ class KeycloakQueries:
             return set(row[0] for row in result)
         
         return set()
+
+    def get_present_user_ids(self, keycloak_user_ids):
+        '''
+        Function:   Filters input Keycloak user IDs to only currently present users.
+        Input:      iterable of keycloak_user_id
+        Output:     set of present keycloak_user_id
+        '''
+        ids = {user_id for user_id in (keycloak_user_ids or []) if user_id}
+        if not ids:
+            return set()
+        placeholders, values = build_in_clause(ids)
+        query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
+        result = self.db.executeSelect(query, values)
+        return {row[0] for row in result}
+
+    def get_prioritized_present_user_ids(self):
+        '''
+        Function:   Gets present Keycloak user IDs grouped by assignment priority.
+        Priority:   II first, then Senior II, then IA.
+        Input:      None
+        Output:     dict of role name -> list of keycloak_user_id
+        '''
+        role_order = [
+            EnumClasses.Role.II.value,
+            EnumClasses.Role.SENIOR_II.value,
+            EnumClasses.Role.IA.value,
+        ]
+
+        try:
+            token = self.get_keycloak_admin_token()
+        except (ValueError, requests.exceptions.RequestException):
+            # Fallback: if Keycloak is temporarily unavailable, still auto-assign
+            # from present users in cache.
+            present_ids = self.get_all_present_user_ids()
+            random.shuffle(present_ids)
+            return {
+                EnumClasses.Role.II.value: present_ids,
+                EnumClasses.Role.SENIOR_II.value: [],
+                EnumClasses.Role.IA.value: [],
+            }
+
+        role_to_ids = {role: set() for role in role_order}
+        for role in role_order:
+            try:
+                users = self.kc.get_users_for_role(token, role)
+                role_to_ids[role] = {user.get("id") for user in users if user.get("id")}
+            except requests.exceptions.RequestException:
+                role_to_ids[role] = set()
+
+        all_ids = set().union(*role_to_ids.values()) if role_to_ids else set()
+        if not all_ids:
+            present_ids = self.get_all_present_user_ids()
+            random.shuffle(present_ids)
+            return {
+                EnumClasses.Role.II.value: present_ids,
+                EnumClasses.Role.SENIOR_II.value: [],
+                EnumClasses.Role.IA.value: [],
+            }
+
+        placeholders, values = build_in_clause(all_ids)
+        query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
+        result = self.db.executeSelect(query, values)
+        present_ids = {row[0] for row in result}
+
+        prioritized = {}
+        for role in role_order:
+            ids = list(role_to_ids[role].intersection(present_ids))
+            random.shuffle(ids)
+            prioritized[role] = ids
+        if not any(prioritized.values()):
+            fallback_ids = self.get_all_present_user_ids()
+            random.shuffle(fallback_ids)
+            prioritized[EnumClasses.Role.II.value] = fallback_ids
+        return prioritized
+
+    def get_all_present_user_ids(self):
+        '''
+        Function:   Gets all present users from local cache without Keycloak calls.
+        Input:      None
+        Output:     list of keycloak_user_id
+        '''
+        result = self.db.executeSelect(SQL_SELECT_ALL_PRESENT_USER_IDS, ())
+        return [row[0] for row in result if row and row[0]]
 
     def resetRecentUsers(self):
         '''

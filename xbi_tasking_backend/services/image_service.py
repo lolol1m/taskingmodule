@@ -53,6 +53,81 @@ def _parse_date_range(payload):
     return start_dt, end_dt
 
 
+def _normalize_dsta_payload(payload):
+    """
+    Accept both legacy payload:
+      { "images": [...] }
+    and new payload:
+      { "tasking": [ { "PassIDFileName": ..., "sensorName": ..., "image": [...] }, ... ] }
+    """
+    if not isinstance(payload, dict):
+        return payload
+
+    if isinstance(payload.get("images"), list):
+        return payload
+
+    tasking_items = payload.get("tasking")
+    if not isinstance(tasking_items, list):
+        return payload
+
+    normalized_images = []
+    for entry in tasking_items:
+        if not isinstance(entry, dict):
+            continue
+
+        # New grouped-by-pass format:
+        # one pass parent with child image rows.
+        if isinstance(entry.get("image"), list):
+            pass_id = entry.get("PassIDFileName")
+            sensor_name = entry.get("sensorName")
+            for img in entry.get("image", []):
+                if not isinstance(img, dict):
+                    continue
+                img_id = img.get("imgId")
+                if img_id is None:
+                    continue
+
+                raw_area_id = img.get("areaId", img.get("areaID"))
+                # Display label for child rows should use imgName when available.
+                area_name = img.get("imgName") or img.get("areaName")
+                if not area_name and raw_area_id is not None and str(raw_area_id).strip() != "":
+                    area_name = str(raw_area_id)
+                if not area_name:
+                    continue
+
+                area_item = {
+                    "areaId": raw_area_id,
+                    "areaName": area_name,
+                }
+                if img.get("imgId") is not None:
+                    area_item["childImgId"] = img.get("imgId")
+                if img.get("imgName") is not None:
+                    area_item["imgName"] = img.get("imgName")
+                if img.get("color") is not None:
+                    area_item["color"] = img.get("color")
+                if img.get("service") is not None:
+                    area_item["service"] = img.get("service")
+                normalized_images.append(
+                    {
+                        "imgId": img_id,
+                        # Child image row label (imgName) kept in image table.
+                        "imageFileName": img.get("imgName") or str(img_id),
+                        "passIdFileName": pass_id or str(img_id),
+                        "sensorName": sensor_name,
+                        "uploadDate": img.get("uploadDate"),
+                        "imageDateTime": img.get("imageDateTime"),
+                        "areas": [area_item],
+                    }
+                )
+            continue
+
+        # Legacy item shape inside "tasking" array
+        if entry.get("imgId") is not None and entry.get("imageFileName") is not None:
+            normalized_images.append(entry)
+
+    return {"images": normalized_images}
+
+
 class ImageService:
     def __init__(self, db, image_queries, tasking_queries):
         self.db = db
@@ -60,6 +135,7 @@ class ImageService:
         self.tasking = tasking_queries
 
     def insert_dsta_data(self, payload, auto_assign=True):
+        payload = _normalize_dsta_payload(payload)
         image_count = 0
         area_count = 0
         errors = []
@@ -77,28 +153,41 @@ class ImageService:
                 try:
                     with self.db.transaction():
                         existing = self.images.getImageByIdAndName(image["imgId"], image["imageFileName"])
+                        image_already_exists = bool(existing)
                         if existing:
                             existing_images.append({
                                 "image_id": image["imgId"],
                                 "image_file_name": image["imageFileName"],
                             })
-                            continue
-                        self.images.insertSensor(image["sensorName"])
-                        image_inserted = self.images.insertImage(
-                            image["imgId"],
-                            image["imageFileName"],
-                            image["sensorName"],
-                            dateutil.parser.isoparse(image["uploadDate"]),
-                            dateutil.parser.isoparse(image["imageDateTime"]),
-                        )
-                        if image_inserted:
-                            image_count += 1
-                        else:
-                            existing_images.append({
-                                "image_id": image["imgId"],
-                                "image_file_name": image["imageFileName"],
-                                })
-                            continue
+                        pass_id_file_name = image.get("passIdFileName")
+                        scvu_pass_id = None
+                        if pass_id_file_name:
+                            scvu_pass_id = self.images.upsertPassReturningId(
+                                pass_id_file_name,
+                                image["sensorName"],
+                                dateutil.parser.isoparse(image["uploadDate"]),
+                                dateutil.parser.isoparse(image["imageDateTime"]),
+                            )
+
+                        if not image_already_exists:
+                            self.images.insertSensor(image["sensorName"])
+                            image_inserted = self.images.insertImage(
+                                image["imgId"],
+                                image["imageFileName"],
+                                image["sensorName"],
+                                dateutil.parser.isoparse(image["uploadDate"]),
+                                dateutil.parser.isoparse(image["imageDateTime"]),
+                                scvu_pass_id=scvu_pass_id,
+                            )
+                            if image_inserted:
+                                image_count += 1
+                            else:
+                                existing_images.append({
+                                    "image_id": image["imgId"],
+                                    "image_file_name": image["imageFileName"],
+                                    })
+                                continue
+                        image_auto_assignee_id = None
                         for area in image["areas"]:
                             try:
                                 self.images.insertArea(area["areaName"])
@@ -106,26 +195,55 @@ class ImageService:
                                     image["imgId"],
                                     area["areaName"],
                                 )
-                                area_id = area.get("areaId")
+                                raw_area_id = area.get("areaId")
+                                external_area_id = None
+                                if raw_area_id is not None and str(raw_area_id).strip() != "":
+                                    external_area_id = str(raw_area_id).strip()
                                 color = area.get("color")
                                 service = area.get("service")
-                                if area_id is not None:
+                                raw_child_img_id = area.get("childImgId")
+                                child_image_id = None
+                                if raw_child_img_id is not None and str(raw_child_img_id).strip() != "":
+                                    try:
+                                        child_image_id = int(str(raw_child_img_id).strip())
+                                    except (TypeError, ValueError):
+                                        child_image_id = None
+                                if external_area_id is not None:
                                     # Persist source area id + metadata for downstream tasking summary display.
                                     updated = self.images.updateImageAreaMetadataByExternalId(
-                                        image["imgId"], area_id, color=color, service=service
+                                        image["imgId"],
+                                        external_area_id,
+                                        color=color,
+                                        service=service,
+                                        child_image_id=child_image_id,
                                     )
                                     if not updated:
                                         self.images.updateImageAreaMetadataByName(
-                                            image["imgId"], area["areaName"], external_area_id=area_id, color=color, service=service
+                                            image["imgId"],
+                                            area["areaName"],
+                                            external_area_id=external_area_id,
+                                            color=color,
+                                            service=service,
+                                            child_image_id=child_image_id,
                                         )
-                                elif color is not None or service is not None:
+                                elif color is not None or service is not None or child_image_id is not None:
                                     self.images.updateImageAreaMetadataByName(
-                                        image["imgId"], area["areaName"], color=color, service=service
+                                        image["imgId"],
+                                        area["areaName"],
+                                        color=color,
+                                        service=service,
+                                        child_image_id=child_image_id,
                                     )
                                 area_count += 1
 
                                 if auto_assign:
-                                    self.tasking.autoAssign(area["areaName"], image["imgId"])
+                                    # Auto-assign once per image row, then reuse the same
+                                    # assignee for remaining areas under that image.
+                                    image_auto_assignee_id = self.tasking.autoAssign(
+                                        area["areaName"],
+                                        image["imgId"],
+                                        preferred_assignee_keycloak_id=image_auto_assignee_id,
+                                    )
                                     
                             except Exception as e:
                                 area_name = area.get("areaName", "unknown")
@@ -230,8 +348,12 @@ class ImageService:
         area_rows = self.images.getImageAreaDataForImages(image_ids)
         area_map = {}
         for row in area_rows:
-            image_id, task_id, area_name, remarks, assignee = row
-            area_map.setdefault(image_id, []).append((task_id, area_name, remarks, assignee))
+            # query_images.getImageAreaDataForImages returns:
+            # (image_id, task_id, area_name, remarks, assignee, priority)
+            image_id, task_id, area_name, remarks, assignee, priority = row
+            area_map.setdefault(image_id, []).append(
+                (task_id, area_name, remarks, assignee, priority)
+            )
 
         for image in image_data:
             image_id = image[0]
@@ -247,4 +369,11 @@ class ImageService:
             self.images.deleteTasksForImage(scvu_image_id)
             self.images.deleteImageAreasForImage(scvu_image_id)
             self.images.deleteImage(scvu_image_id)
+        return {"success": True}
+
+    def delete_image_area(self, payload):
+        scvu_image_area_id = payload["SCVU Image Area ID"]
+        with self.db.transaction():
+            self.images.deleteTaskForImageArea(scvu_image_area_id)
+            self.images.deleteImageArea(scvu_image_area_id)
         return {"success": True}

@@ -83,6 +83,16 @@ class API {
         return response.data
     }
 
+    async deleteUser(body) {
+        const response = await this.client.post("/users/deleteUser", body)
+        return response.data
+    }
+
+    async editUser(body) {
+        const response = await this.client.post("/users/editUser", body)
+        return response.data
+    }
+
     async getAreas() {
         const response = await this.client.get("/lookup/getAreas")
         return response.data
@@ -119,8 +129,18 @@ class API {
 
     }
 
-    async postAssignTask(body){ 
+    async postDeleteImageArea(body){
+        const response = await this.client.post("/images/deleteImageArea", body)
+        return response.data
+    }
+
+    async postAssignTask(body){
               const response = await this.client.post("/tasking/assignTask",  body)
+        return response.data
+    }
+
+    async postEndTasks(body){
+        const response = await this.client.post("/tasking/endTasks", body)
         return response.data
     }
 
@@ -138,6 +158,7 @@ class API {
         const response = await this.client.post("/images/insertDSTAData", formData, {
             headers: { "Content-Type": "multipart/form-data" },
             params: { auto_assign: autoAssign },
+            timeout: 120000,
         })
         return response.data
     }

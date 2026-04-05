@@ -166,7 +166,6 @@ function UpdateSensorCategoryTab() {
         <DataGridPro
           rows={rows}
           columns={columns}
-          disableColumnResize
           loading={loading}
           checkboxSelection
           disableRowSelectionOnClick
@@ -221,7 +220,9 @@ function UpdateSensorCategoryTab() {
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnSeparator': {
-              display: 'none',
+              display: 'flex',
+              visibility: 'visible',
+              opacity: 1,
             },
             '& .MuiDataGrid-scrollbarFiller': {
               backgroundColor: 'transparent',

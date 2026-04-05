@@ -12,7 +12,7 @@ const roles = [
   { value: 'IA', label: 'IA', badge: 'IA', description: 'Image analyst with admin access' },
 ]
 
-function CreateUserTab() {
+function CreateUserTab({ onSuccess }) {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -45,6 +45,7 @@ function CreateUserTab() {
         meta: `Just now · ${formData.username} (${formData.role})`,
       })
       setFormData({ username: '', password: '', role: 'II' })
+      onSuccess?.()
     } catch (err) {
       const message = err.response?.data?.detail || err.response?.data?.message || 'Failed to create user'
       addNotification({
