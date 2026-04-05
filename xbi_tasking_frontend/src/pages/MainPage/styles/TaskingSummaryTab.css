@@ -153,6 +153,8 @@
 
 .tasking-summary__remarks-input:focus {
   outline: 1px solid var(--accent);
+  field-sizing: content;
+  max-height: none;
 }
 
 .tasking-summary__remarks-parent {
