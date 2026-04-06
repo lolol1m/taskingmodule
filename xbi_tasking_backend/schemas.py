@@ -21,6 +21,12 @@ class ImageIdsPayload(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ImageAreaIdsPayload(BaseModel):
+    image_area_ids: list[int] = Field(..., alias="SCVU Image Area ID")
+
+    model_config = {"populate_by_name": True}
+
+
 class TaskAssignment(BaseModel):
     scvu_image_area_id: int = Field(..., alias="SCVU Image Area ID")
     assignee: str = Field(..., alias="Assignee")

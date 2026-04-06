@@ -139,6 +139,11 @@ class API {
         return response.data
     }
 
+    async postAutoAssignTasks(body){
+        const response = await this.client.post("/tasking/autoAssignTasks", body)
+        return response.data
+    }
+
     async postEndTasks(body){
         const response = await this.client.post("/tasking/endTasks", body)
         return response.data
@@ -152,6 +157,24 @@ class API {
         async postInsertTTGData(body){ 
         const response = await this.client.post("/images/insertTTGData", body)
         return response.data
+    }
+
+    async updatePassEntry(body) {
+        const response = await this.client.post("/images/updatePassEntry", body)
+        return response.data
+    }
+
+    async getPasses() {
+        const response = await this.client.get("/images/getPasses")
+        return response.data
+    }
+
+    async insertManualEntry(payload) {
+        const jsonStr = JSON.stringify(payload)
+        const blob = new Blob([jsonStr], { type: 'application/json' })
+        const formData = new FormData()
+        formData.append('file', blob, 'manual_entry.json')
+        return this.insertDSTAData(formData)
     }
 
     async insertDSTAData(formData, autoAssign = true) {

@@ -53,9 +53,6 @@ function NotificationsProvider({ children }) {
   }
 
   useEffect(() => {
-    const enablePolling = import.meta.env.VITE_NOTIFICATIONS_POLLING === 'true'
-    if (!enablePolling) return
-
     const api = new API()
     let cancelled = false
 

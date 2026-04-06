@@ -282,6 +282,22 @@ class ImageService:
                 "areas_inserted": area_count
             }
 
+    def update_pass_entry(self, payload):
+        old_pass_id = payload.get("passIdFileName")
+        new_pass_id = payload.get("newPassIdFileName")
+        sensor_name = payload.get("sensorName")
+        upload_date_raw = payload.get("uploadDate")
+        image_dt_raw = payload.get("imageDateTime")
+        if not old_pass_id:
+            return {"success": False, "error": "Missing passIdFileName"}
+        upload_date = dateutil.parser.isoparse(upload_date_raw) if upload_date_raw else None
+        image_dt = dateutil.parser.isoparse(image_dt_raw) if image_dt_raw else None
+        self.images.updatePassEntry(old_pass_id, new_pass_id, sensor_name, upload_date, image_dt)
+        return {"success": True}
+
+    def get_passes(self):
+        return {"Passes": self.images.getPasses()}
+
     def insert_ttg_data(self, payload):
         required_fields = ['imageFileName', 'sensorName', 'uploadDate', 'imageDateTime', 'areas']
         missing = [field for field in required_fields if field not in payload]

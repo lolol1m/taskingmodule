@@ -223,8 +223,8 @@ function SubmissionTab({
     }
 
     if (tab === 'iir') return [...baseColumns, sfColumn, iirColumn]
-    // SF tab: IA sees both checkboxes, Senior II only sees SF checkbox
-    return canViewIIR ? [...baseColumns, sfColumn, iirColumn] : [...baseColumns, sfColumn]
+    // SF tab: always show SF column only
+    return [...baseColumns, sfColumn]
   }, [tab, canViewIIR, editingRows])
 
   useEffect(() => {

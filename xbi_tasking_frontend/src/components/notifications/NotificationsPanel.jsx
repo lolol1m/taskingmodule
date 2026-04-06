@@ -47,9 +47,11 @@ function NotificationsPanel() {
           </button>
         </div>
         {notifications.length ? (
-          notifications.map((item) => (
+          notifications.map((item) => {
+            const isReported = item?.title === 'IIR Reported' || item?.title === 'SF Reported'
+            return (
             <div
-              className="notification-item"
+              className={`notification-item${isReported ? ' notification-item--reported' : ''}`}
               key={item.id}
               onClick={() => markRead(item.id)}
               role="button"
@@ -60,10 +62,11 @@ function NotificationsPanel() {
                 }
               }}
             >
-              <div className="notification-item__title">{item.title}</div>
+              <div className={`notification-item__title${isReported ? ' notification-item__title--reported' : ''}`}>{item.title}</div>
               <div className="notification-item__meta">{item.meta}</div>
             </div>
-          ))
+            )
+          })
         ) : (
           <div className="notification-item">
             <div className="notification-item__title">No new notifications</div>

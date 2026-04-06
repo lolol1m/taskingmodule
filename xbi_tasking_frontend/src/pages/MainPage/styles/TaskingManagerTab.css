@@ -252,6 +252,196 @@
   gap: 12px;
 }
 
+/* TTG redesigned modal */
+.tasking-manager__modal-content--ttg {
+  width: min(640px, 92vw);
+}
+
+.tasking-manager__modal-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  background: var(--hover, rgba(255,255,255,0.06));
+  border-radius: 12px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.tasking-manager__modal-mode-btn {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.tasking-manager__modal-mode-btn.active {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.tasking-manager__modal-mode-btn:not(.active):hover {
+  color: var(--text);
+}
+
+.tasking-manager__modal-body--ttg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ttg-modal__section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-strong);
+  margin-bottom: 2px;
+}
+
+.ttg-modal__row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.ttg-modal__row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.ttg-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ttg-modal__field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttg-modal__field-hint {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.65;
+}
+
+.ttg-modal__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s;
+  -moz-appearance: textfield;
+}
+
+.ttg-modal__input::-webkit-inner-spin-button,
+.ttg-modal__input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.ttg-modal__input::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.ttg-modal__input:focus {
+  border-color: var(--accent);
+}
+
+.ttg-modal__input--readonly {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--hover, rgba(255,255,255,0.02));
+}
+
+.ttg-modal__select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.ttg-modal__select:focus {
+  border-color: var(--accent);
+}
+
+.ttg-modal__select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+/* DateTimePicker wrapper — strip the MUI outer border, use the field border */
+.ttg-modal__field .MuiOutlinedInput-root {
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 8px !important;
+  background: var(--input-bg, rgba(255, 255, 255, 0.04)) !important;
+  font-size: 14px;
+}
+
+.ttg-modal__field .MuiOutlinedInput-root.Mui-focused {
+  border-color: var(--accent) !important;
+}
+
+.ttg-modal__field .MuiOutlinedInput-root fieldset {
+  border: none !important;
+}
+
+.ttg-modal__field .MuiInputBase-input {
+  padding: 8px 12px !important;
+  color: var(--text) !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+}
+
+.ttg-modal__sensor-hint {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 2px 4px;
+}
+
 .tasking-manager__modal-actions {
   display: flex;
   justify-content: flex-end;

@@ -5,8 +5,6 @@ import Fade from '@mui/material/Fade'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
-import MenuItem from '@mui/material/MenuItem'
-import Select from '@mui/material/Select'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { DateRangeCalendar } from '@mui/x-date-pickers-pro/DateRangeCalendar'
@@ -28,26 +26,16 @@ const style = {
   p: 0,
 }
 
-const SELECT_MENU_PROPS = {
-  MenuProps: { sx: { zIndex: 1000003 } },
-}
-
-const DEFAULT_TIME = { hour: 12, minute: 0, second: 0, meridiem: 'PM' }
+const DEFAULT_TIME = { hour: 0, minute: 0, second: 0 }
 
 const formatDateLabel = (dateValue) => {
   if (!dateValue) return '--'
   return dateValue.format('ddd DD-MM-YY')
 }
 
-const parseHour24 = (hour12, meridiem) => {
-  if (meridiem === 'AM') return hour12 === 12 ? 0 : hour12
-  return hour12 === 12 ? 12 : hour12 + 12
-}
-
 const applyTimeToDate = (dateValue, timeValue) => {
   if (!dateValue) return null
-  const hour24 = parseHour24(timeValue.hour, timeValue.meridiem)
-  return dateValue.hour(hour24).minute(timeValue.minute).second(timeValue.second).millisecond(0)
+  return dateValue.hour(timeValue.hour).minute(timeValue.minute).second(timeValue.second).millisecond(0)
 }
 
 const clamp = (val, min, max) => Math.max(min, Math.min(max, val))
@@ -180,21 +168,11 @@ function DatePickerModal({ open, onClose, onApply }) {
                   <Typography className="date-picker-modal__date-text">{formatDateLabel(value[0])}</Typography>
                 </div>
                 <div className="date-picker-modal__time-half-bottom">
-                  <TimeInput value={fromTime.hour} min={1} max={12} onChange={(v) => updateTime(setFromTime, 'hour', v)} />
+                  <TimeInput value={fromTime.hour} min={0} max={23} onChange={(v) => updateTime(setFromTime, 'hour', v)} />
                   <span className="date-picker-modal__colon">:</span>
                   <TimeInput value={fromTime.minute} min={0} max={59} onChange={(v) => updateTime(setFromTime, 'minute', v)} />
                   <span className="date-picker-modal__colon">:</span>
                   <TimeInput value={fromTime.second} min={0} max={59} onChange={(v) => updateTime(setFromTime, 'second', v)} />
-                  <Select
-                    size="small"
-                    value={fromTime.meridiem}
-                    onChange={(e) => updateTime(setFromTime, 'meridiem', e.target.value)}
-                    className="date-picker-modal__select date-picker-modal__select--ampm"
-                    {...SELECT_MENU_PROPS}
-                  >
-                    <MenuItem value="AM">AM</MenuItem>
-                    <MenuItem value="PM">PM</MenuItem>
-                  </Select>
                 </div>
               </div>
               <span className="date-picker-modal__time-arrow">→</span>
@@ -204,21 +182,11 @@ function DatePickerModal({ open, onClose, onApply }) {
                   <Typography className="date-picker-modal__date-text">{formatDateLabel(value[1])}</Typography>
                 </div>
                 <div className="date-picker-modal__time-half-bottom">
-                  <TimeInput value={toTime.hour} min={1} max={12} onChange={(v) => updateTime(setToTime, 'hour', v)} />
+                  <TimeInput value={toTime.hour} min={0} max={23} onChange={(v) => updateTime(setToTime, 'hour', v)} />
                   <span className="date-picker-modal__colon">:</span>
                   <TimeInput value={toTime.minute} min={0} max={59} onChange={(v) => updateTime(setToTime, 'minute', v)} />
                   <span className="date-picker-modal__colon">:</span>
                   <TimeInput value={toTime.second} min={0} max={59} onChange={(v) => updateTime(setToTime, 'second', v)} />
-                  <Select
-                    size="small"
-                    value={toTime.meridiem}
-                    onChange={(e) => updateTime(setToTime, 'meridiem', e.target.value)}
-                    className="date-picker-modal__select date-picker-modal__select--ampm"
-                    {...SELECT_MENU_PROPS}
-                  >
-                    <MenuItem value="AM">AM</MenuItem>
-                    <MenuItem value="PM">PM</MenuItem>
-                  </Select>
                 </div>
               </div>
             </div>

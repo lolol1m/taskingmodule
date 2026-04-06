@@ -160,6 +160,26 @@ async def insert_ttg_data(request: Request, payload: InsertTTGPayload, user: dic
         return error_response(500, "Failed to insert TTG data", "insert_ttg_failed", {"error": str(e)})
 
 
+@router.post("/updatePassEntry")
+async def update_pass_entry(request: Request, payload: dict, user: dict = Depends(get_current_user)):
+    try:
+        result = await run_blocking(request.app.state.image_service.update_pass_entry, payload)
+        return result
+    except Exception as e:
+        logger.exception("updatePassEntry failed")
+        return error_response(500, "Failed to update pass entry", "update_pass_failed", {"error": str(e)})
+
+
+@router.get("/getPasses")
+async def get_passes(request: Request, user: dict = Depends(get_current_user)):
+    try:
+        result = await run_blocking(request.app.state.image_service.get_passes)
+        return result
+    except Exception as e:
+        logger.exception("getPasses failed")
+        return error_response(500, "Failed to get passes", "get_passes_failed", {"error": str(e)})
+
+
 @router.post("/deleteImage")
 async def delete_image(request: Request, payload: DeleteImagePayload, user: dict = Depends(get_current_user)):
     '''

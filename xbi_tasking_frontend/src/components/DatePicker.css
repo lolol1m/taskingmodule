@@ -31,14 +31,16 @@
 .date-picker-modal__time-controls {
   display: flex;
   align-items: stretch;
-  justify-content: center;
+  justify-content: space-between;
   gap: 0;
   padding: 0 4px;
 }
 
 .date-picker-modal__time-half {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
 }
 
@@ -71,7 +73,7 @@
   color: var(--muted, #9ca3af);
   font-size: 1.1rem;
   font-weight: 600;
-  padding: 0 10px;
+  padding: 0 6px;
   flex-shrink: 0;
   align-self: flex-end;
   margin-bottom: 6px;
@@ -131,28 +133,6 @@
 .date-picker-modal__time-input-arrow:hover {
   background: var(--hover, #1b1d23);
   color: var(--text, #e5e7eb);
-}
-
-/* ── AM/PM select ── */
-
-.date-picker-modal__select--ampm {
-  min-width: 68px;
-}
-
-.date-picker-modal__select--ampm .MuiOutlinedInput-notchedOutline {
-  border-color: var(--border, #2b2d36) !important;
-}
-
-.date-picker-modal__select--ampm .MuiSelect-select {
-  color: var(--text, #e5e7eb);
-  background: var(--panel, #15161a);
-  padding: 5px 8px !important;
-  font-size: 0.9rem;
-}
-
-.date-picker-modal__select--ampm .MuiSvgIcon-root {
-  color: var(--text, #e5e7eb);
-  font-size: 1.1rem;
 }
 
 .date-picker-modal__colon {

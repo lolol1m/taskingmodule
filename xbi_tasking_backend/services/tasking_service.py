@@ -69,10 +69,11 @@ def _parse_date_range(payload, add_day_for_legacy=False):
 
 
 class TaskingService:
-    def __init__(self, tasking_queries, keycloak_queries, image_service=None):
+    def __init__(self, tasking_queries, keycloak_queries, image_service=None, notification_service=None):
         self.tasking = tasking_queries
         self.keycloak = keycloak_queries
         self._image_service = image_service
+        self._notification_service = notification_service
 
     def get_tasking_summary(self, payload, user=None):
         output = {}
@@ -153,10 +154,9 @@ class TaskingService:
             areas_by_image.setdefault(image_id, []).append((image_area_id, area_name))
 
         tasks_by_image = {}
-        for image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name in task_rows:
-            tasks_by_image.setdefault(image_id, []).append(
-                (image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name)
-            )
+        for row in task_rows:
+            image_id = row[0]
+            tasks_by_image.setdefault(image_id, []).append(tuple(row[1:]))
 
         for image in images:
             areas = areas_by_image.get(image[0], [])
@@ -245,6 +245,15 @@ class TaskingService:
                 raise
         return tasks_processed
 
+    def auto_assign_tasks(self, payload):
+        area_ids = payload.get("SCVU Image Area ID", [])
+        processed = 0
+        for area_id in area_ids:
+            assigned = self.tasking.autoAssignForImageArea(area_id)
+            if assigned:
+                processed += 1
+        return processed
+
     def start_tasks(self, payload):
         for task_id in payload["SCVU Task ID"]:
             self.tasking.startTask(task_id)
@@ -253,11 +262,13 @@ class TaskingService:
         for task_id in payload["SCVU Task ID"]:
             self.tasking.endTask(task_id)
 
-    def complete_tasks(self, payload):
-        for task_id in payload["SCVU Task ID"]:
+    def complete_tasks(self, payload, user=None):
+        task_ids = payload.get("SCVU Task ID", [])
+        for task_id in task_ids:
             self.tasking.completeTask(task_id)
+        self._push_reported_notifications(task_ids, user, stage_label="Task completed")
     
-    def verify_pass(self, payload, vetter_keycloak_id=None):
+    def verify_pass(self, payload, vetter_keycloak_id=None, user=None):
         task_ids = payload.get("SCVU Task ID", [])
         submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
         for task_id in task_ids:
@@ -336,3 +347,46 @@ class TaskingService:
         if self._image_service is None:
             raise RuntimeError("ImageService dependency not configured")
         return self._image_service
+
+    @staticmethod
+    def _coerce_bool(value):
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes", "y")
+        return bool(value)
+
+    @staticmethod
+    def _build_notification_meta(context):
+        pass_id = context.get("pass_id_file_name") or "N/A"
+        image_name = context.get("image_file_name") or "N/A"
+        image_id = context.get("image_id") or "N/A"
+        area_name = context.get("area_name") or "N/A"
+        return f"Pass {pass_id} · Image {image_name} (ID {image_id}) · Area {area_name}"
+
+    def _push_reported_notifications(self, task_ids, user, stage_label):
+        if not self._notification_service:
+            return
+        context_by_task = self.tasking.getTaskNotificationContextByIds(task_ids)
+        for task_id in task_ids:
+            context = context_by_task.get(task_id) or {}
+            report = (context.get("report") or "").strip().upper()
+            meta = self._build_notification_meta(context)
+            if report == "DS(SF)":
+                self._notification_service.push(
+                    "SF Reported",
+                    f"{meta} · Task {task_id} · {stage_label}",
+                    user=user,
+                    target_roles=["Senior II", "IA"],
+                    persist=True,
+                )
+            if report == "IIR":
+                self._notification_service.push(
+                    "IIR Reported",
+                    f"{meta} · Task {task_id} · {stage_label}",
+                    user=user,
+                    target_roles=["IA"],
+                    persist=True,
+                )

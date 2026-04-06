@@ -1385,10 +1385,29 @@ function TaskingSummaryTab({
           return next
         })
       }
-      const actionTitle =
+      let actionTitle =
         apiPath === '/tasking/startTasks' ? 'Tasks started' :
         apiPath === '/tasking/endTasks' ? 'Tasks ended' :
         apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+      if (apiPath === '/tasking/completeTasks') {
+        const reportTypes = new Set(
+          actionableRows
+            .map((row) => {
+              const rowId = row?.id
+              const report = normalizeSelectValue(getWorkingValue(rowId, 'Report') ?? row?.report ?? '')
+              const normalized = String(report || '').trim().toUpperCase()
+              if (normalized === 'DS(SF)') return 'SF'
+              if (normalized === 'IIR') return 'IIR'
+              return null
+            })
+            .filter(Boolean),
+        )
+        if (reportTypes.size === 1) {
+          actionTitle = reportTypes.has('IIR') ? 'IIR Reported' : 'SF Reported'
+        } else if (reportTypes.size > 1) {
+          actionTitle = 'IIR/SF Reported'
+        }
+      }
       addNotification({
         title: actionTitle,
         meta: `Just now · ${taskIds.length} tasks`,

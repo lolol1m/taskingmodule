@@ -96,7 +96,9 @@ SQL_GET_TASKING_MANAGER_TASK_FOR_IMAGES = """
         COALESCE(task.proposed_assignee_keycloak_id, %s) as proposed_assignee_keycloak_id,
         task.remarks,
         COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
-        task_status.name as task_status_name
+        task_status.name as task_status_name,
+        image_area.color,
+        image_area.service
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN image ON image.scvu_image_id = image_area.scvu_image_id
@@ -351,6 +353,28 @@ SQL_GET_TASK_SUBMISSION_STATUS_BY_IDS = """
     WHERE task.scvu_task_id IN ({placeholders})
 """
 
+SQL_GET_TASK_NOTIFICATION_CONTEXT_BY_IDS = """
+    SELECT
+        task.scvu_task_id,
+        COALESCE(pass.pass_id_file_name, '') as pass_id_file_name,
+        COALESCE(image.image_file_name, '') as image_file_name,
+        COALESCE(image.image_id, 0) as image_id,
+        COALESCE(image_area.external_area_id, area.area_name, '') as area_name,
+        COALESCE(task_report.name, image_report.name, '') as effective_report,
+        COALESCE(task.sf_reported, FALSE) as sf_reported,
+        COALESCE(task.iir_reported, FALSE) as iir_reported,
+        COALESCE(task_status.name, '') as task_status
+    FROM task
+    JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
+    JOIN image ON image_area.scvu_image_id = image.scvu_image_id
+    LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id
+    LEFT JOIN area ON area.scvu_area_id = image_area.scvu_area_id
+    LEFT JOIN report task_report ON task_report.id = task.report_id
+    LEFT JOIN report image_report ON image_report.id = image.report_id
+    LEFT JOIN task_status ON task_status.id = task.task_status_id
+    WHERE task.scvu_task_id IN ({placeholders})
+"""
+
 class TaskingQueries:
     def __init__(self, db, keycloak_queries):
         self.db = db
@@ -519,7 +543,16 @@ class TaskingQueries:
                 assignee_ids.append(row[3])
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
-        for scvu_image_id, image_area_id, current_assignee_keycloak_id, proposed_assignee_keycloak_id, remarks, priority_name, task_status_name in results:
+        for row in results:
+            scvu_image_id = row[0]
+            image_area_id = row[1]
+            current_assignee_keycloak_id = row[2]
+            proposed_assignee_keycloak_id = row[3]
+            remarks = row[4]
+            priority_name = row[5]
+            task_status_name = row[6]
+            color = row[7] if len(row) > 7 else None
+            service = row[8] if len(row) > 8 else None
             if current_assignee_keycloak_id == AssigneeLabel.UNASSIGNED or not current_assignee_keycloak_id:
                 current_assignee_name = AssigneeLabel.UNASSIGNED
             else:
@@ -529,7 +562,7 @@ class TaskingQueries:
                 if proposed_assignee_keycloak_id
                 else ""
             )
-            formatted.append((scvu_image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name))
+            formatted.append((scvu_image_id, image_area_id, current_assignee_name, proposed_assignee_name, remarks, priority_name, task_status_name, color, service))
         return formatted
 
     def updateTaskingManagerData(self, scvu_image_area_id, priority_name):
@@ -560,8 +593,40 @@ class TaskingQueries:
         Input:      area_id
         Output:     NIL
         '''
+        assignee_keycloak_id = self._choose_auto_assignee(preferred_assignee_keycloak_id)
+        if not assignee_keycloak_id:
+            logger.debug("autoAssign has no users to assign")
+            return None
+        
+        # Obtain scvu_image_area_id
+        result = self.db.executeSelect(SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN, (area_name, image_id))
+        if not result:
+            logger.warning(
+                "autoAssign failed to resolve image_area: area=%s image_id=%s",
+                area_name,
+                image_id,
+            )
+            return None
+        scvu_image_area_id  = result[0][0]
+
+        self.db.executeInsert(
+            SQL_SET_PROPOSED_ASSIGNEE,
+            (assignee_keycloak_id, scvu_image_area_id, 1),
+        )
+        return assignee_keycloak_id
+
+    def autoAssignForImageArea(self, scvu_image_area_id, preferred_assignee_keycloak_id=None):
+        assignee_keycloak_id = self._choose_auto_assignee(preferred_assignee_keycloak_id)
+        if not assignee_keycloak_id:
+            return None
+        self.db.executeInsert(
+            SQL_SET_PROPOSED_ASSIGNEE,
+            (assignee_keycloak_id, scvu_image_area_id, 1),
+        )
+        return assignee_keycloak_id
+
+    def _choose_auto_assignee(self, preferred_assignee_keycloak_id=None):
         prioritized_users = self.keycloak.get_prioritized_present_user_ids()
-        # Strong preference for II, but still allow Senior II / IA via weighted random.
         role_weights = {
             EnumClasses.Role.II.value: 10,
             EnumClasses.Role.SENIOR_II.value: 3,
@@ -578,37 +643,19 @@ class TaskingQueries:
             weighted_values.extend([weight] * len(ids))
 
         if not weighted_candidates:
-            logger.debug("autoAssign has no users to assign")
             return None
-        
-        # Obtain scvu_image_area_id
-        result = self.db.executeSelect(SQL_GET_IMAGE_AREA_ID_FOR_AUTOASSIGN, (area_name, image_id))
-        if not result:
-            logger.warning(
-                "autoAssign failed to resolve image_area: area=%s image_id=%s",
-                area_name,
-                image_id,
-            )
-            return None
-        scvu_image_area_id  = result[0][0]
 
-        if preferred_assignee_keycloak_id and preferred_assignee_keycloak_id in set(weighted_candidates):
-            assignee_keycloak_id = preferred_assignee_keycloak_id
-        else:
-            # Keep role preference, but dampen users who already have many active tasks
-            # so assignments spread out instead of repeatedly picking one person.
-            active_counts = self.getActiveTaskCountsForUsers(weighted_candidates)
-            adjusted_weights = []
-            for idx, user_id in enumerate(weighted_candidates):
-                base_weight = float(weighted_values[idx])
-                load_penalty = 1.0 + float(active_counts.get(user_id, 0))
-                adjusted_weights.append(base_weight / load_penalty)
-            assignee_keycloak_id = random.choices(weighted_candidates, weights=adjusted_weights, k=1)[0]
-        self.db.executeInsert(
-            SQL_SET_PROPOSED_ASSIGNEE,
-            (assignee_keycloak_id, scvu_image_area_id, 1),
-        )
-        return assignee_keycloak_id
+        unique_candidates = set(weighted_candidates)
+        if preferred_assignee_keycloak_id and preferred_assignee_keycloak_id in unique_candidates:
+            return preferred_assignee_keycloak_id
+
+        active_counts = self.getActiveTaskCountsForUsers(weighted_candidates)
+        adjusted_weights = []
+        for idx, user_id in enumerate(weighted_candidates):
+            base_weight = float(weighted_values[idx])
+            load_penalty = 1.0 + float(active_counts.get(user_id, 0))
+            adjusted_weights.append(base_weight / load_penalty)
+        return random.choices(weighted_candidates, weights=adjusted_weights, k=1)[0]
 
     def getTaskingSummaryImageData(self, start_date, end_date, limit=None, offset=None):
         '''
@@ -975,6 +1022,32 @@ class TaskingQueries:
                 "report": (row[1] or "").strip(),
                 "sf_reported": bool(row[2]),
                 "iir_reported": bool(row[3]),
+            }
+            for row in rows
+        }
+
+    def getTaskNotificationContextByIds(self, task_ids):
+        '''
+        Function:   Gets pass/image/report/submission/status context for notifications
+        Input:      iterable of task IDs
+        Output:     dict of task_id -> context
+        '''
+        ids = list(task_ids or [])
+        if not ids:
+            return {}
+        placeholders, values = build_in_clause(ids)
+        query = SQL_GET_TASK_NOTIFICATION_CONTEXT_BY_IDS.format(placeholders=placeholders)
+        rows = self.db.executeSelect(query, values)
+        return {
+            row[0]: {
+                "pass_id_file_name": row[1] or "",
+                "image_file_name": row[2] or "",
+                "image_id": row[3],
+                "area_name": row[4] or "",
+                "report": (row[5] or "").strip(),
+                "sf_reported": bool(row[6]),
+                "iir_reported": bool(row[7]),
+                "task_status": (row[8] or "").strip(),
             }
             for row in rows
         }

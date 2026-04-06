@@ -112,6 +112,8 @@ def format_tasking_manager_area(image_data, area_data, image_areas_data):
     remarks = None
     priority = None
     task_status = None
+    color = None
+    service = None
     for image_area in image_areas_data:
         if area_data[0] == image_area[0]:
             assignee = image_area[1]
@@ -119,6 +121,8 @@ def format_tasking_manager_area(image_data, area_data, image_areas_data):
             remarks = image_area[3] if len(image_area) > 3 else None
             priority = image_area[4] if len(image_area) > 4 else None
             task_status = image_area[5] if len(image_area) > 5 else None
+            color = image_area[6] if len(image_area) > 6 else None
+            service = image_area[7] if len(image_area) > 7 else None
     return {
         'Area Name': area_data[1],
         'Parent ID': image_data[0],
@@ -128,4 +132,6 @@ def format_tasking_manager_area(image_data, area_data, image_areas_data):
         'Remarks': remarks,
         'Priority': priority,
         'Task Status': task_status,
+        'Color': color,
+        'Service': service,
     }

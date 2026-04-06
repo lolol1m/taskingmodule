@@ -75,24 +75,29 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
   const [modalOpen, setModalOpen] = useState(false)
-  const [areaOptions, setAreaOptions] = useState([])
+  const [modalMode, setModalMode] = useState('new_pass')
+  const [passOptions, setPassOptions] = useState([])
   const { addNotification } = useNotifications()
-  const [formInput, setFormInput] = useState({
-    imageFileName: '',
+
+  const EMPTY_FORM = {
+    passId: '',
     sensorName: '',
+    selectedPass: null,
+    imageId: '',
+    areaId: '',
+    imageName: '',
     uploadDate: null,
     imageDateTime: null,
-    areas: [],
-  })
+    color: '',
+    service: '',
+  }
+  const [formInput, setFormInput] = useState(EMPTY_FORM)
+  const [editingRow, setEditingRow] = useState(null)
 
   const resetForm = () => {
-    setFormInput({
-      imageFileName: '',
-      sensorName: '',
-      uploadDate: null,
-      imageDateTime: null,
-      areas: [],
-    })
+    setFormInput(EMPTY_FORM)
+    setModalMode('new_pass')
+    setEditingRow(null)
   }
 
   const formatData = (inputData) => {
@@ -174,11 +179,14 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             scvuImageAreaId,
             imageName: null,
             imageDatetime: readValue(parent, ['Image Datetime', 'Image Date Time', 'Image DateTime']) || '—',
-            sensorName: null,
+            sensorName: readValue(parent, ['Sensor Name', 'Sensor']) || null,
             uploadDate: readValue(parent, ['Upload Date', 'UploadDate']) || '—',
             priority: readValue(entry, ['Priority', 'priority', 'Priority Level']) || '—',
             taskStatus,
             ttg: null,
+            color: readValue(entry, ['Color', 'color']) || '',
+            service: readValue(entry, ['Service', 'service']) || '',
+            passIdFileName: readValue(parent, ['Image File Name', 'Image Filename', 'Image Name']) || parentName,
           }
         }
 
@@ -196,8 +204,9 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             proposedAssignee: '',
             sensorName: readValue(entry, ['Sensor Name', 'Sensor']) || null,
             imageName: imageFileName,
-            uploadDate: '—',
-            imageDatetime: '—',
+            passIdFileName: imageFileName,
+            uploadDate: readValue(entry, ['Upload Date', 'UploadDate']) || '—',
+            imageDatetime: readValue(entry, ['Image Datetime', 'Image Date Time', 'Image DateTime']) || '—',
             priority: '—',
             ttg: readValue(entry, ['TTG']) ?? null,
             childImageIds: [imageId],
@@ -290,21 +299,12 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     }
   }
 
-  const fetchAreas = async () => {
+  const fetchPasses = async () => {
     try {
-      setError(null)
-      const data = await api.getAreas()
-      const areas = Array.isArray(data?.Areas) ? data.Areas : []
-      const names = Array.from(new Set(areas.map((area) => area?.['Area Name']).filter(Boolean)))
-      setAreaOptions(names)
+      const data = await api.getPasses()
+      setPassOptions(Array.isArray(data?.Passes) ? data.Passes : [])
     } catch (err) {
-      console.warn('Unable to load areas', err)
-      const message = getErrorMessage(err, 'Unable to load areas.')
-      setError(message)
-      addNotification({
-        title: 'Area list failed',
-        meta: 'Just now · Please try again',
-      })
+      console.warn('Unable to load passes', err)
     }
   }
 
@@ -327,7 +327,9 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
 
   useEffect(() => {
     if (modalOpen) {
-      fetchAreas()
+      fetchPasses()
+    } else {
+      resetForm()
     }
   }, [modalOpen])
 
@@ -565,7 +567,10 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
               className="tasking-manager__action-btn tasking-manager__action-btn--icon"
               size="small"
               aria-label="Edit"
-              onClick={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                openEditModal(params.row)
+              }}
             >
               <img src={editIcon} alt="" className="tasking-manager__action-icon" />
             </Button>
@@ -745,30 +750,150 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
     }
   }
 
-  const handleCreateTTG = async () => {
-    const payload = {
-      imageFileName: formInput.imageFileName,
-      sensorName: formInput.sensorName,
-      uploadDate: toISOLocal(formInput.uploadDate),
-      imageDateTime: toISOLocal(formInput.imageDateTime),
-      areas: formInput.areas || [],
+  const autoAssignSelected = async () => {
+    const selectedRows = rows.filter((row) => normalizedSelectedIds.has(String(row.id)))
+    const childRows = selectedRows.filter((row) => row?.groupName?.length > 1)
+    if (!childRows.length) {
+      addNotification({
+        title: 'No tasks selected',
+        meta: 'Select child task rows to auto-assign',
+      })
+      return
+    }
+    const eligibleRows = childRows.filter((row) => {
+      const status = String(row?.taskStatus || '').trim().toLowerCase()
+      return status === '' || status === 'incomplete'
+    })
+    if (!eligibleRows.length) {
+      addNotification({
+        title: 'No eligible tasks',
+        meta: 'Only not-started/incomplete tasks can be auto-assigned',
+      })
+      return
+    }
+    const areaIds = Array.from(
+      new Set(
+        eligibleRows
+          .map((row) => Number(row?.scvuImageAreaId))
+          .filter((value) => Number.isFinite(value)),
+      ),
+    )
+    if (!areaIds.length) {
+      addNotification({
+        title: 'Auto-assign failed',
+        meta: 'Unable to resolve image area IDs for selected rows',
+      })
+      return
     }
     try {
+      const result = await api.postAutoAssignTasks({ 'SCVU Image Area ID': areaIds })
+      const processed = Number(result?.tasks_processed || 0)
+      const skipped = areaIds.length - processed
+      const meta = skipped > 0
+        ? `Just now · ${processed} auto-assigned, ${skipped} skipped`
+        : `Just now · ${processed} task(s) auto-assigned`
+      addNotification({
+        title: 'Auto-assign complete',
+        meta,
+      })
+      setHasPendingEdits(false)
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      const message = getErrorMessage(err, 'Unable to auto-assign tasks.')
+      addNotification({
+        title: 'Auto-assign failed',
+        meta: message,
+      })
+    }
+  }
+
+  const openEditModal = (row) => {
+    const isChild = row?.groupName?.length > 1
+    const parentRow = isChild ? rows.find((r) => String(r.id) === String(row.parentId)) : row
+
+    const parseDate = (val) => {
+      if (!val || val === '—') return null
+      const d = new Date(val)
+      return Number.isNaN(d.getTime()) ? null : d
+    }
+
+    setEditingRow(parentRow || row)
+    setModalMode('new_pass')
+    setFormInput({
+      ...EMPTY_FORM,
+      passId: parentRow?.passIdFileName || '',
+      sensorName: parentRow?.sensorName || '',
+      uploadDate: parseDate(parentRow?.uploadDate),
+      imageDateTime: parseDate(parentRow?.imageDatetime),
+    })
+    setModalOpen(true)
+  }
+
+  const handleEditSubmit = async () => {
+    if (!editingRow) return
+    try {
       setError(null)
-      await api.postInsertTTGData(payload)
+      const payload = {
+        passIdFileName: editingRow.passIdFileName || '',
+        newPassIdFileName: formInput.passId || null,
+        sensorName: formInput.sensorName || null,
+        uploadDate: toISOLocal(formInput.uploadDate),
+        imageDateTime: toISOLocal(formInput.imageDateTime),
+      }
+      await api.updatePassEntry(payload)
       resetForm()
       setModalOpen(false)
       addNotification({
-        title: 'TTG created',
-        meta: `Just now · ${payload.areas.length} areas`,
+        title: 'Entry updated',
+        meta: 'Just now',
+      })
+      setRefreshKey((prev) => prev + 1)
+    } catch (err) {
+      console.error('Edit failed', err)
+      const message = getErrorMessage(err, 'Unable to update entry.')
+      setError(message)
+      addNotification({
+        title: 'Update failed',
+        meta: 'Just now · Please try again',
+      })
+    }
+  }
+
+  const handleCreateTTG = async () => {
+    const passIdFileName =
+      modalMode === 'new_pass' ? formInput.passId : formInput.selectedPass?.passIdFileName
+    const sensorName =
+      modalMode === 'new_pass' ? formInput.sensorName : (formInput.selectedPass?.sensorName || '')
+
+    const imageEntry = {
+      imgId: Number(formInput.imageId),
+      areaId: formInput.areaId,
+      imgName: formInput.imageName,
+      uploadDate: toISOLocal(formInput.uploadDate),
+      imageDateTime: toISOLocal(formInput.imageDateTime),
+    }
+    if (formInput.color) imageEntry.color = formInput.color
+    if (formInput.service) imageEntry.service = formInput.service
+
+    const payload = {
+      tasking: [{ PassIDFileName: passIdFileName, sensorName, image: [imageEntry] }],
+    }
+    try {
+      setError(null)
+      await api.insertManualEntry(payload)
+      resetForm()
+      setModalOpen(false)
+      addNotification({
+        title: 'Entry created',
+        meta: `Just now · ${passIdFileName}`,
       })
       setRefreshKey((prev) => prev + 1)
     } catch (err) {
       console.error('TTG create failed', err)
-      const message = getErrorMessage(err, 'Unable to create TTG.')
+      const message = getErrorMessage(err, 'Unable to create entry.')
       setError(message)
       addNotification({
-        title: 'TTG creation failed',
+        title: 'Creation failed',
         meta: 'Just now · Please try again',
       })
     }
@@ -777,6 +902,33 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
   const role = UserService.readUserRoleSingle()
   if (role === 'II') {
     return <div className="tasking-manager__notice">You do not have permission to view this tab.</div>
+  }
+
+  const autocompleteInputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      backgroundColor: 'var(--input-bg, rgba(255,255,255,0.05))',
+      color: 'var(--text)',
+      fontSize: 14,
+      '& fieldset': { borderColor: 'var(--border-strong)' },
+      '&:hover fieldset': { borderColor: 'var(--muted)' },
+      '&.Mui-focused fieldset': { borderColor: 'var(--accent)' },
+    },
+    '& .MuiInputBase-input': { padding: '8px 12px', color: 'var(--text)' },
+    '& .MuiInputBase-input::placeholder': { color: 'var(--muted)', opacity: 1 },
+    '& .MuiSvgIcon-root': { color: 'var(--muted)' },
+  }
+
+  const datePickerSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      backgroundColor: 'var(--input-bg, rgba(255,255,255,0.05))',
+      color: 'var(--text)',
+      fontSize: 14,
+      '& fieldset': { border: 'none' },
+    },
+    '& .MuiInputBase-input': { padding: '8px 12px', color: 'var(--text)' },
+    '& .MuiInputAdornment-root .MuiSvgIcon-root': { color: 'var(--muted)' },
   }
   const canSeeSubImageName = role === 'IA'
 
@@ -903,6 +1055,13 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
             disabled={!selectionModel.ids.size || hasEmptyAssignee}
           >
             Apply Change
+          </Button>
+          <Button
+            className="tasking-manager__button"
+            onClick={autoAssignSelected}
+            disabled={!selectionModel.ids.size}
+          >
+            Auto Assign
           </Button>
         </div>
       </div>
@@ -1050,71 +1209,257 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
 
       <div className={`tasking-manager__modal ${modalOpen ? 'is-open' : ''}`}>
         <div className="tasking-manager__modal-backdrop" onClick={() => setModalOpen(false)} />
-        <div className="tasking-manager__modal-content">
+        <div className="tasking-manager__modal-content tasking-manager__modal-content--ttg">
           <div className="tasking-manager__modal-header">
-            <div className="tasking-manager__modal-title">Create TTG</div>
-            <IconButton onClick={() => setModalOpen(false)} size="small">
-              X
+            <div className="tasking-manager__modal-title">{editingRow ? 'Edit Entry' : 'Create TTG'}</div>
+            <IconButton onClick={() => setModalOpen(false)} size="small" sx={{ border: 'none' }}>
+              ✕
             </IconButton>
           </div>
-          <div className="tasking-manager__modal-body">
-            <TextField
-              label="Sensor Name"
-              value={formInput.sensorName}
-              onChange={(event) => setFormInput((prev) => ({ ...prev, sensorName: event.target.value }))}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Image File Name"
-              value={formInput.imageFileName}
-              onChange={(event) => setFormInput((prev) => ({ ...prev, imageFileName: event.target.value }))}
-              fullWidth
-              size="small"
-            />
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DateTimePicker
-                label="Upload Date"
-                value={formInput.uploadDate ? dayjs(formInput.uploadDate) : null}
-                onChange={(value) =>
-                  setFormInput((prev) => ({ ...prev, uploadDate: value ? value.toDate() : null }))
-                }
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-              <DateTimePicker
-                label="Image Datetime"
-                value={formInput.imageDateTime ? dayjs(formInput.imageDateTime) : null}
-                onChange={(value) =>
-                  setFormInput((prev) => ({ ...prev, imageDateTime: value ? value.toDate() : null }))
-                }
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </LocalizationProvider>
-            <Autocomplete
-              multiple
-              freeSolo
-              options={areaOptions}
-              value={formInput.areas}
-              onChange={(_, newValue) => setFormInput((prev) => ({ ...prev, areas: newValue }))}
-              renderInput={(inputParams) => <TextField {...inputParams} label="Areas" size="small" fullWidth />}
-            />
+
+          {/* Mode toggle — hidden when editing */}
+          {!editingRow && (
+            <div className="tasking-manager__modal-mode-toggle">
+              <button
+                type="button"
+                className={`tasking-manager__modal-mode-btn${modalMode === 'new_pass' ? ' active' : ''}`}
+                onClick={() => { setModalMode('new_pass'); setFormInput(EMPTY_FORM) }}
+              >
+                New Pass ID
+              </button>
+              <button
+                type="button"
+                className={`tasking-manager__modal-mode-btn${modalMode === 'add_image' ? ' active' : ''}`}
+                onClick={() => { setModalMode('add_image'); setFormInput(EMPTY_FORM) }}
+              >
+                Add Image to Existing Pass
+              </button>
+            </div>
+          )}
+
+          <div className="tasking-manager__modal-body tasking-manager__modal-body--ttg">
+            {editingRow ? (
+              <>
+                <div className="ttg-modal__row">
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Pass ID</label>
+                    <input
+                      className="ttg-modal__input"
+                      value={formInput.passId}
+                      onChange={(e) => setFormInput((p) => ({ ...p, passId: e.target.value }))}
+                    />
+                  </div>
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Sensor Name</label>
+                    <input
+                      className="ttg-modal__input"
+                      value={formInput.sensorName}
+                      onChange={(e) => setFormInput((p) => ({ ...p, sensorName: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <div className="ttg-modal__row">
+                    <div className="ttg-modal__field">
+                      <label className="ttg-modal__field-label">Upload Date</label>
+                      <DateTimePicker
+                        value={formInput.uploadDate ? dayjs(formInput.uploadDate) : null}
+                        onChange={(val) => setFormInput((p) => ({ ...p, uploadDate: val ? val.toDate() : null }))}
+                        views={['year', 'month', 'day', 'hours', 'minutes', 'seconds']}
+                        format="YYYY-MM-DD HH:mm:ss"
+                        ampm={false}
+                        slotProps={{ textField: { size: 'small', fullWidth: true, sx: datePickerSx } }}
+                      />
+                    </div>
+                    <div className="ttg-modal__field">
+                      <label className="ttg-modal__field-label">Image DateTime</label>
+                      <DateTimePicker
+                        value={formInput.imageDateTime ? dayjs(formInput.imageDateTime) : null}
+                        onChange={(val) => setFormInput((p) => ({ ...p, imageDateTime: val ? val.toDate() : null }))}
+                        views={['year', 'month', 'day', 'hours', 'minutes', 'seconds']}
+                        format="YYYY-MM-DD HH:mm:ss"
+                        ampm={false}
+                        slotProps={{ textField: { size: 'small', fullWidth: true, sx: datePickerSx } }}
+                      />
+                    </div>
+                  </div>
+                </LocalizationProvider>
+              </>
+            ) : (
+              <>
+                {/* Pass identifier section */}
+                <div className="ttg-modal__section-label">Pass</div>
+                <div className="ttg-modal__row">
+                  {modalMode === 'new_pass' ? (
+                    <>
+                      <div className="ttg-modal__field">
+                        <label className="ttg-modal__field-label">Pass ID</label>
+                        <input
+                          className="ttg-modal__input"
+                          placeholder="e.g. PASS_20250301"
+                          value={formInput.passId}
+                          onChange={(e) => setFormInput((p) => ({ ...p, passId: e.target.value }))}
+                        />
+                      </div>
+                      <div className="ttg-modal__field">
+                        <label className="ttg-modal__field-label">Sensor Name</label>
+                        <input
+                          className="ttg-modal__input"
+                          placeholder="e.g. SAR"
+                          value={formInput.sensorName}
+                          onChange={(e) => setFormInput((p) => ({ ...p, sensorName: e.target.value }))}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="ttg-modal__field" style={{ flex: 1 }}>
+                      <label className="ttg-modal__field-label">Pass ID</label>
+                      <Autocomplete
+                        options={passOptions}
+                        getOptionLabel={(opt) => opt.passIdFileName || ''}
+                        value={formInput.selectedPass}
+                        onChange={(_, val) => setFormInput((p) => ({ ...p, selectedPass: val }))}
+                        isOptionEqualToValue={(opt, val) => opt.passIdFileName === val?.passIdFileName}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Select existing pass…"
+                            size="small"
+                            sx={autocompleteInputSx}
+                          />
+                        )}
+                        sx={{ width: '100%' }}
+                      />
+                    </div>
+                  )}
+                </div>
+                {modalMode === 'add_image' && formInput.selectedPass && (
+                  <div className="ttg-modal__sensor-hint">
+                    Sensor: <strong>{formInput.selectedPass.sensorName || '—'}</strong>
+                  </div>
+                )}
+
+                {/* Image details section */}
+                <div className="ttg-modal__section-label" style={{ marginTop: 8 }}>Image Details</div>
+                <div className="ttg-modal__row">
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Image ID</label>
+                    <input
+                      className="ttg-modal__input"
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 52000"
+                      value={formInput.imageId}
+                      onChange={(e) => setFormInput((p) => ({ ...p, imageId: e.target.value }))}
+                    />
+                  </div>
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Area ID</label>
+                    <input
+                      className="ttg-modal__input"
+                      placeholder="e.g. B52"
+                      value={formInput.areaId}
+                      onChange={(e) => setFormInput((p) => ({ ...p, areaId: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="ttg-modal__row">
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Image Name</label>
+                    <input
+                      className="ttg-modal__input"
+                      placeholder="e.g. img_52"
+                      value={formInput.imageName}
+                      onChange={(e) => setFormInput((p) => ({ ...p, imageName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Color</label>
+                    <select
+                      className="ttg-modal__select"
+                      value={formInput.color}
+                      onChange={(e) => setFormInput((p) => ({ ...p, color: e.target.value }))}
+                    >
+                      <option value="">— Select —</option>
+                      {['Red', 'Amber', 'Green'].map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ttg-modal__row">
+                  <div className="ttg-modal__field">
+                    <label className="ttg-modal__field-label">Service</label>
+                    <select
+                      className="ttg-modal__select"
+                      value={formInput.service}
+                      onChange={(e) => setFormInput((p) => ({ ...p, service: e.target.value }))}
+                    >
+                      <option value="">— Select —</option>
+                      {['Land', 'Air', 'Sea'].map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }} />
+                </div>
+
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <div className="ttg-modal__row">
+                    <div className="ttg-modal__field">
+                      <label className="ttg-modal__field-label">Upload Date</label>
+                      <DateTimePicker
+                        value={formInput.uploadDate ? dayjs(formInput.uploadDate) : null}
+                        onChange={(val) => setFormInput((p) => ({ ...p, uploadDate: val ? val.toDate() : null }))}
+                        views={['year', 'month', 'day', 'hours', 'minutes', 'seconds']}
+                        format="YYYY-MM-DD HH:mm:ss"
+                        ampm={false}
+                        slotProps={{ textField: { size: 'small', fullWidth: true, sx: datePickerSx } }}
+                      />
+                    </div>
+                    <div className="ttg-modal__field">
+                      <label className="ttg-modal__field-label">Image DateTime</label>
+                      <DateTimePicker
+                        value={formInput.imageDateTime ? dayjs(formInput.imageDateTime) : null}
+                        onChange={(val) => setFormInput((p) => ({ ...p, imageDateTime: val ? val.toDate() : null }))}
+                        views={['year', 'month', 'day', 'hours', 'minutes', 'seconds']}
+                        format="YYYY-MM-DD HH:mm:ss"
+                        ampm={false}
+                        slotProps={{ textField: { size: 'small', fullWidth: true, sx: datePickerSx } }}
+                      />
+                    </div>
+                  </div>
+                </LocalizationProvider>
+              </>
+            )}
           </div>
+
           <div className="tasking-manager__modal-actions">
             <Button className="tasking-manager__button" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              className="tasking-manager__button tasking-manager__button--primary"
-              disabled={
-                !formInput.sensorName ||
-                !formInput.imageFileName ||
-                !formInput.uploadDate ||
-                !formInput.imageDateTime
-              }
-              onClick={handleCreateTTG}
-            >
-              Submit
-            </Button>
+            {editingRow ? (
+              <Button
+                className="tasking-manager__button tasking-manager__button--primary"
+                disabled={!formInput.passId || !formInput.sensorName}
+                onClick={handleEditSubmit}
+              >
+                Save Changes
+              </Button>
+            ) : (
+              <Button
+                className="tasking-manager__button tasking-manager__button--primary"
+                disabled={
+                  (modalMode === 'new_pass' ? !formInput.passId || !formInput.sensorName : !formInput.selectedPass) ||
+                  !formInput.imageId ||
+                  !formInput.areaId ||
+                  !formInput.imageName ||
+                  !formInput.uploadDate ||
+                  !formInput.imageDateTime
+                }
+                onClick={handleCreateTTG}
+              >
+                Submit
+              </Button>
+            )}
           </div>
         </div>
       </div>

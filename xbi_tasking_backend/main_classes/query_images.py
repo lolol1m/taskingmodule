@@ -53,6 +53,23 @@ SQL_UPDATE_IMAGE_AREA_METADATA_BY_EXTERNAL_ID = (
     "  AND external_area_id = %s"
 )
 
+SQL_UPDATE_PASS = (
+    "UPDATE pass SET "
+    "pass_id_file_name = COALESCE(%s, pass_id_file_name), "
+    "sensor_id = COALESCE((SELECT id FROM sensor WHERE name = %s), sensor_id), "
+    "upload_date = COALESCE(%s, upload_date), "
+    "image_datetime = COALESCE(%s, image_datetime) "
+    "WHERE pass_id_file_name = %s"
+)
+
+SQL_UPDATE_IMAGES_FOR_PASS = (
+    "UPDATE image SET "
+    "sensor_id = COALESCE((SELECT id FROM sensor WHERE name = %s), sensor_id), "
+    "upload_date = COALESCE(%s, upload_date), "
+    "image_datetime = COALESCE(%s, image_datetime) "
+    "WHERE scvu_pass_id = (SELECT scvu_pass_id FROM pass WHERE pass_id_file_name = %s)"
+)
+
 SQL_INSERT_TTG_IMAGE_RETURNING_ID = (
     "INSERT INTO image (image_file_name, sensor_id, upload_date, image_datetime, ew_status_id) "
     "VALUES (%s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'ttg done')) "
@@ -139,6 +156,13 @@ SQL_GET_IMAGE_DATA_FOR_USER = """
                 AND t.assignee_keycloak_id = %s
         )
 """
+
+SQL_GET_PASSES = (
+    "SELECT pass.pass_id_file_name, COALESCE(sensor.name, '') as sensor_name "
+    "FROM pass "
+    "LEFT JOIN sensor ON sensor.id = pass.sensor_id "
+    "ORDER BY pass.pass_id_file_name"
+)
 
 SQL_DELETE_TASKS_FOR_IMAGE = (
     "DELETE FROM task WHERE scvu_image_area_id IN (SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s)"
@@ -293,6 +317,26 @@ class ImageQueries:
         Output:     list of tuples (image_id, image_file_name)
         '''
         return self.db.executeSelect(SQL_GET_IMAGE_BY_ID_AND_NAME, (image_id, image_file_name))
+
+    def updatePassEntry(self, old_pass_id, new_pass_id=None, sensor_name=None, upload_date=None, image_datetime=None):
+        if sensor_name:
+            self.db.executeInsert(SQL_INSERT_SENSOR, (sensor_name,))
+        self.db.executeInsert(
+            SQL_UPDATE_IMAGES_FOR_PASS,
+            (sensor_name, upload_date, image_datetime, old_pass_id),
+        )
+        return self.db.executeInsert(
+            SQL_UPDATE_PASS,
+            (new_pass_id, sensor_name, upload_date, image_datetime, old_pass_id),
+        )
+
+    def getPasses(self):
+        '''
+        Function:   Returns all existing passes (pass_id_file_name + sensor_name)
+        Output:     list of dicts
+        '''
+        rows = self.db.executeSelect(SQL_GET_PASSES)
+        return [{"passIdFileName": row[0], "sensorName": row[1]} for row in rows]
 
     def getImageAreaData(self, scvu_image_id):
         '''

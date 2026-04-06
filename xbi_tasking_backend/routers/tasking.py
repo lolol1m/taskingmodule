@@ -6,6 +6,7 @@ from api_utils import error_response, model_to_dict, run_blocking
 from schemas import (
     AssignTaskPayload,
     DateRangePayload,
+    ImageAreaIdsPayload,
     ImageIdsPayload,
     KeyValueMapResponse,
     StatusResponse,
@@ -252,6 +253,30 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
         return error_response(500, "Failed to assign tasks", "assign_task_failed")
 
 
+@router.post("/autoAssignTasks")
+async def auto_assign_tasks(request: Request, payload: ImageAreaIdsPayload, user: dict = Depends(get_current_user)):
+    try:
+        if not can_assign_tasks(user):
+            return error_response(403, "Insufficient permissions", "insufficient_permissions")
+        data = model_to_dict(payload)
+        area_ids = data.get("SCVU Image Area ID", [])
+        if not area_ids:
+            return error_response(400, "SCVU Image Area ID list is required", "missing_image_area_ids")
+        processed = await run_blocking(request.app.state.tasking_service.auto_assign_tasks, data)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_auto_assign",
+                user,
+                details={"area_count": len(area_ids), "tasks_processed": processed},
+                ip_address=request.client.host if request.client else None,
+            )
+        return {"status": "success", "message": "Auto-assignment completed", "tasks_processed": processed}
+    except Exception:
+        logger.exception("autoAssignTasks failed")
+        return error_response(500, "Failed to auto-assign tasks", "auto_assign_failed")
+
+
 @router.post("/startTasks")
 async def start_tasks(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
@@ -334,7 +359,7 @@ async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict =
         }
     '''
     try:
-        result = await run_blocking(request.app.state.tasking_service.complete_tasks, model_to_dict(payload))
+        result = await run_blocking(request.app.state.tasking_service.complete_tasks, model_to_dict(payload), user)
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)
             if audit:
@@ -373,6 +398,7 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
             request.app.state.tasking_service.verify_pass,
             model_to_dict(payload),
             user.get("sub"),
+            user,
         )
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)

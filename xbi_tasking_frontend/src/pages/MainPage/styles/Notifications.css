@@ -61,6 +61,10 @@
   color: #e5e7eb;
 }
 
+.notification-item__title--reported {
+  color: #ef4444;
+}
+
 .notification-item__meta {
   font-size: 11px;
   color: #9ca3af;
