@@ -25,7 +25,7 @@ By default, the tasks are automatically assigned to users but can be changed in 
 7. When done labelling task/area, click "Complete Task" to show that it is ready for vetting by Senior II
 
 # Vetting
-1. Log in as user with Senior II role (works for IA but reaalistically to be done by Senior II)
+1. Log in as user with Senior II role (works for IA but realistically to be done by Senior II)
 2. Set display dates to feb 2 - feb 7
 3. Go to 'Tasking Summary' at the navigation bar
 4. After verifying, click "Verify Pass" or "Verify Fail". If pass, then the task/area is marked as complete

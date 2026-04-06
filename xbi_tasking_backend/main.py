@@ -249,4 +249,4 @@ async def index():
 
 #TODO Hardcoded where certs are placed
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True, ssl_certfile = "/certs/server.crt", ssl_keyfile = "/certs/server.key")
+    uvicorn.run("main:app", host="172.1.2.3", port=5000, reload=True, ssl_certfile = "/certs/server.crt", ssl_keyfile = "/certs/server.key")

@@ -1,0 +1,43 @@
+{{- if .Values.ingress.enabled }}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # This allows Nginx to talk to a Vite/Keycloak backend that is ALSO using HTTPS
+    # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+    # Optional: Disable the forced redirect if you want to allow HTTP for testing
+    # nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+      - {{ .Values.ingress.frontendHost }}
+      - {{ .Values.ingress.keycloakHost }}
+  rules:
+    - host: {{ .Values.ingress.frontendHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.frontend.serviceName }}
+                port:
+                  number: {{ .Values.frontend.port }}
+
+    - host: {{ .Values.ingress.keycloakHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.keycloak.serviceName }}
+                port:
+                  number: {{ .Values.keycloak.port }}
+{{- end }}

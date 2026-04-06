@@ -1,0 +1,104 @@
+apiVersion: v1
+data:
+  keycloak.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIFEjCCAvqgAwIBAgIUZxffnjNXADJqrDp97ZdvH4U4Mv0wDQYJKoZIhvcNAQEL
+    BQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI2MDIyMzA3NDIyN1oXDTI3MDIy
+    MzA3NDIyN1owFDESMBAGA1UEAwwJbG9jYWxob3N0MIICIjANBgkqhkiG9w0BAQEF
+    AAOCAg8AMIICCgKCAgEAqtqRcB5hXlQLnpQAkFpb76OYo80sxxNMikyZ0l1IuQoX
+    8vcBGQT/5JeQMDog8LD8XabX9PUUR8kf/A74RutlJvSheXQ8IgOsWmrT2gw6s4hX
+    ECpQxH3sgpf4FNaQjgp/msS+1uiiRrDaAUtuoAyjQQB+JJdfGj8HYlfGZAQyZYLi
+    EbHXU2AHi7nKkT7JFSEbM8v8uaNk58gcysw6oL3i1MFqjCLcWimghT/JWliWoEq1
+    Xm3XhvLwbv1O8Lan2h9p//ga8JZD7Ya5aZZFr4Xfq7cKZ63FZ0AUj1jIPqVfYzDz
+    Misoed+OwQv0X9G1ZuDUXL7AGxpy5PFmz3sij/h7RoOdyTM5u34nqSBz70++sJEZ
+    ZRIpTllGEcOYyz0Oftg3m8E76nItDAZqZznZg8Re1Tz39pj6f8OnIdmBmJN+lrxH
+    Wjfu6J5cbuNF7KJB4BZXwEfk+S8wsy5zYTXb1iCK33HChWuxC8G4u+OXGZpsfAMf
+    d7r4b9UhnJtO3bvlH91W7hF2+34J1zJz1uGCIBlvJ485hrYIi6ym8C7PaBWkvAMh
+    9xBmW8emMbv9mK4H1IZE8Bc+yzSeqr9/FoQeKjgrxkb8zUuY209zoyXDgx4ZQ+Cx
+    mw+7iTscXx2WzdEQvvoHZJDMZKSd+6FtpxrWZ6Lx6Tfjn1cDCkhTaTJol1MmhPEC
+    AwEAAaNcMFowHgYDVR0RBBcwFYIJbG9jYWxob3N0gghrZXljbG9hazAMBgNVHRME
+    BTADAQH/MAsGA1UdDwQEAwICpDAdBgNVHQ4EFgQUhPkMbFO7qxKYXcSzs7WaMzYY
+    snAwDQYJKoZIhvcNAQELBQADggIBACSnqDHyonPI6sjD591/ix6s92rgsOmdyptn
+    2DaNuf12Lx71wPyvGTjy2N8XUD8IQ9VB3W0Op/rMzgJNazdxXCL9pq2Mks4U0ozd
+    2VXnoXb5BkBAoiqi5IORULvzkYsstzmRBI4zmiHVVaLSURbACFVZk1k6YTMnBtZi
+    acYrUorHdOTnizQmYgk77NUjasULkgYZrevFPCMpmCi/3m53qbn4NDEpH1WSt9Z2
+    KaVPzGNPImI78DtGSsJxxwtryR0ZVZgvZhfzIesTrnDrFhxzxOyPHNj1FQsITNfX
+    VlXTl0LpCNpLL8vK1ogpDX1tdDFrOoSNnnazCZIaCNL/AFXWvMpqjR/yU+4BuAtf
+    iCNpIVVP4VzWFDSuQO/VFKzEP5MPAR6ORBdQPI88yCGKENXX0q+SbfZGRG1IfBJy
+    q36EqB48z+RAMZhmwLOwq9e3X+Lkh9dZWi8fzDTOwGdXTV8suiCNjMDI+lM44MDn
+    pXXfUAaPoYaXIYIVqy0GEexiccP4zciNbWEe3vhNE92mIy7G1Ed8ZEz63NJJo1dL
+    FpoL0Pi87u2eZsBMiOaoV9fQGIXvOKmBAQiAkSPfpwDa6iyqorkCwehRjHeRhy0i
+    7T2P9Ws0W1BqjthdZR4/R5LljyC9RewqSnbFU1BXf6hdirJfTplHURS2h4ZvWkmO
+    bHXUFrb3
+    -----END CERTIFICATE-----
+  server.cnf: |
+    [req]
+    prompt = no
+    x509_extensions = req_ext
+    distinguished_name = dn
+
+    [dn]
+    CN = 172.1.2.3
+
+    [req_ext]
+    subjectAltName = @alt_names
+    basicConstraints = CA:TRUE
+    keyUsage = keyCertSign, digitalSignature, keyEncipherment
+
+    [alt_names]
+    DNS.1 = localhost
+    DNS.2 = keycloak
+  server.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDFjCCAf6gAwIBAgIUZZqK/OGflGxShBJ3Ywlj4ncpzCUwDQYJKoZIhvcNAQEL
+    BQAwFjEUMBIGA1UEAwwLMTcyLjMwLjY0LjEwHhcNMjYwMjI2MTUwMjA4WhcNMjcw
+    MjI2MTUwMjA4WjAWMRQwEgYDVQQDDAsxNzIuMzAuNjQuMTCCASIwDQYJKoZIhvcN
+    AQEBBQADggEPADCCAQoCggEBAK/27irgS2n4Iuk097BrLWfXhcCSJv6rynKbZXl/
+    x2C5ccwjdrQH4CUJCY6RmDswVbaRWI1857L6D16L2wGBqNwWrksAgWmKS2t/RS5K
+    j5IebEDSbio1TjuEOKdYRxPkIHC7iqSvZSwhxs8a4CRZ2XXdWIkuoynIpYAFt0kX
+    bCJOVxXriVfezOJCLHvdPFCl0GnSyvrcGKA8CATiQ0MtcRj5WYx/kDP8mFKct56g
+    tQYT1DoDt00ZlpRe/sEHdDUsECINT6FJHec0GHUP+mehWPfwcB+ZKj6GzUQRxe5K
+    oQ4Eav+fUXxlMp8ZEipj+jVJyyOzxtDvE1s5ph6KnUfyLBECAwEAAaNcMFowHgYD
+    VR0RBBcwFYIJbG9jYWxob3N0gghrZXljbG9hazAMBgNVHRMEBTADAQH/MAsGA1Ud
+    DwQEAwICpDAdBgNVHQ4EFgQUDoOe0b2KSsp1HMHvTHCpOMj6e2YwDQYJKoZIhvcN
+    AQELBQADggEBABP0LkJcWWrDCIFj5orXA4psDiQApY1/CqKDQkQzyTNfNu5Kxqr/
+    rDb3bA9wSSjMk6Zo2u9gaBA3+E13E0c2FNHdmlGh1DlqwHzvdne38+d+Jurt6Hbn
+    dbKiXfuEapym3dGsLaMmPVu6MviEwGObKFsRqhqKYJZLEyAnm/3s7XwrapkNyZB7
+    Fk8HapLx2Pq0xJL0dC50q+GAHEH8ZRsli29PcCwqMOTFLdJ4xPm7I4Voh1/Hfqyn
+    5QlA91yDg6N4HvoIS4rwjhhnfUPwJdjMVuxt+QmzUigS5Vauy4LTQMkH1Pw9IWka
+    Mjy8am0lCtrJ9nn60E10XBGUY18MDX9DJjk=
+    -----END CERTIFICATE-----
+  server.key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCv9u4q4Etp+CLp
+    NPeway1n14XAkib+q8pym2V5f8dguXHMI3a0B+AlCQmOkZg7MFW2kViNfOey+g9e
+    i9sBgajcFq5LAIFpiktrf0UuSo+SHmxA0m4qNU47hDinWEcT5CBwu4qkr2UsIcbP
+    GuAkWdl13ViJLqMpyKWABbdJF2wiTlcV64lX3sziQix73TxQpdBp0sr63BigPAgE
+    4kNDLXEY+VmMf5Az/JhSnLeeoLUGE9Q6A7dNGZaUXv7BB3Q1LBAiDU+hSR3nNBh1
+    D/pnoVj38HAfmSo+hs1EEcXuSqEOBGr/n1F8ZTKfGRIqY/o1Scsjs8bQ7xNbOaYe
+    ip1H8iwRAgMBAAECggEAFjGk9I95s5HyhUuC+iNqhLBwVEua04BDdpUXBW4Sbaa2
+    LbNDY42ivckYBX1joAOGrBJFAwOADdjwW1J0ewopjCjoLtmPeQpSXOqehSouVZW0
+    vbBM6NH0XhldM+40eNPLK6zb3c2pixlvg+u13Z/fh7g1VIgnWDvQdAdEiNmFcAYP
+    2UcXMjgm7jR14odYu/mc/pl08prQR8mUc30ARDX2os5tDgNj1ftXN0fcZrrtEZIW
+    EMO4rCxToLr66ys9qi/8uQ2/0P7Xaivk2sUVlPKnKqYXmRCV/qx4jxJSllwdk9Kc
+    fzvjfw8S85ojFFcAAH2H/ASxnR+06mRJ1f7yB5Pd6QKBgQDi18/96KiF3MW6xQRv
+    Qd/JoPioWWCrjlDbCOK+E4qDk7GT/r184K1aSWRUsl1Z0nfUQmptM8qvedxdKYjQ
+    eZe+4CWT5T5czsouQbjV69OfsUuvaib7gUHfn+ToULNQfzFN+FymmnBFTFu2QH0A
+    bUzc29nYMBPa1RhEeUPSGrIE5wKBgQDGlPsily8OhUnGK6DkPpSxHUNTASApCm2d
+    b2kDMopfh3oyD1Llof/cBuUl9IWjiF7Ag4dn9RqhkteAI6k6k1QuSnA5JBTmWidr
+    wmy/tJiDaMu0qA+qFfQepoBvF7dHJRYfgsH+mMmRgagnf0zbcjcEKNwsY36OfolP
+    fP2z/qywRwKBgBvFHcJQtCjHETG/Ir7YCqRtX2OEpY/6+S0HVnK8g6197DRY8CuU
+    ecRezbiMqV7wpBjJFKxPtdVrjq2dAxG6gPguCoujedH0ws2M4CrYFu0q0EAmN6V8
+    emr88RH7pygImimYaQdAStRA981E8ciWmN1E0NNld1jH05O2YLYc7IQrAoGAUeZd
+    0P1TTgTQ0Wdq+teIkaeE/bXIIsUHQlgRkl0EzrNcRUsmoEh48rDxTv8TIsf6dCGK
+    9egTrLGYKWQLxnm+zTysHhTwfbSO75WHLmV4RTIyWXa6xyY4wW9gJvE8CJ6WCjbu
+    dWdkMpur02ZgN11arV+Attnt9yzeyqa9J8AQTr8CgYEA0VV2AV+eQaR5ZbLg3O4f
+    FyZya7S6KDqvyjK2bkKqqRQXyaeOXpG0+Yp9+aaXo/Kn1EvIWA+A2fML365l+QBO
+    mYW5uzA6TXgrNEfPOQ721HWosc8w7B5061zIoocDiSX3K50CFK8zjkArJgwMJt+b
+    xJAE9sj8Puxij2ewJV3tOrs=
+    -----END PRIVATE KEY-----
+kind: ConfigMap
+metadata:
+  labels:
+    app: backend
+  name: backend-cm0

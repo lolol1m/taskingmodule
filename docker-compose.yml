@@ -11,10 +11,10 @@ services:
       - backend
     environment:
       VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
-      VITE_BACKEND_URL: https://localhost:5000
-      VITE_KEYCLOAK_URL: https://localhost:8443
-      # VITE_BACKEND_URL: https://host_ip_address:5000
-      # VITE_KEYCLOAK_URL: https://host_ip_address:8443
+      # VITE_BACKEND_URL: https://localhost:5000
+      # VITE_KEYCLOAK_URL: https://localhost:8443
+      VITE_BACKEND_URL: https://172.1.2.3:5000
+      VITE_KEYCLOAK_URL: https://172.1.2.3:8443
       # VITE_KEYCLOAK_URL: http://keycloak:8080
       VITE_KEYCLOAK_REALM: xbi-tasking
       VITE_CLIENT_ID: xbi-tasking-frontend
@@ -32,8 +32,8 @@ services:
       keycloak:
         condition: service_started
     environment:
-      # FRONTEND_URL: https://host_ip_address:5173      
-      FRONTEND_URL: https://localhost:5173
+      FRONTEND_URL: https://172.1.2.3:5173      
+      # FRONTEND_URL: https://localhost:5173
       # Database
       DB_HOST: postgres
       DB_NAME: XBI_TASKING_3
@@ -43,8 +43,8 @@ services:
       AUTO_INIT_DB: true
 
       # Keycloak 
-      KEYCLOAK_PUBLIC_URL: https://localhost:8443
-      # KEYCLOAK_PUBLIC_URL: https://host_ip_address:8443
+      # KEYCLOAK_PUBLIC_URL: https://localhost:8443
+      KEYCLOAK_PUBLIC_URL: https://172.1.2.3:8443
       KEYCLOAK_INTERNAL_URL: https://keycloak:8443
       KEYCLOAK_REALM: xbi-tasking
       KEYCLOAK_CLIENT_ID: xbi-tasking-backend

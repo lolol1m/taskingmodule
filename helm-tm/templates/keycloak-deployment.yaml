@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.keycloak.serviceName }}
+  name: {{ .Values.keycloak.serviceName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.keycloak.serviceName }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.keycloak.serviceName }}
+    spec:
+      containers:
+        - image: {{ .Values.keycloak.image }}
+          name: {{ .Values.keycloak.containerName}}
+          imagePullPolicy: {{ .Values.keycloak.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.keycloak.port }}
+              protocol: TCP
+          env:
+          {{- range $key, $value := .Values.keycloak.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+          {{- end }}
+          
+          volumeMounts:
+            - mountPath: /opt/keycloak/data
+              name: keycloak-data
+      restartPolicy: Always
+      volumes:
+        - name: keycloak-data
+          persistentVolumeClaim:
+            claimName: keycloak-data
