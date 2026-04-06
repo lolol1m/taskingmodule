@@ -211,6 +211,7 @@ function UserPresenceTab({ userRole }) {
   const { addNotification } = useNotifications()
 
   const canCreateUsers = userRole === 'IA'
+  const canEditUsers = userRole === 'IA'
   const hasPendingEdits = useMemo(() => Object.keys(editingRows).length > 0, [editingRows])
   const hasSelectedPendingEdits = useMemo(() => {
     if (!selectionModel?.ids || selectionModel.ids.size === 0) return false
@@ -270,64 +271,68 @@ function UserPresenceTab({ userRole }) {
           )
         },
       },
-      { field: 'lastUpdated', headerName: 'Last Updated', minWidth: 180, flex: 0.9 },
-      {
-        field: 'actions',
-        headerName: 'Actions',
-        minWidth: 100,
-        width: 100,
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
-        renderCell: (params) => {
-          const isEditing = Boolean(editingRows[params.row.id])
-          return (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <Tooltip title={isEditing ? 'Cancel edit' : 'Edit user'}>
-                <Button
-                  className="tasking-manager__action-btn tasking-manager__action-btn--icon"
-                  size="small"
-                  onClick={() => {
-                    if (isEditing) {
-                      setEditingRows((prev) => {
-                        const next = { ...prev }
-                        delete next[params.row.id]
-                        return next
-                      })
-                    } else {
-                      setEditingRows((prev) => ({
-                        ...prev,
-                        [params.row.id]: {
-                          user: params.row.user,
-                          role: params.row.role,
-                          status: params.row.status,
-                        },
-                      }))
-                    }
-                  }}
-                >
-                  {isEditing ? (
-                    <span style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1 }}>✕</span>
-                  ) : (
-                    <img src={editIcon} alt="Edit" className="tasking-manager__action-icon" />
-                  )}
-                </Button>
-              </Tooltip>
-              <Tooltip title="Delete user">
-                <Button
-                  className="tasking-manager__action-btn tasking-manager__action-btn--icon"
-                  size="small"
-                  onClick={() => handleDelete(params.row)}
-                >
-                  <img src={binIcon} alt="Delete" className="tasking-manager__action-icon" />
-                </Button>
-              </Tooltip>
+      { field: 'lastUpdated', headerName: 'Status Last Updated', minWidth: 180, flex: 0.9 },
+      ...(canEditUsers
+        ? [
+            {
+              field: 'actions',
+              headerName: 'Actions',
+              minWidth: 100,
+              width: 100,
+              sortable: false,
+              filterable: false,
+              disableColumnMenu: true,
+              renderCell: (params) => {
+                const isEditing = Boolean(editingRows[params.row.id])
+                return (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <Tooltip title={isEditing ? 'Cancel edit' : 'Edit user'}>
+                      <Button
+                        className="tasking-manager__action-btn tasking-manager__action-btn--icon"
+                        size="small"
+                        onClick={() => {
+                          if (isEditing) {
+                            setEditingRows((prev) => {
+                              const next = { ...prev }
+                              delete next[params.row.id]
+                              return next
+                            })
+                          } else {
+                            setEditingRows((prev) => ({
+                              ...prev,
+                              [params.row.id]: {
+                                user: params.row.user,
+                                role: params.row.role,
+                                status: params.row.status,
+                              },
+                            }))
+                          }
+                        }}
+                      >
+                        {isEditing ? (
+                          <span style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1 }}>✕</span>
+                        ) : (
+                          <img src={editIcon} alt="Edit" className="tasking-manager__action-icon" />
+                        )}
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="Delete user">
+                      <Button
+                        className="tasking-manager__action-btn tasking-manager__action-btn--icon"
+                        size="small"
+                        onClick={() => handleDelete(params.row)}
+                      >
+                        <img src={binIcon} alt="Delete" className="tasking-manager__action-icon" />
+                      </Button>
+                    </Tooltip>
             </div>
-          )
-        },
-      },
+                )
+              },
+            },
+          ]
+        : []),
     ],
-    [editingRows],
+    [editingRows, canEditUsers],
   )
 
   useEffect(() => {
@@ -507,16 +512,17 @@ function UserPresenceTab({ userRole }) {
 
         {error ? <Typography className="admin-tab__error">{error}</Typography> : null}
 
-        {/* Apply Change row — above the table, left-aligned */}
-        <div>
-          <Button
-            className="tasking-summary__button"
-            disabled={!hasSelectedPendingEdits}
-            onClick={applyChanges}
-          >
-            Apply Change
-          </Button>
-        </div>
+        {canEditUsers && (
+          <div>
+            <Button
+              className="tasking-summary__button"
+              disabled={!hasSelectedPendingEdits}
+              onClick={applyChanges}
+            >
+              Apply Change
+            </Button>
+          </div>
+        )}
 
         <div className="admin-tab__grid admin-tab__grid--with-footer">
           <DataGridPro

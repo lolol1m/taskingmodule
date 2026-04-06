@@ -268,6 +268,14 @@ class TaskingService:
             self.tasking.completeTask(task_id)
         self._push_reported_notifications(task_ids, user, stage_label="Task completed")
     
+    def start_verification(self, payload, vetter_keycloak_id):
+        for task_id in payload.get("SCVU Task ID", []):
+            self.tasking.startVerification(task_id, vetter_keycloak_id)
+
+    def unstart_verification(self, payload, vetter_keycloak_id):
+        for task_id in payload.get("SCVU Task ID", []):
+            self.tasking.unstartVerification(task_id, vetter_keycloak_id)
+
     def verify_pass(self, payload, vetter_keycloak_id=None, user=None):
         task_ids = payload.get("SCVU Task ID", [])
         submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
@@ -288,9 +296,11 @@ class TaskingService:
                 )
 
         for task_id in task_ids:
-            self.tasking.verifyPass(task_id)
+            if vetter_keycloak_id:
+                self.tasking.verifyPassWithVetter(task_id, vetter_keycloak_id)
+            else:
+                self.tasking.verifyPass(task_id)
 
-        # Auto-complete images after verification when every task under the image is completed.
         if not task_ids or self._image_service is None:
             return
         image_ids = self.tasking.getImageIdsForTasks(task_ids)
@@ -298,7 +308,7 @@ class TaskingService:
             return
         self._image_service.complete_images({"SCVU Image ID": image_ids}, vetter_keycloak_id)
     
-    def verify_fail(self, payload):
+    def verify_fail(self, payload, vetter_keycloak_id=None):
         for task_id in payload.get("SCVU Task ID", []):
             self.tasking.verifyFail(task_id)
 

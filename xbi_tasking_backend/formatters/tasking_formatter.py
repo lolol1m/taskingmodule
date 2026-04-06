@@ -82,6 +82,8 @@ def format_tasking_summary_area(area, parent_id):
         "Priority": area[16],
         "Exploit Start Time": area[17].strftime(datetime_format) if area[17] else None,
         "Exploit End Time": area[18].strftime(datetime_format) if area[18] else None,
+        "Vetter Keycloak ID": area[19] if len(area) > 19 else None,
+        "Vetter": area[20] if len(area) > 20 else None,
         "SCVU Task ID": area[0],
         "Parent ID": parent_id
     }

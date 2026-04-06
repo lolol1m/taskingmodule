@@ -377,7 +377,7 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
 
   const renderProposedAssignee = (params) => {
     const isImageRow = params?.row?.groupName?.length === 1
-    const selectableAssignees = (assignees || []).filter((option) => option?.id && option.id !== 'Multiple')
+    const selectableAssignees = (assignees || []).filter((option) => option?.id && option.id !== 'Multiple' && option.is_present !== false)
     const getAssigneeLabel = (value) => {
       if (!value) return '—'
       if (value === 'Multiple') return 'Multiple'

@@ -184,6 +184,8 @@ const buildRows = (inputData) => {
         scvuTaskId: entry['SCVU Task ID'] || null,
         sfReported: Boolean(entry['SF Reported'] ?? entry['sfReported'] ?? false),
         iirReported: Boolean(entry['IIR Reported'] ?? entry['iirReported'] ?? false),
+        vetterKeycloakId: entry['Vetter Keycloak ID'] ?? entry['vetterKeycloakId'] ?? null,
+        vetter: entry['Vetter'] ?? entry['vetter'] ?? null,
       })
     }
   })
@@ -638,6 +640,21 @@ function TaskingSummaryTab({
           return allSame ? first : 'Multiple'
         },
       },
+      ...(verificationOnlyActions
+        ? [
+            {
+              field: 'vetter',
+              headerName: 'Vetter',
+              minWidth: 110,
+              flex: 0.6,
+              renderCell: (params) => {
+                if (!params?.row) return '—'
+                if (params.row.parentId === undefined) return '—'
+                return params.row.vetter || '—'
+              },
+            },
+          ]
+        : []),
       {
         field: 'report',
         headerName: 'Report',
@@ -1230,13 +1247,15 @@ function TaskingSummaryTab({
       '/tasking/completeTasks': ['in progress'],
       '/tasking/verifyPass': ['verifying'],
       '/tasking/verifyFail': ['verifying'],
+      '/tasking/startVerification': ['verifying'],
+      '/tasking/unstartVerification': ['verifying'],
     }
     const selectedTaskRows = taskRows
       .map((rowId) => rows.find((item) => item.id === rowId))
       .filter((row) => !!row)
 
     const expected = allowedStatuses[apiPath]
-    const eligibleRows = expected
+    let eligibleRows = expected
       ? selectedTaskRows.filter((row) => expected.includes(normalizeStatus(row?.taskStatus)))
       : selectedTaskRows
 
@@ -1258,6 +1277,46 @@ function TaskingSummaryTab({
         title: 'Some rows skipped',
         meta: `${selectedTaskRows.length - eligibleRows.length} task(s) not in required status`,
       })
+    }
+
+    const currentUserKeycloakId = UserService.getTokenParsed()?.sub
+    if (apiPath === '/tasking/startVerification') {
+      const alreadyClaimed = eligibleRows.filter((row) => row.vetterKeycloakId && row.vetterKeycloakId !== currentUserKeycloakId)
+      if (alreadyClaimed.length > 0) {
+        addNotification({
+          title: 'Already being verified',
+          meta: `${alreadyClaimed.length} task(s) are being verified by another user`,
+        })
+      }
+    }
+
+    if (apiPath === '/tasking/unstartVerification') {
+      const notMine = eligibleRows.filter((row) => row.vetterKeycloakId !== currentUserKeycloakId)
+      if (notMine.length === eligibleRows.length) {
+        addNotification({
+          title: 'Cannot unstart',
+          meta: 'You can only unstart verification for tasks you are verifying',
+        })
+        return
+      }
+    }
+
+    if ((apiPath === '/tasking/verifyPass' || apiPath === '/tasking/verifyFail') && verificationOnlyActions) {
+      const notMine = eligibleRows.filter((row) => !row.vetterKeycloakId || row.vetterKeycloakId !== currentUserKeycloakId)
+      if (notMine.length === eligibleRows.length) {
+        addNotification({
+          title: 'Verification locked',
+          meta: 'You must start verification before verifying these tasks',
+        })
+        return
+      }
+      if (notMine.length > 0) {
+        eligibleRows = eligibleRows.filter((row) => row.vetterKeycloakId === currentUserKeycloakId)
+        addNotification({
+          title: 'Some rows skipped',
+          meta: `${notMine.length} task(s) not assigned to you for verification`,
+        })
+      }
     }
 
     let actionableRows = eligibleRows
@@ -1346,15 +1405,25 @@ function TaskingSummaryTab({
         '/tasking/verifyFail': 'Incomplete',
       }
       const nextStatusLabel = nextStatusByPath[apiPath]
-      if (nextStatusLabel) {
+
+      const isStartVerification = apiPath === '/tasking/startVerification'
+      const isUnstartVerification = apiPath === '/tasking/unstartVerification'
+      const isVerifyAction = apiPath === '/tasking/verifyPass' || apiPath === '/tasking/verifyFail'
+
+      if (nextStatusLabel || isStartVerification || isUnstartVerification) {
         setWorkingData((prev) => {
           if (!prev) return prev
           const next = { ...prev }
           actionableRows.forEach((row) => {
             const rowKey = String(row.id)
             const taskKey = String(row?.scvuTaskId || '')
-            if (next[rowKey]) {
-              const updated = { ...next[rowKey], 'Task Status': nextStatusLabel, taskStatus: nextStatusLabel }
+            const applyPatch = (existing) => {
+              if (!existing) return existing
+              const updated = { ...existing }
+              if (nextStatusLabel) {
+                updated['Task Status'] = nextStatusLabel
+                updated.taskStatus = nextStatusLabel
+              }
               if (apiPath === '/tasking/verifyFail') {
                 updated['Remarks'] = ''
                 updated.remarks = ''
@@ -1364,22 +1433,28 @@ function TaskingSummaryTab({
                 updated.cloudCover = ''
                 updated['Image Quality'] = ''
                 updated.imageQuality = ''
+                updated['Vetter Keycloak ID'] = null
+                updated['Vetter'] = null
               }
-              next[rowKey] = updated
+              if (isVerifyAction) {
+                updated['Vetter Keycloak ID'] = null
+                updated['Vetter'] = null
+              }
+              if (isStartVerification) {
+                updated['Vetter Keycloak ID'] = currentUserKeycloakId
+                updated['Vetter'] = UserService.getUsername()
+              }
+              if (isUnstartVerification) {
+                updated['Vetter Keycloak ID'] = null
+                updated['Vetter'] = null
+              }
+              return updated
+            }
+            if (next[rowKey]) {
+              next[rowKey] = applyPatch(next[rowKey])
             }
             if (taskKey && next[taskKey] && next[taskKey]['Parent ID'] !== undefined) {
-              const updated = { ...next[taskKey], 'Task Status': nextStatusLabel, taskStatus: nextStatusLabel }
-              if (apiPath === '/tasking/verifyFail') {
-                updated['Remarks'] = ''
-                updated.remarks = ''
-                updated['Report'] = ''
-                updated.report = ''
-                updated['Cloud Cover'] = ''
-                updated.cloudCover = ''
-                updated['Image Quality'] = ''
-                updated.imageQuality = ''
-              }
-              next[taskKey] = updated
+              next[taskKey] = applyPatch(next[taskKey])
             }
           })
           return next
@@ -1388,7 +1463,9 @@ function TaskingSummaryTab({
       let actionTitle =
         apiPath === '/tasking/startTasks' ? 'Tasks started' :
         apiPath === '/tasking/endTasks' ? 'Tasks ended' :
-        apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+        apiPath === '/tasking/completeTasks' ? 'Tasks completed' :
+        apiPath === '/tasking/startVerification' ? 'Verification started' :
+        apiPath === '/tasking/unstartVerification' ? 'Verification unstarted' : 'Tasks updated'
       if (apiPath === '/tasking/completeTasks') {
         const reportTypes = new Set(
           actionableRows
@@ -1860,6 +1937,24 @@ function TaskingSummaryTab({
                 disabled={!selection.length}
               >
                 Complete Task
+              </Button>
+            ) : null}
+            {verificationOnlyActions && (role === 'Senior II' || role === 'IA') ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/tasking/startVerification')}
+                disabled={!selection.length}
+              >
+                Start Verification
+              </Button>
+            ) : null}
+            {verificationOnlyActions && (role === 'Senior II' || role === 'IA') ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/tasking/unstartVerification')}
+                disabled={!selection.length}
+              >
+                Unstart Verification
               </Button>
             ) : null}
             {isShow.VF ? (

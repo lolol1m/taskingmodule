@@ -117,6 +117,7 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS child_image_id BIGINT")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_start_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS vetter_keycloak_id VARCHAR(255)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS proposed_assignee_keycloak_id VARCHAR(255)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS sf_reported BOOLEAN DEFAULT FALSE")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS iir_reported BOOLEAN DEFAULT FALSE")

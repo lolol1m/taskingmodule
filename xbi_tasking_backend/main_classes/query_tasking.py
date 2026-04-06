@@ -193,7 +193,8 @@ SQL_GET_TASKING_SUMMARY_AREA = (
     "COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name, "
     "COALESCE(task.image_quality, image.image_quality, NULL) as image_quality_name, "
     "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name, "
-    "task.exploit_start_time, task.exploit_end_time "
+    "task.exploit_start_time, task.exploit_end_time, "
+    "task.vetter_keycloak_id "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN area ON image_area.scvu_area_id = area.scvu_area_id "
@@ -221,7 +222,8 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
         COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name,
         COALESCE(task.image_quality, image.image_quality, NULL) as image_quality_name,
         COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
-        task.exploit_start_time, task.exploit_end_time
+        task.exploit_start_time, task.exploit_end_time,
+        task.vetter_keycloak_id
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
@@ -249,7 +251,8 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
         COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name,
         COALESCE(task.image_quality, image.image_quality, NULL) as image_quality_name,
         COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
-        task.exploit_start_time, task.exploit_end_time
+        task.exploit_start_time, task.exploit_end_time,
+        task.vetter_keycloak_id
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
@@ -306,9 +309,33 @@ SQL_UPDATE_TASK_STATUS_VERIFY_FAIL = (
     "sf_reported = FALSE, "
     "iir_reported = FALSE, "
     "exploit_start_time = NULL, "
-    "exploit_end_time = NULL "
+    "exploit_end_time = NULL, "
+    "vetter_keycloak_id = NULL "
     "WHERE scvu_task_id = %s "
     "AND task_status_id = (SELECT id FROM task_status WHERE name = %s)"
+)
+
+SQL_START_VERIFICATION = (
+    "UPDATE task SET vetter_keycloak_id = %s "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "AND vetter_keycloak_id IS NULL"
+)
+
+SQL_UNSTART_VERIFICATION = (
+    "UPDATE task SET vetter_keycloak_id = NULL "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "AND vetter_keycloak_id = %s"
+)
+
+SQL_VERIFY_PASS_WITH_VETTER = (
+    "UPDATE task SET "
+    "task_status_id = (SELECT id FROM task_status WHERE name = %s), "
+    "vetter_keycloak_id = NULL "
+    "WHERE scvu_task_id = %s "
+    "AND task_status_id = (SELECT id FROM task_status WHERE name = %s) "
+    "AND vetter_keycloak_id = %s"
 )
 
 SQL_RESET_IMAGE_TASKS_FROM_COMPLETED = (
@@ -321,7 +348,8 @@ SQL_RESET_IMAGE_TASKS_FROM_COMPLETED = (
     "sf_reported = FALSE, "
     "iir_reported = FALSE, "
     "exploit_start_time = NULL, "
-    "exploit_end_time = NULL "
+    "exploit_end_time = NULL, "
+    "vetter_keycloak_id = NULL "
     "WHERE task_status_id = (SELECT id FROM task_status WHERE name = %s) "
     "AND scvu_image_area_id IN ("
     "  SELECT scvu_image_area_id "
@@ -695,6 +723,9 @@ class TaskingQueries:
         user_ids = [row[4] for row in results if row[4]]
         usernames = self.keycloak.get_keycloak_usernames_bulk(user_ids)
 
+        vetter_ids = [row[19] for row in results if row[19]]
+        vetter_usernames = self.keycloak.get_keycloak_usernames_bulk(vetter_ids)
+
         formatted_results = []
         for row in results:
             (
@@ -717,8 +748,10 @@ class TaskingQueries:
                 priority_name,
                 exploit_start_time,
                 exploit_end_time,
+                vetter_keycloak_id,
             ) = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
+            vetter_username = vetter_usernames.get(vetter_keycloak_id) if vetter_keycloak_id else None
             formatted_results.append(
                 (
                     task_id,
@@ -740,6 +773,8 @@ class TaskingQueries:
                     priority_name,
                     exploit_start_time,
                     exploit_end_time,
+                    vetter_keycloak_id,
+                    vetter_username,
                 )
             )
 
@@ -760,6 +795,9 @@ class TaskingQueries:
 
         user_ids = [row[5] for row in results if row[5]]
         usernames = self.keycloak.get_keycloak_usernames_bulk(user_ids)
+
+        vetter_ids = [row[20] for row in results if row[20]]
+        vetter_usernames = self.keycloak.get_keycloak_usernames_bulk(vetter_ids)
 
         formatted_results = []
         for row in results:
@@ -784,8 +822,10 @@ class TaskingQueries:
                 priority_name,
                 exploit_start_time,
                 exploit_end_time,
+                vetter_keycloak_id,
             ) = row
             username = usernames.get(assignee_keycloak_id) if assignee_keycloak_id else AssigneeLabel.UNASSIGNED
+            vetter_username = vetter_usernames.get(vetter_keycloak_id) if vetter_keycloak_id else None
             formatted_results.append(
                 (
                     image_id,
@@ -808,6 +848,8 @@ class TaskingQueries:
                     priority_name,
                     exploit_start_time,
                     exploit_end_time,
+                    vetter_keycloak_id,
+                    vetter_username,
                 )
             )
         return formatted_results
@@ -827,6 +869,9 @@ class TaskingQueries:
 
         user_ids = [row[5] for row in results if row[5]]
         usernames = self.keycloak.get_keycloak_usernames_bulk(user_ids)
+
+        vetter_ids = [row[20] for row in results if row[20]]
+        vetter_usernames = self.keycloak.get_keycloak_usernames_bulk(vetter_ids)
 
         formatted_results = []
         for row in results:
@@ -851,8 +896,10 @@ class TaskingQueries:
                 priority_name,
                 exploit_start_time,
                 exploit_end_time,
+                vetter_keycloak_id,
             ) = row
             username = usernames.get(assignee_kc_id) if assignee_kc_id else AssigneeLabel.UNASSIGNED
+            vetter_username = vetter_usernames.get(vetter_keycloak_id) if vetter_keycloak_id else None
             formatted_results.append(
                 (
                     image_id,
@@ -875,6 +922,8 @@ class TaskingQueries:
                     priority_name,
                     exploit_start_time,
                     exploit_end_time,
+                    vetter_keycloak_id,
+                    vetter_username,
                 )
             )
         return formatted_results
@@ -904,6 +953,18 @@ class TaskingQueries:
         '''
         self.db.executeUpdate(SQL_UPDATE_TASK_STATUS_COMPLETE, (TaskStatus.VERIFYING, task_id, TaskStatus.IN_PROGRESS))
 
+    def startVerification(self, task_id, vetter_keycloak_id):
+        return self.db.executeUpdate(
+            SQL_START_VERIFICATION,
+            (vetter_keycloak_id, task_id, TaskStatus.VERIFYING),
+        )
+
+    def unstartVerification(self, task_id, vetter_keycloak_id):
+        return self.db.executeUpdate(
+            SQL_UNSTART_VERIFICATION,
+            (task_id, TaskStatus.VERIFYING, vetter_keycloak_id),
+        )
+
     def verifyPass(self, task_id):
         '''
         Function:   Updates task status to Complete if it is currently Verifying
@@ -911,6 +972,12 @@ class TaskingQueries:
         Output:     NIL
         '''
         self.db.executeUpdate(SQL_UPDATE_TASK_STATUS, (TaskStatus.COMPLETED, task_id, TaskStatus.VERIFYING))
+
+    def verifyPassWithVetter(self, task_id, vetter_keycloak_id):
+        self.db.executeUpdate(
+            SQL_VERIFY_PASS_WITH_VETTER,
+            (TaskStatus.COMPLETED, task_id, TaskStatus.VERIFYING, vetter_keycloak_id),
+        )
 
     def verifyFail(self, task_id):
         '''

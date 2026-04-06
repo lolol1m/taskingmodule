@@ -149,6 +149,16 @@ class API {
         return response.data
     }
 
+    async postStartVerification(body) {
+        const response = await this.client.post("/tasking/startVerification", body)
+        return response.data
+    }
+
+    async postUnstartVerification(body) {
+        const response = await this.client.post("/tasking/unstartVerification", body)
+        return response.data
+    }
+
     async postUpdateTaskingManagerData(body){ 
         const response = await this.client.post("/tasking/updateTaskingManagerData",  body)
     

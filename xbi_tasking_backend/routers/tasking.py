@@ -376,6 +376,44 @@ async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict =
         return error_response(500, "Failed to complete tasks", "complete_tasks_failed")
     
 
+@router.post("/startVerification")
+async def start_verification(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
+    try:
+        vetter_keycloak_id = user.get("sub")
+        await run_blocking(request.app.state.tasking_service.start_verification, model_to_dict(payload), vetter_keycloak_id)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_start_verification",
+                user,
+                details={"task_count": len(payload.task_ids)},
+                ip_address=request.client.host if request.client else None,
+            )
+        return StatusResponse(status="success", message="Verification started")
+    except Exception:
+        logger.exception("startVerification failed")
+        return error_response(500, "Failed to start verification", "start_verification_failed")
+
+
+@router.post("/unstartVerification")
+async def unstart_verification(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
+    try:
+        vetter_keycloak_id = user.get("sub")
+        await run_blocking(request.app.state.tasking_service.unstart_verification, model_to_dict(payload), vetter_keycloak_id)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_unstart_verification",
+                user,
+                details={"task_count": len(payload.task_ids)},
+                ip_address=request.client.host if request.client else None,
+            )
+        return StatusResponse(status="success", message="Verification unstarted")
+    except Exception:
+        logger.exception("unstartVerification failed")
+        return error_response(500, "Failed to unstart verification", "unstart_verification_failed")
+
+
 @router.post("/verifyPass")
 async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
