@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.postgres.serviceName }}
+  name: {{ .Values.postgres.serviceName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.postgres.serviceName }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.postgres.serviceName }}
+    spec:
+      containers:
+        - image: {{ .Values.postgres.image }}
+          ports:
+            - containerPort: {{ .Values.postgres.port }}
+              protocol: TCP
+          env:
+          {{- range $key, $value := .Values.postgres.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+          {{- end }}
+
+          livenessProbe:
+            exec:
+              command:
+                - 'pg_isready -U postgres '
+            failureThreshold: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+          name: {{ .Values.postgres.containerName }}
+          
+
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: pgdata
+      restartPolicy: Always
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: pgdata

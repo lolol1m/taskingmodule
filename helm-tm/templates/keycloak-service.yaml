@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ .Values.keycloak.serviceName }}
+  name: {{ .Values.keycloak.serviceName }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: "8443"
+    # port is hardcoded to 8443 to access keycloak directly
+      port: {{ .Values.keycloak.port }}
+      targetPort: {{ .Values.keycloak.port }}
+  selector:
+    app: {{ .Values.keycloak.serviceName }}

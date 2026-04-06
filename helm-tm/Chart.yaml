@@ -1,0 +1,31 @@
+apiVersion: v2
+name: tangy-stack
+description: A Helm chart for the Tangy application stack (React, Python, Keycloak, Postgres)
+
+# This is the chart version (increment this when you change the chart structure)
+version: 0.1.0
+
+# This is the version of the actual application code
+appVersion: "1.0.0"
+
+# Type 'application' means this chart is intended to be deployed directly
+type: application
+
+# (Optional) Maintainer information
+# maintainers:
+#   - name: lemon
+#     email: lemon@tangy.local
+
+# dependencies:
+#   - name: postgres
+#     version: 15.6
+#     repository: https://charts.bitnami.com/bitnami
+#     condition: postgres.enabled
+
+# (Optional) Keywords for searching/filtering
+keywords:
+  - react
+  - vite
+  - python
+  - keycloak
+  - postgres

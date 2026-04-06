@@ -1,0 +1,95 @@
+replicas: 1
+host: 172.1.2.3
+
+ingress:
+  enabled: true
+  frontendHost: tangy.local
+  keycloakHost: tangy.auth.local
+
+frontend:
+  serviceName: frontend
+  image: tangy_trial-frontend:latest
+  imagePullPolicy: IfNotPresent
+  containerName: xbi-frontend-trial
+
+  # port: 443
+  # targetPort: 5173
+  port: 5173
+  targetPort: 5173
+  probes:
+    enabled: true
+
+  env:
+    # VITE_BACKEND_URL: {{printf "https://backend:%d" .Values.backend.port}}
+    VITE_BACKEND_URL: "https://backend:5000"
+    VITE_CLIENT_ID: xbi-tasking-frontend
+    VITE_KEYCLOAK_REALM: xbi-tasking
+    # VITE_KEYCLOAK_URL: {{printf "https://" .Values.host .Values.keycloak.port}}
+    # VITE_KEYCLOAK_URL: {{printf "https://" .Values.ingress.keycloakHost .Values.keycloak.port}}
+    VITE_KEYCLOAK_URL: "https://tangy.auth.local:8443"
+    VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
+
+backend:
+  serviceName: backend
+  image: tangy_trial-backend:latest
+  imagePullPolicy: IfNotPresent
+  containerName: xbi-backend-trial
+
+  port: 5000
+
+  env:
+    ALLOWED_CLIENT_IDS: xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin
+    AUTO_INIT_DB: "true"
+    # DB_HOST: {{ .Values.postgres.serviceName }}
+    # DB_NAME: {{ .Values.postgres.env.POSTGRES_DB }}
+    # DB_PASSWORD: {{ .Values.postgres.env.POSTGRES_PASSWORD }}
+    # DB_PORT: {{ .Values.postgres.port }}
+    # DB_USER: {{ .Values.postgres.env.POSTGRES_USER }}
+    DB_HOST: postgres
+    DB_NAME: XBI_TASKING_3
+    DB_PASSWORD: password
+    DB_PORT: 5432
+    DB_USER: postgres
+    # FRONTEND_URL: https://172.1.2.3:5173
+    FRONTEND_URL: https://tangy.local:5173
+    KEYCLOAK_ADMIN_CLIENT_ID: xbi-tasking-admin
+    KEYCLOAK_ADMIN_CLIENT_SECRET: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
+    KEYCLOAK_CLIENT_ID: xbi-tasking-backend
+    KEYCLOAK_CLIENT_SECRET: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
+    KEYCLOAK_ENABLED: "true"
+    KEYCLOAK_INTERNAL_URL: https://keycloak:8443
+    # KEYCLOAK_PUBLIC_URL: https://172.1.2.3:8443
+    KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:8443
+    KEYCLOAK_REALM: xbi-tasking
+
+keycloak:
+  serviceName: keycloak
+  image: tangy_trial-keycloak:latest
+  imagePullPolicy: IfNotPresent
+  containerName: xbi-keycloak-trial
+
+  port: 8443
+
+  storage:
+    size: 1Gi
+
+  env:
+    KC_BOOTSTRAP_ADMIN_USERNAME: admin
+    KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
+
+postgres:
+  serviceName: postgres
+  image: postgres:15.6
+  imagePullPolicy: IfNotPresent
+  containerName: xbi-postgres-trial
+
+  storage:
+    size: 1Gi
+
+  port: 5432
+  env:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: password
+    POSTGRES_DB: XBI_TASKING_3
+
