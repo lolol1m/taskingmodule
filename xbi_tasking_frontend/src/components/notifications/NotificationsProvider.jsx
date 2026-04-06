@@ -4,10 +4,29 @@ import API from '../../api/api.js'
 
 export const NotificationsContext = createContext(null)
 
-const mergeNotifications = (current, incoming) => {
+const DISMISSED_KEY = 'dismissed_notification_ids'
+
+const readDismissedIds = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
+const persistDismissedId = (id) => {
+  const ids = readDismissedIds()
+  ids.add(id)
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]))
+  } catch { /* ignore */ }
+}
+
+const mergeNotifications = (current, incoming, dismissed) => {
   const byId = new Map(current.map((item) => [item.id, item]))
   incoming.forEach((item) => {
     if (!item?.id) return
+    if (dismissed.has(item.id)) return
     if (!byId.has(item.id)) {
       byId.set(item.id, { ...item, read: !!item.read })
     }
@@ -48,6 +67,11 @@ function NotificationsProvider({ children }) {
     setNotifications((prev) => prev.map((item) => ({ ...item, read: true })))
   }
 
+  const removeNotification = (id) => {
+    persistDismissedId(id)
+    setNotifications((prev) => prev.filter((item) => item.id !== id))
+  }
+
   const clearNotifications = () => {
     setNotifications([])
   }
@@ -61,7 +85,8 @@ function NotificationsProvider({ children }) {
         const response = await api.client.get('/notifications')
         const items = response?.data?.Notifications
         if (!cancelled && Array.isArray(items)) {
-          setNotifications((prev) => mergeNotifications(prev, items))
+          const dismissed = readDismissedIds()
+          setNotifications((prev) => mergeNotifications(prev, items, dismissed))
         }
       } catch (error) {
         if (!cancelled) {
@@ -85,6 +110,7 @@ function NotificationsProvider({ children }) {
       addNotification,
       markRead,
       markAllRead,
+      removeNotification,
       clearNotifications,
     }),
     [notifications],

@@ -1,25 +1,26 @@
- .notification-shell {
+.notification-shell {
   position: relative;
 }
 
+/* ── Panel ─────────────────────────────────────────────────── */
 .notification-panel {
   position: absolute;
   right: 0;
   top: 48px;
-  width: 320px;
+  width: 380px;
+  max-height: 520px;
   background: #15161a;
   border: 1px solid #23242a;
-  border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
   z-index: 20;
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 240ms ease, transform 240ms ease;
+  transition: opacity 200ms ease, transform 200ms ease;
   pointer-events: auto;
+  overflow: hidden;
 }
 
 .notification-panel.is-hidden {
@@ -28,52 +29,246 @@
   pointer-events: none;
 }
 
+/* ── Header ────────────────────────────────────────────────── */
 .notification-panel__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #23242a;
 }
 
-.notification-panel__footer {
-  border: none;
-  background: transparent;
-  color: #93c5fd;
-  text-align: left;
-  padding: 6px 4px;
-  font-family: inherit;
-}
-
-.notification-item {
-  background: #111318;
-  border: 1px solid #23242a;
-  border-radius: 10px;
-  padding: 10px;
+.notification-panel__header-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+}
+
+.notification-panel__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e5e7eb;
+  letter-spacing: -0.01em;
+}
+
+.notification-panel__subtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.notification-panel__close {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.notification-panel__close:hover {
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Scrollable body ───────────────────────────────────────── */
+.notification-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 12px 12px;
+}
+
+.notification-panel__body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notification-panel__body::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 999px;
+}
+
+/* ── Date group ────────────────────────────────────────────── */
+.notification-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notification-group + .notification-group {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #23242a;
+}
+
+.notification-group__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 8px 4px;
+}
+
+/* ── Notification item ─────────────────────────────────────── */
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.notification-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.notification-item--unread {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.notification-item--unread:hover {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+/* ── Icon circle ───────────────────────────────────────────── */
+.notification-item__icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-item__icon--reported {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+/* ── Content ───────────────────────────────────────────────── */
+.notification-item__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .notification-item__title {
   font-size: 13px;
   font-weight: 600;
   color: #e5e7eb;
+  line-height: 1.35;
 }
 
 .notification-item__title--reported {
-  color: #ef4444;
+  color: #f87171;
 }
 
 .notification-item__meta {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.notification-item__time {
   font-size: 11px;
+  color: #4b5563;
+  margin-top: 2px;
+}
+
+/* ── Delete button ─────────────────────────────────────────── */
+.notification-item__delete {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, color 150ms ease, background 150ms ease;
+}
+
+.notification-item:hover .notification-item__delete {
+  opacity: 1;
+}
+
+.notification-item__delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Empty state ───────────────────────────────────────────── */
+.notification-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.notification-panel__empty-icon {
+  opacity: 0.3;
+  margin-bottom: 4px;
+}
+
+.notification-panel__empty-title {
+  font-size: 14px;
+  font-weight: 600;
   color: #9ca3af;
 }
 
+.notification-panel__empty-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ── Footer ────────────────────────────────────────────────── */
+.notification-panel__footer {
+  border-top: 1px solid #23242a;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.notification-panel__footer-btn {
+  border: none;
+  background: transparent;
+  color: #818cf8;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 150ms ease;
+}
+
+.notification-panel__footer-btn:hover {
+  background: rgba(129, 140, 248, 0.1);
+}
+
+/* ── Legacy ────────────────────────────────────────────────── */
 .link-button {
   border: none;
   background: transparent;
-  color: #93c5fd;
+  color: #818cf8;
   font-size: 12px;
   font-family: inherit;
 }

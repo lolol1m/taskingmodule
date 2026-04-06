@@ -70,3 +70,47 @@
 .Toastify__toast--error .Toastify__progress-bar {
   background: #ef4444;
 }
+
+/* MUI DateTimePicker popup scrollbars */
+.MuiPickersPopper-root *,
+.MuiDialog-root .MuiPickersLayout-root *,
+.MuiMultiSectionDigitalClock-root *,
+.MuiDigitalClock-root,
+.MuiTimeClock-root * {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent !important;
+}
+
+.MuiPickersPopper-root *::-webkit-scrollbar,
+.MuiDialog-root .MuiPickersLayout-root *::-webkit-scrollbar,
+.MuiMultiSectionDigitalClock-root *::-webkit-scrollbar,
+.MuiDigitalClock-root::-webkit-scrollbar,
+.MuiTimeClock-root *::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.MuiPickersPopper-root *::-webkit-scrollbar-track,
+.MuiDialog-root .MuiPickersLayout-root *::-webkit-scrollbar-track,
+.MuiMultiSectionDigitalClock-root *::-webkit-scrollbar-track,
+.MuiDigitalClock-root::-webkit-scrollbar-track,
+.MuiTimeClock-root *::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.MuiPickersPopper-root *::-webkit-scrollbar-thumb,
+.MuiDialog-root .MuiPickersLayout-root *::-webkit-scrollbar-thumb,
+.MuiMultiSectionDigitalClock-root *::-webkit-scrollbar-thumb,
+.MuiDigitalClock-root::-webkit-scrollbar-thumb,
+.MuiTimeClock-root *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-radius: 999px !important;
+}
+
+.MuiPickersPopper-root *::-webkit-scrollbar-thumb:hover,
+.MuiDialog-root .MuiPickersLayout-root *::-webkit-scrollbar-thumb:hover,
+.MuiMultiSectionDigitalClock-root *::-webkit-scrollbar-thumb:hover,
+.MuiDigitalClock-root::-webkit-scrollbar-thumb:hover,
+.MuiTimeClock-root *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5) !important;
+}

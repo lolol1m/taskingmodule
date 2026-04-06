@@ -225,6 +225,7 @@
 .tasking-manager__modal-content {
   position: relative;
   width: min(700px, 90vw);
+  max-height: 85vh;
   background: var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: 16px;
@@ -233,6 +234,26 @@
   flex-direction: column;
   gap: 16px;
   z-index: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.tasking-manager__modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tasking-manager__modal-content::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.tasking-manager__modal-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.tasking-manager__modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 .tasking-manager__modal-header {

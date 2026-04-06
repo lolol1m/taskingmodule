@@ -588,9 +588,11 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
                 try {
                   setError(null)
                   const deleteCount = isChildRow ? 1 : resolveDeleteImageIds().length
-                  const shouldDelete = window.confirm(
-                    `Delete ${deleteCount} ${isChildRow ? 'child row' : 'image(s)'}? This action cannot be undone.`,
-                  )
+                  const passName = params?.row?.passIdFileName || params?.row?.groupName?.[0] || ''
+                  const confirmMsg = isChildRow
+                    ? 'Delete image? This action cannot be undone.'
+                    : `Delete Pass ID ${passName}? This action cannot be undone.`
+                  const shouldDelete = window.confirm(confirmMsg)
                   if (!shouldDelete) return
                   if (isChildRow) {
                     const imageAreaId = params?.row?.scvuImageAreaId
@@ -616,16 +618,16 @@ function TaskingManagerTab({ dateRange, title = 'Tasking Manager', subtitle = 'M
                     }
                   }
                   addNotification({
-                    title: isChildRow ? 'Child row deleted' : 'TTG deleted',
-                    meta: isChildRow ? 'Just now · 1 row removed' : `Just now · ${deleteCount} image(s) removed`,
+                    title: isChildRow ? 'Image deleted' : `Pass ID ${passName} deleted`,
+                    meta: isChildRow ? 'Just now · 1 image removed' : `Just now · ${deleteCount} image(s) removed`,
                   })
                   setRefreshKey((prev) => prev + 1)
                 } catch (err) {
-                  console.error('TTG delete failed', err)
-                  const message = getErrorMessage(err, 'Unable to delete TTG.')
+                  console.error('Delete failed', err)
+                  const message = getErrorMessage(err, 'Unable to delete.')
                   setError(message)
                   addNotification({
-                    title: 'TTG delete failed',
+                    title: isChildRow ? 'Image delete failed' : 'Pass ID delete failed',
                     meta: 'Just now · Please try again',
                   })
                 }
