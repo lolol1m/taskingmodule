@@ -33,6 +33,12 @@ class QueryManager():
     def createKeycloakUser(self, username, password, role_name):
         return self._keycloak.createKeycloakUser(username, password, role_name)
 
+    def deleteKeycloakUser(self, user_id):
+        return self._keycloak.deleteKeycloakUser(user_id)
+
+    def editKeycloakUser(self, user_id, new_username, new_role, new_status):
+        return self._keycloak.editKeycloakUser(user_id, new_username, new_role, new_status)
+
     def get_keycloak_admin_token(self):
         '''
         Obtain Keycloak admin token of xbi-tasking-admin client
@@ -45,6 +51,9 @@ class QueryManager():
     
     def getUserActiveTasks(self, keycloak_user_id):
         return self._tasking.getUserActiveTasks(keycloak_user_id)
+
+    def getUserAnyTaskCount(self, keycloak_user_id):
+        return self._tasking.getUserAnyTaskCount(keycloak_user_id)
 
     def getActiveTaskCountsForUsers(self, keycloak_user_ids):
         return self._tasking.getActiveTaskCountsForUsers(keycloak_user_ids)
@@ -72,6 +81,9 @@ class QueryManager():
     
     def getTaskStatusID(self, status_name):
         return self._tasking.getTaskStatusID(status_name)
+
+    def getImageIdsForTasks(self, task_ids):
+        return self._tasking.getImageIdsForTasks(task_ids)
     
     def completeImage(self, scvu_image_id, vetter_keycloak_id, current_datetime):
         return self._images.completeImage(scvu_image_id, vetter_keycloak_id, current_datetime)
@@ -154,8 +166,21 @@ class QueryManager():
     def updateTaskingSummaryImage(self, scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing):
         return self._tasking.updateTaskingSummaryImage(scvu_image_id, report_name, image_category_name, image_quality_name, cloud_cover_name, target_tracing)
     
-    def updateTaskingSummaryTask(self, scvu_task_id, remarks=None, ir_reported=None, sf_reported=None):
-        return self._tasking.updateTaskingSummaryTask(scvu_task_id, remarks, ir_reported, sf_reported)
+    def updateTaskingSummaryTask(
+        self,
+        scvu_task_id,
+        remarks=None,
+        report_name=None,
+        cloud_cover_name=None,
+        image_quality_name=None,
+    ):
+        return self._tasking.updateTaskingSummaryTask(
+            scvu_task_id,
+            remarks,
+            report_name,
+            cloud_cover_name,
+            image_quality_name,
+        )
 
     def getImageAreaData(self, scvu_image_id):
         return self._images.getImageAreaData(scvu_image_id)

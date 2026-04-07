@@ -6,6 +6,7 @@ from api_utils import error_response, model_to_dict, run_blocking
 from schemas import (
     AssignTaskPayload,
     DateRangePayload,
+    ImageAreaIdsPayload,
     ImageIdsPayload,
     KeyValueMapResponse,
     StatusResponse,
@@ -193,6 +194,8 @@ async def update_tasking_manager_data(request: Request, payload: UpdateTaskingMa
                 )
             return StatusResponse(status="success", message="Tasking manager updated")
         return result
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_tasking_manager_update")
     except Exception:
         logger.exception("updateTaskingManagerData failed")
         return error_response(500, "Failed to update tasking manager", "update_tasking_manager_failed")
@@ -226,7 +229,7 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
         }
     '''
     try:
-        if not is_admin_user(user):
+        if not can_assign_tasks(user):
             return error_response(403, "Insufficient permissions", "insufficient_permissions")
         data = model_to_dict(payload)
         tasks = data.get("Tasks", [])
@@ -243,9 +246,35 @@ async def assign_task(request: Request, payload: AssignTaskPayload, user: dict =
                 ip_address=request.client.host if request.client else None,
             )
         return {"status": "success", "message": "Tasks assigned successfully", "tasks_processed": task_count}
+    except ValueError as e:
+        return error_response(400, str(e), "invalid_assignee")
     except Exception:
         logger.exception("assignTask failed")
         return error_response(500, "Failed to assign tasks", "assign_task_failed")
+
+
+@router.post("/autoAssignTasks")
+async def auto_assign_tasks(request: Request, payload: ImageAreaIdsPayload, user: dict = Depends(get_current_user)):
+    try:
+        if not can_assign_tasks(user):
+            return error_response(403, "Insufficient permissions", "insufficient_permissions")
+        data = model_to_dict(payload)
+        area_ids = data.get("SCVU Image Area ID", [])
+        if not area_ids:
+            return error_response(400, "SCVU Image Area ID list is required", "missing_image_area_ids")
+        processed = await run_blocking(request.app.state.tasking_service.auto_assign_tasks, data)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_auto_assign",
+                user,
+                details={"area_count": len(area_ids), "tasks_processed": processed},
+                ip_address=request.client.host if request.client else None,
+            )
+        return {"status": "success", "message": "Auto-assignment completed", "tasks_processed": processed}
+    except Exception:
+        logger.exception("autoAssignTasks failed")
+        return error_response(500, "Failed to auto-assign tasks", "auto_assign_failed")
 
 
 @router.post("/startTasks")
@@ -283,6 +312,35 @@ async def start_tasks(request: Request, payload: TaskIdsPayload, user: dict = De
         return error_response(500, "Failed to start tasks", "start_tasks_failed")
 
 
+@router.post("/endTasks")
+async def end_tasks(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
+    '''
+    Function: Ends the Tasks by reverting task status from In Progress back to Incomplete
+    
+    Input:
+
+        {
+            'SCVU Task ID': <list of int>
+        }
+    '''
+    try:
+        result = await run_blocking(request.app.state.tasking_service.end_tasks, model_to_dict(payload))
+        if result is None:
+            audit = getattr(request.app.state, "audit_service", None)
+            if audit:
+                audit.log_event(
+                    "task_end",
+                    user,
+                    details={"task_count": len(payload.task_ids)},
+                    ip_address=request.client.host if request.client else None,
+                )
+            return StatusResponse(status="success", message="Tasks ended")
+        return result
+    except Exception:
+        logger.exception("endTasks failed")
+        return error_response(500, "Failed to end tasks", "end_tasks_failed")
+
+
 @router.post("/completeTasks")
 async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
@@ -301,7 +359,7 @@ async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict =
         }
     '''
     try:
-        result = await run_blocking(request.app.state.tasking_service.complete_tasks, model_to_dict(payload))
+        result = await run_blocking(request.app.state.tasking_service.complete_tasks, model_to_dict(payload), user)
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)
             if audit:
@@ -317,6 +375,44 @@ async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict =
         logger.exception("completeTasks failed")
         return error_response(500, "Failed to complete tasks", "complete_tasks_failed")
     
+
+@router.post("/startVerification")
+async def start_verification(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
+    try:
+        vetter_keycloak_id = user.get("sub")
+        await run_blocking(request.app.state.tasking_service.start_verification, model_to_dict(payload), vetter_keycloak_id)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_start_verification",
+                user,
+                details={"task_count": len(payload.task_ids)},
+                ip_address=request.client.host if request.client else None,
+            )
+        return StatusResponse(status="success", message="Verification started")
+    except Exception:
+        logger.exception("startVerification failed")
+        return error_response(500, "Failed to start verification", "start_verification_failed")
+
+
+@router.post("/unstartVerification")
+async def unstart_verification(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
+    try:
+        vetter_keycloak_id = user.get("sub")
+        await run_blocking(request.app.state.tasking_service.unstart_verification, model_to_dict(payload), vetter_keycloak_id)
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "task_unstart_verification",
+                user,
+                details={"task_count": len(payload.task_ids)},
+                ip_address=request.client.host if request.client else None,
+            )
+        return StatusResponse(status="success", message="Verification unstarted")
+    except Exception:
+        logger.exception("unstartVerification failed")
+        return error_response(500, "Failed to unstart verification", "unstart_verification_failed")
+
 
 @router.post("/verifyPass")
 async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
@@ -336,7 +432,12 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
         }
     '''
     try:
-        result = await run_blocking(request.app.state.tasking_service.verify_pass, model_to_dict(payload))
+        result = await run_blocking(
+            request.app.state.tasking_service.verify_pass,
+            model_to_dict(payload),
+            user.get("sub"),
+            user,
+        )
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)
             if audit:
@@ -348,6 +449,8 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
                 )
             return StatusResponse(status="success", message="Tasks verified")
         return result
+    except ValueError as e:
+        return error_response(400, str(e), "verify_pass_validation_failed")
     except Exception:
         logger.exception("verifyPass failed")
         return error_response(500, "Failed to verify tasks", "verify_pass_failed")
@@ -356,7 +459,8 @@ async def verify_pass(request: Request, payload: TaskIdsPayload, user: dict = De
 @router.post("/verifyFail")
 async def verify_fail(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     '''
-    Function: Verifies the Tasks as Failed and resets task status to In Progress
+    Function: Verifies the Tasks as Failed and re-queues them as Incomplete
+              so a fresh exploit window can be tracked on restart
     
     Input:
 
@@ -557,8 +661,6 @@ async def update_tasking_summary_data(request: Request, payload: UpdateTaskingSu
         
     '''
     try:
-        if not is_admin_user(user):
-            return error_response(403, "Insufficient permissions", "insufficient_permissions")
         result = await run_blocking(request.app.state.tasking_service.update_tasking_summary, model_to_dict(payload))
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)

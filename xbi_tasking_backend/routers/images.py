@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request, UploadFile
 
 from api_utils import error_response, model_to_dict, run_blocking
 from constants import ContentType, MAX_UPLOAD_BYTES
-from schemas import DeleteImagePayload, InsertTTGPayload, StatusResponse
+from schemas import DeleteImageAreaPayload, DeleteImagePayload, InsertTTGPayload, StatusResponse
 from security import get_current_user, is_admin_user
 
 
@@ -160,6 +160,26 @@ async def insert_ttg_data(request: Request, payload: InsertTTGPayload, user: dic
         return error_response(500, "Failed to insert TTG data", "insert_ttg_failed", {"error": str(e)})
 
 
+@router.post("/updatePassEntry")
+async def update_pass_entry(request: Request, payload: dict, user: dict = Depends(get_current_user)):
+    try:
+        result = await run_blocking(request.app.state.image_service.update_pass_entry, payload)
+        return result
+    except Exception as e:
+        logger.exception("updatePassEntry failed")
+        return error_response(500, "Failed to update pass entry", "update_pass_failed", {"error": str(e)})
+
+
+@router.get("/getPasses")
+async def get_passes(request: Request, user: dict = Depends(get_current_user)):
+    try:
+        result = await run_blocking(request.app.state.image_service.get_passes)
+        return result
+    except Exception as e:
+        logger.exception("getPasses failed")
+        return error_response(500, "Failed to get passes", "get_passes_failed", {"error": str(e)})
+
+
 @router.post("/deleteImage")
 async def delete_image(request: Request, payload: DeleteImagePayload, user: dict = Depends(get_current_user)):
     '''
@@ -193,3 +213,24 @@ async def delete_image(request: Request, payload: DeleteImagePayload, user: dict
     except Exception as e:
         logger.exception("deleteImage failed")
         return error_response(500, "Failed to delete image", "delete_image_failed", {"error": str(e)})
+
+
+@router.post("/deleteImageArea")
+async def delete_image_area(request: Request, payload: DeleteImageAreaPayload, user: dict = Depends(get_current_user)):
+    if not is_admin_user(user):
+        return error_response(403, "Insufficient permissions", "insufficient_permissions")
+    try:
+        result = await run_blocking(request.app.state.image_service.delete_image_area, model_to_dict(payload))
+        audit = getattr(request.app.state, "audit_service", None)
+        if audit:
+            audit.log_event(
+                "image_area_delete",
+                user,
+                target=str(payload.image_area_id),
+                details={"image_area_id": payload.image_area_id},
+                ip_address=request.client.host if request.client else None,
+            )
+        return result
+    except Exception as e:
+        logger.exception("deleteImageArea failed")
+        return error_response(500, "Failed to delete image area", "delete_image_area_failed", {"error": str(e)})

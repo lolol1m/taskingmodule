@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Autocomplete,
   Box,
   Button,
-  Checkbox,
   ClickAwayListener,
   LinearProgress,
   MenuItem,
@@ -12,6 +11,7 @@ import {
   Typography,
 } from '@mui/material'
 import { DataGridPro } from '@mui/x-data-grid-pro'
+import truePng from '../../../assets/true.png'
 import API from '../../../api/api'
 import { ToastContainer, toast} from 'react-toastify';
 import UserService from '../../../auth/UserService';
@@ -20,6 +20,9 @@ const api = new API()
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
+
+const TABLE_AUTO_REFRESH_MS = 5000
+const IMAGE_QUALITY_OPTIONS = ['Low', 'Medium', 'High']
 
 
 
@@ -45,11 +48,17 @@ const getRemarksValue = (entry) => {
   return normalized.trim().length === 0 ? '' : normalized
 }
 
+const dashIfEmpty = (value) => (value === null || value === undefined || value === '' ? '—' : value)
+const normalizeSelectValue = (value) => (value === '—' ? '' : (value ?? ''))
+const normalizePassKey = (value) => String(value || '').trim().toLowerCase()
+
 const buildRows = (inputData) => {
   if (!inputData) return []
 
   const rows = []
   const taskProgress = new Map()
+  const passParentByImageId = new Map()
+  const passParentRows = new Map()
 
   Object.keys(inputData).forEach((key) => {
     const entry = inputData[key]
@@ -60,7 +69,8 @@ const buildRows = (inputData) => {
     const normalized = typeof status === 'string' ? status.trim().toLowerCase() : ''
     const current = taskProgress.get(parentId) || { completed: 0, total: 0 }
     current.total += 1
-    if (normalized === 'completed') {
+    // Treat Verifying as completed progress for Image Status bar.
+    if (normalized === 'completed' || normalized === 'verifying') {
       current.completed += 1
     }
     taskProgress.set(parentId, current)
@@ -79,31 +89,60 @@ const buildRows = (inputData) => {
 
     if (entry['Child ID']) {
       const imageFileName = normalizeImageName(entry['Image File Name'] || `Image_${key}`)
-      rows.push({
-        id: Number(key),
-        groupName: [imageFileName],
-        treePath: [`img_${key}`],
-        sensorName: entry['Sensor Name'],
-        imageId: entry['Image ID'],
-        uploadDate: entry['Upload Date'],
-        imageDateTime: entry['Image Datetime'],
-        areaName: entry['Area'],
-        assignee: entry['Assignee'],
-        report: entry['Report'],
-        taskCompleted: resolveTaskCompleted(entry, key),
-        priority: entry['Priority'],
-        imageQuality: entry['Image Quality'],
-        cloudCover: entry['Cloud Cover'],
-        color: entry['Color'] ?? entry['color'] ?? '',
-        service: entry['Service'] ?? entry['service'] ?? '',
-        exploitStartTime:
-          entry['Exploit Start Time'] ?? entry['Expliot Start Time'] ?? entry['exploitStartTime'] ?? '',
-        exploitEndTime:
-          entry['Exploit End Time'] ?? entry['Expliot End Time'] ?? entry['exploitEndTime'] ?? '',
-        irReported: entry['IR Reported'] ?? entry['irReported'] ?? null,
-        sfReported: entry['SF Reported'] ?? entry['sfReported'] ?? null,
-        remarks: getRemarksValue(entry),
-        childId: entry['Child ID'],
+      const numericImageId = Number(key)
+      const defaultRowId = Number.isFinite(numericImageId) ? numericImageId : key
+      const existingParent = passParentRows.get(imageFileName)
+      const passRowId = existingParent?.id ?? defaultRowId
+      const passTreeKey = existingParent?.treePath?.[0] || `pass_${imageFileName}_${passRowId}`
+      passParentByImageId.set(String(key), { rowId: passRowId, treeKey: passTreeKey })
+
+      if (!passParentRows.has(imageFileName)) {
+        passParentRows.set(imageFileName, {
+          id: passRowId,
+          groupName: [imageFileName],
+          treePath: [passTreeKey],
+          sensorName: dashIfEmpty(entry['Sensor Name']),
+          imageId: '—',
+          uploadDate: '—',
+          imageDateTime: '—',
+          areaName: '—',
+          assignee: dashIfEmpty(entry['Assignee']),
+          report: '—',
+          taskCompleted: '0/0',
+          priority: '—',
+          imageQuality: '—',
+          cloudCover: '—',
+          color: entry['Color'] ?? entry['color'] ?? '',
+          service: entry['Service'] ?? entry['service'] ?? '',
+          exploitStartTime:
+            entry['Exploit Start Time'] ?? entry['Expliot Start Time'] ?? entry['exploitStartTime'] ?? '',
+          exploitEndTime:
+            entry['Exploit End Time'] ?? entry['Expliot End Time'] ?? entry['exploitEndTime'] ?? '',
+          remarks: '—',
+          childId: [],
+          childImageIds: [],
+        })
+      }
+
+      const parentRow = passParentRows.get(imageFileName)
+      const parentChildIds = Array.isArray(parentRow.childId) ? parentRow.childId : []
+      const nextChildIds = [...parentChildIds, ...(entry['Child ID'] || [])]
+      const uniqueChildIds = [...new Set(nextChildIds)]
+      const childImageIds = [...new Set([...(parentRow.childImageIds || []), Number(key)])]
+      const progress = taskProgress.get(Number(key))
+      const currentCompleted = progress?.completed ?? 0
+      const currentTotal = progress?.total ?? 0
+      const existingProgress = parseProgress(parentRow.taskCompleted)
+      const [prevCompleted, prevTotal] =
+        existingProgress === null
+          ? [0, 0]
+          : parentRow.taskCompleted.split('/').map((item) => Number(item))
+
+      passParentRows.set(imageFileName, {
+        ...parentRow,
+        taskCompleted: `${(prevCompleted || 0) + currentCompleted}/${(prevTotal || 0) + currentTotal}`,
+        childId: uniqueChildIds,
+        childImageIds,
       })
       return
     }
@@ -112,35 +151,47 @@ const buildRows = (inputData) => {
       const parentId = Number(entry['Parent ID'])
       const parent = inputData[parentId] || inputData[entry['Parent ID']]
       const parentName = normalizeImageName(parent?.['Image File Name'] || `Image_${parentId}`)
-      const areaName = entry['Area Name'] || `Area_${key}`
+      const parentMeta = passParentByImageId.get(String(parentId))
+      const parentPassId = parentMeta?.rowId ?? parentId
+      const parentTreeKey = parentMeta?.treeKey ?? `pass_${parentName}_${parentPassId}`
+      const subImageName = entry['imgName'] ?? entry['Img Name'] ?? entry['Area Name'] ?? `Area_${key}`
+      const areaDisplayName =
+        entry['Area ID'] ?? entry['areaId'] ?? entry['SCVU Image Area ID'] ?? entry['Area Name'] ?? `Area_${key}`
       rows.push({
         id: Number(key),
-        groupName: [parentName, areaName],
-        treePath: [`img_${parentId}`, areaName],
-        taskStatus: entry['Task Status'],
-        assignee: entry['Assignee'],
-        areaName,
+        groupName: [parentName, subImageName],
+        treePath: [parentTreeKey, subImageName],
+        taskStatus: dashIfEmpty(entry['Task Status']),
+        assignee: dashIfEmpty(entry['Assignee']),
+        imageId: dashIfEmpty(entry['Image ID'] ?? parent?.['Image ID']),
+        uploadDate: dashIfEmpty(parent?.['Upload Date']),
+        imageDateTime: dashIfEmpty(parent?.['Image Datetime']),
+        report: dashIfEmpty(entry['Report'] ?? parent?.['Report']),
+        priority: dashIfEmpty(entry['Priority'] ?? parent?.['Priority']),
+        cloudCover: dashIfEmpty(entry['Cloud Cover'] ?? parent?.['Cloud Cover']),
+        areaName: areaDisplayName,
+        imgName: subImageName,
         color: entry['Color'] ?? entry['color'] ?? '',
         service: entry['Service'] ?? entry['service'] ?? '',
         exploitStartTime:
           entry['Exploit Start Time'] ?? entry['Expliot Start Time'] ?? entry['exploitStartTime'] ?? '',
         exploitEndTime:
           entry['Exploit End Time'] ?? entry['Expliot End Time'] ?? entry['exploitEndTime'] ?? '',
-        irReported: entry['IR Reported'] ?? entry['irReported'] ?? null,
-        sfReported: entry['SF Reported'] ?? entry['sfReported'] ?? null,
-        imageQuality: entry['Image Quality'] ?? parent?.['Image Quality'] ?? '',
+        imageQuality: dashIfEmpty(entry['Image Quality'] ?? parent?.['Image Quality'] ?? ''),
         remarks: getRemarksValue(entry),
-        parentId,
+        parentId: parentPassId,
         areaId: entry['Area ID'] ?? entry['areaId'] ?? entry['SCVU Image Area ID'] ?? null,
         scvuTaskId: entry['SCVU Task ID'] || null,
+        sfReported: Boolean(entry['SF Reported'] ?? entry['sfReported'] ?? false),
+        iirReported: Boolean(entry['IIR Reported'] ?? entry['iirReported'] ?? false),
+        vetterKeycloakId: entry['Vetter Keycloak ID'] ?? entry['vetterKeycloakId'] ?? null,
+        vetter: entry['Vetter'] ?? entry['vetter'] ?? null,
       })
     }
   })
 
-  return rows
+  return [...passParentRows.values(), ...rows]
 }
-
-const formatBoolean = (value) => (value === true ? 'Yes' : value === false ? 'No' : '')
 
 const parseProgress = (value) => {
   if (!value || typeof value !== 'string' || !value.includes('/')) return null
@@ -178,7 +229,16 @@ const toBackendTaskId = (rowKey) => {
   return numericKey < 0 ? Math.abs(numericKey) : numericKey
 }
 
-function TaskingSummaryTab({ dateRange, isCollapsed }) {
+function TaskingSummaryTab({
+  dateRange,
+  isCollapsed,
+  title = 'Tasking Summary',
+  subtitle = 'Task status overview for the selected date range.',
+  taskStatusFilter = null,
+  showVerificationActions = true,
+  verificationOnlyActions = false,
+  readOnlyInputs = false,
+}) {
   const [inputData, setInputData] = useState(null)
   const [workingData, setWorkingData] = useState(null)
   const [dropdownValues, setDropdownValues] = useState(() => {
@@ -195,15 +255,85 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [hasPendingEdits, setHasPendingEdits] = useState(false)
   const [selection, setSelection] = useState([])
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState({ imageAreaName: false })
   const [openCopy, setOpenCopy] = useState(false)
   const [clipboardValue, setClipboardValue] = useState('')
+  const [completedImageCountByPass, setCompletedImageCountByPass] = useState({})
+  const completedImageCountByPassRef = useRef({})
+  const passBaselineTotalsRef = useRef({})
   const { addNotification } = useNotifications()
   const handleTooltipClose = () => setOpenCopy(false)
+  const applyWorkingDataChange = (updater) => {
+    setWorkingData((prev) => updater(prev))
+    setHasPendingEdits(true)
+  }
 
   const rows = useMemo(() => buildRows(workingData || inputData), [workingData, inputData])
+  const normalizedStatusFilters = useMemo(() => {
+    if (!taskStatusFilter) return null
+    const values = Array.isArray(taskStatusFilter) ? taskStatusFilter : [taskStatusFilter]
+    const normalized = values.map((value) => normalizeStatus(value)).filter(Boolean)
+    if (!normalized.length) return null
+    return new Set(normalized)
+  }, [taskStatusFilter])
+  const displayedRows = useMemo(() => {
+    const reportPriority = (report) => {
+      const r = String(report || '').trim().toUpperCase()
+      if (r === 'IIR') return 0
+      if (r === 'DS(SF)') return 1
+      return 2
+    }
+
+    const sortByReport = (list) => {
+      // Separate parent and child rows, sort children by report priority, then
+      // re-attach parents in the order their highest-priority child dictates.
+      const parents = list.filter((row) => row?.parentId === undefined)
+      const children = list.filter((row) => row?.parentId !== undefined)
+      children.sort((a, b) => reportPriority(a.report) - reportPriority(b.report))
+      // Build parent priority: minimum (best) child report priority per parent id.
+      const parentPriority = new Map()
+      children.forEach((row) => {
+        const key = String(row.parentId)
+        const prev = parentPriority.get(key) ?? 99
+        parentPriority.set(key, Math.min(prev, reportPriority(row.report)))
+      })
+      parents.sort((a, b) => {
+        const pa = parentPriority.get(String(a.id)) ?? 99
+        const pb = parentPriority.get(String(b.id)) ?? 99
+        return pa - pb
+      })
+      // Interleave: parent followed by its children in report-priority order.
+      const result = []
+      parents.forEach((parent) => {
+        result.push(parent)
+        children.filter((c) => String(c.parentId) === String(parent.id)).forEach((c) => result.push(c))
+      })
+      // Append any orphan children (shouldn't normally exist).
+      const addedIds = new Set(result.map((r) => r.id))
+      children.filter((c) => !addedIds.has(c.id)).forEach((c) => result.push(c))
+      return result
+    }
+
+    if (!normalizedStatusFilters) return sortByReport(rows)
+    const includedChildIds = new Set(
+      rows
+        .filter((row) => row?.parentId !== undefined)
+        .filter((row) => normalizedStatusFilters.has(normalizeStatus(row?.taskStatus)))
+        .map((row) => row.id),
+    )
+    const parentIds = new Set(
+      rows
+        .filter((row) => includedChildIds.has(row.id))
+        .map((row) => row.parentId)
+        .filter((value) => value !== undefined && value !== null),
+    )
+    const filtered = rows.filter((row) => parentIds.has(row.id) || includedChildIds.has(row.id))
+    return sortByReport(filtered)
+  }, [rows, normalizedStatusFilters])
 
   const reportColor = (value) => {
     switch (value) {
@@ -354,15 +484,62 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     return row ? row[field] : null
   }
 
-  const role = UserService.readUserRoleSingle()
-  const canSeeSubImageName = role === 'IA'
+  const getImageVerificationProgress = (row) => {
+    const source = workingData || inputData
+    if (!source) return null
+    const imageIds = new Set(
+      (Array.isArray(row?.childImageIds) ? row.childImageIds : [])
+        .map((id) => String(id))
+        .filter((id) => id && id !== '—'),
+    )
+    const currentTotal = imageIds.size
+    if (!currentTotal) return null
+    const passKey = normalizePassKey(row?.groupName?.[0] || row?.id?.toString() || '')
+    const completedCount = Number(completedImageCountByPassRef.current[passKey] || 0)
+    if (!passBaselineTotalsRef.current[passKey]) {
+      passBaselineTotalsRef.current[passKey] = currentTotal
+    } else if (currentTotal > passBaselineTotalsRef.current[passKey]) {
+      passBaselineTotalsRef.current[passKey] = currentTotal
+    }
+    const stableTotal =
+      verificationOnlyActions && passBaselineTotalsRef.current[passKey]
+        ? Math.max(currentTotal + completedCount, Number(passBaselineTotalsRef.current[passKey]) || 0)
+        : currentTotal
 
+    let verifiedCurrent = 0
+    imageIds.forEach((imageId) => {
+      const imageEntry = source[String(imageId)]
+      if (!imageEntry) return
+      const childTaskIds = Array.isArray(imageEntry['Child ID']) ? imageEntry['Child ID'] : []
+      if (childTaskIds.length === 0) return
+      const allCompleted = childTaskIds.every((taskId) => {
+        const key = String(-Math.abs(Number(taskId)))
+        const child = source[key] || source[String(taskId)]
+        const status = normalizeStatus(child?.['Task Status'] ?? child?.taskStatus ?? '')
+        return status === 'completed'
+      })
+      if (allCompleted) verifiedCurrent += 1
+    })
+
+    // In unverified/verification views, images that have moved out from this pass
+    // are treated as already verified so the parent total remains stable.
+    const inferredVerified = verificationOnlyActions ? Math.max(stableTotal - currentTotal, 0) : 0
+    const verified = Math.min(stableTotal, verifiedCurrent + inferredVerified)
+
+    return {
+      verified,
+      total: stableTotal,
+      ratio: Math.round((verified / stableTotal) * 100),
+      label: `${verified}/${stableTotal}`,
+    }
+  }
+
+  const role = UserService.readUserRoleSingle()
   const getSubImageLabel = (row, fallbackName = '') => {
     if (!row?.parentId) return fallbackName || row?.id?.toString() || 'unknown'
-    const derivedAreaId = extractAreaIdFromName(row?.areaName || fallbackName)
+    const subImageName = row?.imgName || row?.areaName || fallbackName || ''
+    const derivedAreaId = extractAreaIdFromName(subImageName)
     const subImageId = row?.areaId ?? derivedAreaId ?? row?.scvuTaskId ?? row?.id
-    if (!canSeeSubImageName) return `${subImageId ?? ''}`
-    const subImageName = row?.areaName || fallbackName || ''
     return subImageName || `${subImageId ?? ''}`
   }
 
@@ -381,6 +558,36 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     return qualityValues.join('\n')
   }
 
+  const parseExploitTimestamp = (value) => {
+    if (!value || typeof value !== 'string') return null
+    // Backend commonly sends "YYYY-MM-DD, HH:mm:ss".
+    const normalized = value.includes(', ') ? value.replace(', ', 'T') : value
+    const parsed = new Date(normalized)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const getAggregatedExploitTime = (row, field, mode, gridApi) => {
+    if (!row?.childId || !Array.isArray(row.childId)) return row?.[field] || ''
+    const dateValues = row.childId
+      .map((taskId) => {
+        const numericTaskId = Number(taskId)
+        if (!Number.isFinite(numericTaskId)) return null
+        const taskRowId = -Math.abs(numericTaskId)
+        const taskRow = gridApi?.getRow?.(taskRowId)
+        if (!taskRow) return null
+        const rowValue = taskRow[field]
+        const parsed = parseExploitTimestamp(rowValue || '')
+        return parsed ? { parsed, raw: rowValue } : null
+      })
+      .filter(Boolean)
+
+    if (dateValues.length === 0) return row?.[field] || ''
+    if (mode === 'min') {
+      return dateValues.reduce((acc, curr) => (curr.parsed < acc.parsed ? curr : acc)).raw
+    }
+    return dateValues.reduce((acc, curr) => (curr.parsed > acc.parsed ? curr : acc)).raw
+  }
+
   const roundDownToHour = (value) => {
     if (!value || typeof value !== 'string') return value
     return value.replace(/(\d{2}):\d{2}:\d{2}$/, '$1:00:00')
@@ -392,7 +599,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     () => [
       {
         field: 'imageAreaName',
-        headerName: 'Image/Area Name',
+        headerName: 'Pass ID/Image',
         minWidth: 180,
         flex: 1.3,
         valueGetter: (params) => {
@@ -408,30 +615,72 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       },
       { field: 'sensorName', headerName: 'Sensor Name', minWidth: 110, flex: 0.6 },
       { field: 'imageId', headerName: 'Image ID', minWidth: 90, flex: 0.45 },
-      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 120, flex: 0.7, valueFormatter: dateFormatter },
-      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 130, flex: 0.8, valueFormatter: dateFormatter },
+      { field: 'uploadDate', headerName: 'Upload Date', minWidth: 145, flex: 0.7, valueFormatter: dateFormatter },
+      { field: 'imageDateTime', headerName: 'Image Date Time', minWidth: 145, flex: 0.7, valueFormatter: dateFormatter },
       { field: 'areaName', headerName: 'Area Name', minWidth: 110, flex: 0.6 },
-      { field: 'assignee', headerName: 'Assignee', minWidth: 110, flex: 0.6 },
+      {
+        field: 'assignee',
+        headerName: 'Assignee',
+        minWidth: 110,
+        flex: 0.6,
+        renderCell: (params) => {
+          if (!params?.row) return '—'
+          if (params.row.parentId !== undefined) {
+            return params.row.assignee || '—'
+          }
+          const parentKey = String(params.row.id)
+          const children = rows.filter((row) => String(row.parentId) === parentKey)
+          if (!children.length) return params.row.assignee || '—'
+          const normalized = children
+            .map((row) => String(row.assignee || '').trim())
+            .filter((value) => value && value !== '—' && value.toLowerCase() !== 'nil')
+          if (!normalized.length) return '—'
+          const first = normalized[0]
+          const allSame = normalized.every((value) => value === first)
+          return allSame ? first : 'Multiple'
+        },
+      },
+      ...(verificationOnlyActions
+        ? [
+            {
+              field: 'vetter',
+              headerName: 'Vetter',
+              minWidth: 110,
+              flex: 0.6,
+              renderCell: (params) => {
+                if (!params?.row) return '—'
+                if (params.row.parentId === undefined) return '—'
+                return params.row.vetter || '—'
+              },
+            },
+          ]
+        : []),
       {
         field: 'report',
         headerName: 'Report',
         minWidth: 130,
         flex: 0.6,
         renderCell: (params) => {
-          if (!params?.row?.childId) return null
+          if (!params?.row) return null
+          if (params.row.parentId === undefined) return '—'
           const rowId = params.row.id
-          const currentValue = getWorkingValue(rowId, 'Report') ?? params?.row?.report ?? null
+          const currentValue = normalizeSelectValue(
+            getWorkingValue(rowId, 'Report') ?? params?.row?.report ?? '',
+          )
+          if (readOnlyInputs) {
+            return <Box sx={{ width: '100%' }}>{currentValue || '—'}</Box>
+          }
           return (
             <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
               <TextField
                 select
                 fullWidth
                 size="small"
-                value={currentValue ?? ''}
+                value={currentValue}
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) =>
+                  applyWorkingDataChange((prev) =>
                     updateWorkingRow(prev, rowId, 'Report', event.target.value || null, inputData),
                   )
                 }
@@ -455,23 +704,25 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       {
         field: 'remarks',
         headerName: 'Remarks',
-        minWidth: 140,
-        flex: 0.9,
+        minWidth: 250,
+        flex: 1.1,
         renderCell: (params) => {
           if (!params?.row) return ''
           if (params.row.parentId === undefined) {
-            const parentRemarks = normalizeRemarksValue(params?.row?.remarks ?? '')
-            return (
-              <Box
-                className={`tasking-summary__remarks-parent${parentRemarks ? '' : ' is-empty'}`}
-                sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}
-              >
-                {parentRemarks || '—'}
-              </Box>
-            )
+            return '—'
           }
           const rowId = params.row.id
           const currentValue = normalizeRemarksValue(getWorkingValue(rowId, 'Remarks') ?? params?.row?.remarks ?? '')
+          if (readOnlyInputs) {
+            return (
+              <Box
+                className={`tasking-summary__remarks-parent${currentValue ? '' : ' is-empty'}`}
+                sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}
+              >
+                {currentValue || '—'}
+              </Box>
+            )
+          }
           return (
             <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
               <textarea
@@ -483,7 +734,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
                 onFocus={(event) => event.stopPropagation()}
                 onKeyDownCapture={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) =>
+                  applyWorkingDataChange((prev) =>
                     updateWorkingRow(prev, rowId, 'Remarks', normalizeRemarksValue(event.target.value), inputData),
                   )
                 }
@@ -500,6 +751,58 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
         minWidth: 140,
         flex: 0.8,
         renderCell: (params) => {
+          if (params?.row?.parentId === undefined) {
+            if (verificationOnlyActions) {
+              const verificationProgress = getImageVerificationProgress(params?.row)
+              if (!verificationProgress) return '0/0'
+              return (
+                <Box
+                  sx={{
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    gap: 0.5,
+                  }}
+                >
+                  <LinearProgress
+                    variant="determinate"
+                    value={verificationProgress.ratio}
+                    sx={{ height: 5, borderRadius: 999 }}
+                  />
+                  <Typography variant="caption" sx={{ color: 'var(--muted)', lineHeight: 1.2 }}>
+                    {verificationProgress.label}
+                  </Typography>
+                </Box>
+              )
+            }
+            // Parent rows are synthetic pass-group rows; use the computed row value
+            // instead of looking up by id in workingData/inputData.
+            const progressValue = parseProgress(params?.row?.taskCompleted)
+            if (progressValue !== null) {
+              return (
+                <Box
+                  sx={{
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    gap: 0.5,
+                  }}
+                >
+                  <LinearProgress
+                    variant="determinate"
+                    value={progressValue}
+                    sx={{ height: 5, borderRadius: 999 }}
+                  />
+                  <Typography variant="caption" sx={{ color: 'var(--muted)', lineHeight: 1.2 }}>
+                    {params?.row?.taskCompleted}
+                  </Typography>
+                </Box>
+              )
+            }
+            return params?.row?.taskStatus || ''
+          }
           const rowId = params?.row?.id
           const taskCompleted =
             rowId != null
@@ -533,7 +836,17 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           return taskStatus || ''
         },
       },
-      { field: 'priority', headerName: 'Priority', minWidth: 90, flex: 0.5 },
+      {
+        field: 'priority',
+        headerName: 'Priority',
+        minWidth: 90,
+        flex: 0.5,
+        renderCell: (params) => {
+          if (!params?.row) return '—'
+          if (params.row.parentId === undefined) return '—'
+          return params.row.priority || '—'
+        },
+      },
       {
         field: 'color',
         headerName: 'Color',
@@ -553,55 +866,27 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
         headerName: 'Exploit Start Time',
         minWidth: 140,
         flex: 0.75,
-        renderCell: (params) => params?.row?.exploitStartTime || '—',
+        renderCell: (params) => {
+          if (!params?.row) return '—'
+          if (params.row.parentId === undefined) {
+            const earliestStart = getAggregatedExploitTime(params.row, 'exploitStartTime', 'min', params.api)
+            return earliestStart || '—'
+          }
+          return params.row.exploitStartTime || '—'
+        },
       },
       {
         field: 'exploitEndTime',
         headerName: 'Exploit End Time',
         minWidth: 140,
         flex: 0.75,
-        renderCell: (params) => params?.row?.exploitEndTime || '—',
-      },
-      {
-        field: 'irReported',
-        headerName: 'IR Reported',
-        minWidth: 95,
-        flex: 0.5,
         renderCell: (params) => {
-          if (!params?.row || role !== 'IA') return ''
-          if (params?.row?.parentId === undefined) return formatBoolean(params?.row?.irReported)
-          const rowId = params.row.id
-          const currentValue = Boolean(getWorkingValue(rowId, 'IR Reported') ?? params?.row?.irReported)
-          return (
-            <Checkbox
-              checked={currentValue}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'IR Reported', newValue, inputData))
-              }
-            />
-          )
-        },
-      },
-      {
-        field: 'sfReported',
-        headerName: 'SF Reported',
-        minWidth: 95,
-        flex: 0.5,
-        renderCell: (params) => {
-          if (!params?.row || role !== 'IA') return ''
-          if (params?.row?.parentId === undefined) return formatBoolean(params?.row?.sfReported)
-          const rowId = params.row.id
-          const currentValue = Boolean(getWorkingValue(rowId, 'SF Reported') ?? params?.row?.sfReported)
-          return (
-            <Checkbox
-              checked={currentValue}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(_, newValue) =>
-                setWorkingData((prev) => updateWorkingRow(prev, rowId, 'SF Reported', newValue, inputData))
-              }
-            />
-          )
+          if (!params?.row) return '—'
+          if (params.row.parentId === undefined) {
+            const latestEnd = getAggregatedExploitTime(params.row, 'exploitEndTime', 'max', params.api)
+            return latestEnd || '—'
+          }
+          return params.row.exploitEndTime || '—'
         },
       },
       {
@@ -612,31 +897,59 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
         renderCell: (params) => {
           if (!params?.row) return ''
           if (params.row.parentId === undefined) {
-            const aggregated = getAggregatedImageQuality(params.row)
             return (
-              <Box className="tasking-summary__remarks-parent" sx={{ width: '100%', whiteSpace: 'pre-wrap', lineHeight: 1.25 }}>
-                {aggregated || '—'}
+              <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                —
               </Box>
             )
           }
           const rowId = params.row.id
-          const currentValue = getWorkingValue(rowId, 'Image Quality') ?? params?.row?.imageQuality ?? ''
+          const rawCurrentValue = getWorkingValue(rowId, 'Image Quality') ?? params?.row?.imageQuality ?? ''
+          const currentValue = IMAGE_QUALITY_OPTIONS.find(
+            (option) => option.toLowerCase() === String(rawCurrentValue).trim().toLowerCase(),
+          ) || ''
+          if (readOnlyInputs) {
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: 1.25,
+                }}
+              >
+                {currentValue || rawCurrentValue || '—'}
+              </Box>
+            )
+          }
           return (
-            <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
-              <textarea
-                rows={1}
-                value={currentValue ?? ''}
+            <Box sx={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={currentValue}
                 onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-                onFocus={(event) => event.stopPropagation()}
-                onKeyDownCapture={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) => updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData))
+                  applyWorkingDataChange((prev) =>
+                    updateWorkingRow(prev, rowId, 'Image Quality', event.target.value, inputData),
+                  )
                 }
-                placeholder="Image quality"
-                className="tasking-summary__remarks-input"
-              />
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => (selected ? selected : 'Image Quality'),
+                }}
+                sx={cloudCoverSelectSx()}
+              >
+                <MenuItem value="" sx={{ display: 'none' }} />
+                {IMAGE_QUALITY_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Box>
           )
         },
@@ -647,20 +960,26 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
         minWidth: 132,
         flex: 0.68,
         renderCell: (params) => {
-          if (!params?.row?.childId) return null
+          if (!params?.row) return null
+          if (params.row.parentId === undefined) return '—'
           const rowId = params.row.id
-          const currentValue = getWorkingValue(rowId, 'Cloud Cover') ?? params?.row?.cloudCover ?? null
+          const currentValue = normalizeSelectValue(
+            getWorkingValue(rowId, 'Cloud Cover') ?? params?.row?.cloudCover ?? '',
+          )
+          if (readOnlyInputs) {
+            return <Box sx={{ width: '100%' }}>{currentValue || '—'}</Box>
+          }
           return (
             <Box sx={{ width: '100%', minWidth: 0, display: 'flex', alignItems: 'center' }}>
               <TextField
                 select
                 fullWidth
                 size="small"
-                value={currentValue ?? ''}
+                value={currentValue}
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
                 onChange={(event) =>
-                  setWorkingData((prev) =>
+                  applyWorkingDataChange((prev) =>
                     updateWorkingRow(prev, rowId, 'Cloud Cover', event.target.value || null, inputData),
                   )
                 }
@@ -681,17 +1000,66 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           )
         },
       },
+      ...(verificationOnlyActions
+        ? [
+            {
+              field: 'sfReported',
+              headerName: 'SF Reported',
+              minWidth: 110,
+              flex: 0.55,
+              renderCell: (params) => {
+                if (params?.row?.parentId === undefined) return '—'
+                const report = String(params?.row?.report || '').trim().toUpperCase()
+                if (report !== 'DS(SF)' && report !== 'IIR') return '—'
+                return params?.row?.sfReported ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img
+                      src={truePng}
+                      alt="reported"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        filter:
+                          'brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(189deg) brightness(118%)',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ color: 'var(--muted)' }}>—</Box>
+                )
+              },
+            },
+            {
+              field: 'iirReported',
+              headerName: 'IIR Reported',
+              minWidth: 110,
+              flex: 0.55,
+              renderCell: (params) => {
+                if (params?.row?.parentId === undefined) return '—'
+                const report = String(params?.row?.report || '').trim().toUpperCase()
+                if (report !== 'IIR') return '—'
+                return params?.row?.iirReported ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img
+                      src={truePng}
+                      alt="reported"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        filter:
+                          'brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(189deg) brightness(118%)',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ color: 'var(--muted)' }}>—</Box>
+                )
+              },
+            },
+          ]
+        : []),
     ],
-    [],
-  )
-
-  const columnVisibilityModel = useMemo(
-    () => ({
-      imageAreaName: false,
-      irReported: role === 'IA',
-      sfReported: role === 'IA',
-    }),
-    [role],
+    [readOnlyInputs, role, rows, verificationOnlyActions],
   )
 
   useEffect(() => {
@@ -700,6 +1068,11 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       quickFilterValues: searchText ? [searchText] : [],
     }))
   }, [searchText])
+
+  useEffect(() => {
+    const visibleIds = new Set(displayedRows.map((row) => row.id))
+    setSelection((prev) => prev.filter((id) => visibleIds.has(id)))
+  }, [displayedRows])
 
   const getTreeDataPath = (row) => {
     if (row.treePath && Array.isArray(row.treePath)) {
@@ -734,6 +1107,27 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCompletedCountsByPass = async () => {
+    if (!verificationOnlyActions || !dateRange) return
+    try {
+      const data = await api.getCompleteImageData(dateRange)
+      const counts = {}
+      Object.keys(data || {}).forEach((key) => {
+        const entry = data?.[key]
+        if (!entry || !entry['Child ID']) return
+        const passName = normalizePassKey(normalizeImageName(entry['Image File Name'] || ''))
+        if (!passName) return
+        counts[passName] = (counts[passName] || 0) + 1
+      })
+      completedImageCountByPassRef.current = counts
+      setCompletedImageCountByPass(counts)
+    } catch (err) {
+      console.warn('Completed image count fetch failed:', err)
+      completedImageCountByPassRef.current = {}
+      setCompletedImageCountByPass({})
     }
   }
 
@@ -853,34 +1247,244 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       '/tasking/completeTasks': ['in progress'],
       '/tasking/verifyPass': ['verifying'],
       '/tasking/verifyFail': ['verifying'],
+      '/tasking/startVerification': ['verifying'],
+      '/tasking/unstartVerification': ['verifying'],
     }
+    const selectedTaskRows = taskRows
+      .map((rowId) => rows.find((item) => item.id === rowId))
+      .filter((row) => !!row)
+
     const expected = allowedStatuses[apiPath]
-    if (expected) {
-      const invalid = taskRows
-        .map((rowId) => rows.find((item) => item.id === rowId))
-        .filter((row) => {
-          const status = normalizeStatus(row?.taskStatus)
-          return !expected.includes(status)
-        })
-      if (invalid.length) {
-        const expectedLabel = expected.map((value) => value.replace(/\b\w/g, (c) => c.toUpperCase())).join(', ')
+    let eligibleRows = expected
+      ? selectedTaskRows.filter((row) => expected.includes(normalizeStatus(row?.taskStatus)))
+      : selectedTaskRows
+
+    if (eligibleRows.length === 0) {
+      const expectedLabel = (expected || [])
+        .map((value) => value.replace(/\b\w/g, (c) => c.toUpperCase()))
+        .join(', ')
+      addNotification({
+        title: 'No eligible tasks',
+        meta: expectedLabel
+          ? `Expected ${expectedLabel} for selected rows`
+          : 'No selected tasks can be updated',
+      })
+      return
+    }
+
+    if (expected && eligibleRows.length < selectedTaskRows.length) {
+      addNotification({
+        title: 'Some rows skipped',
+        meta: `${selectedTaskRows.length - eligibleRows.length} task(s) not in required status`,
+      })
+    }
+
+    const currentUserKeycloakId = UserService.getTokenParsed()?.sub
+    if (apiPath === '/tasking/startVerification') {
+      const alreadyClaimed = eligibleRows.filter((row) => row.vetterKeycloakId && row.vetterKeycloakId !== currentUserKeycloakId)
+      if (alreadyClaimed.length > 0) {
         addNotification({
-          title: 'Invalid task status',
-          meta: `Expected ${expectedLabel} · ${invalid.length} task(s) not ready`,
+          title: 'Already being verified',
+          meta: `${alreadyClaimed.length} task(s) are being verified by another user`,
+        })
+      }
+    }
+
+    if (apiPath === '/tasking/unstartVerification') {
+      const notMine = eligibleRows.filter((row) => row.vetterKeycloakId !== currentUserKeycloakId)
+      if (notMine.length === eligibleRows.length) {
+        addNotification({
+          title: 'Cannot unstart',
+          meta: 'You can only unstart verification for tasks you are verifying',
         })
         return
       }
     }
 
-    const taskIds = taskRows.map((rowId) => {
-      const row = rows.find((item) => item.id === rowId)
-      return row?.scvuTaskId || rowId
-    })
+    if ((apiPath === '/tasking/verifyPass' || apiPath === '/tasking/verifyFail') && verificationOnlyActions) {
+      const notMine = eligibleRows.filter((row) => !row.vetterKeycloakId || row.vetterKeycloakId !== currentUserKeycloakId)
+      if (notMine.length === eligibleRows.length) {
+        addNotification({
+          title: 'Verification locked',
+          meta: 'You must start verification before verifying these tasks',
+        })
+        return
+      }
+      if (notMine.length > 0) {
+        eligibleRows = eligibleRows.filter((row) => row.vetterKeycloakId === currentUserKeycloakId)
+        addNotification({
+          title: 'Some rows skipped',
+          meta: `${notMine.length} task(s) not assigned to you for verification`,
+        })
+      }
+    }
+
+    let actionableRows = eligibleRows
+    if (apiPath === '/tasking/completeTasks') {
+      const missingInputs = eligibleRows.filter((row) => {
+        const rowId = row?.id
+        const report = normalizeSelectValue(getWorkingValue(rowId, 'Report') ?? row?.report ?? '')
+        const cloudCover = normalizeSelectValue(getWorkingValue(rowId, 'Cloud Cover') ?? row?.cloudCover ?? '')
+        const imageQuality = normalizeSelectValue(getWorkingValue(rowId, 'Image Quality') ?? row?.imageQuality ?? '')
+        return !report || !cloudCover || !imageQuality
+      })
+
+      if (missingInputs.length === eligibleRows.length) {
+        addNotification({
+          title: 'Missing required inputs',
+          meta: 'Fill Report, Cloud Cover, and Image Quality before Complete Task',
+        })
+        return
+      }
+
+      if (missingInputs.length > 0) {
+        const missingRowIds = new Set(missingInputs.map((row) => row.id))
+        actionableRows = eligibleRows.filter((row) => !missingRowIds.has(row.id))
+        addNotification({
+          title: 'Some rows skipped',
+          meta: `${missingInputs.length} task(s) missing required inputs`,
+        })
+      }
+    }
+
+    if (apiPath === '/tasking/startTasks' || apiPath === '/tasking/completeTasks') {
+      const inputPayload = {}
+      actionableRows.forEach((row) => {
+        const key = String(row.id)
+        const baseRow = inputData?.[key] || {}
+        const currentRow = workingData?.[key] || {}
+        const currentRemarks = normalizeRemarksValue(
+          currentRow['Remarks'] ?? currentRow.remarks ?? row.remarks ?? '',
+        )
+        const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
+        const currentReport = normalizeSelectValue(
+          currentRow['Report'] ?? currentRow.report ?? row.report ?? '',
+        )
+        const baseReport = normalizeSelectValue(baseRow['Report'] ?? baseRow.report ?? '')
+        const currentCloudCover = normalizeSelectValue(
+          currentRow['Cloud Cover'] ?? currentRow.cloudCover ?? row.cloudCover ?? '',
+        )
+        const baseCloudCover = normalizeSelectValue(baseRow['Cloud Cover'] ?? baseRow.cloudCover ?? '')
+        const currentImageQuality = normalizeSelectValue(
+          currentRow['Image Quality'] ?? currentRow.imageQuality ?? row.imageQuality ?? '',
+        )
+        const baseImageQuality = normalizeSelectValue(baseRow['Image Quality'] ?? baseRow.imageQuality ?? '')
+        const taskId = row['SCVU Task ID'] ?? row?.scvuTaskId ?? toBackendTaskId(row.id)
+        const patch = {}
+        if (currentRemarks !== baseRemarks) patch['Remarks'] = currentRemarks
+        if (currentReport !== baseReport) patch['Report'] = currentReport
+        if (currentCloudCover !== baseCloudCover) patch['Cloud Cover'] = currentCloudCover
+        if (currentImageQuality !== baseImageQuality) patch['Image Quality'] = currentImageQuality
+        if (Object.keys(patch).length > 0) inputPayload[taskId] = patch
+      })
+      if (Object.keys(inputPayload).length > 0) {
+        try {
+          await api.postUpdateTaskingSummaryData(inputPayload)
+        } catch (err) {
+          console.error('Tasking Summary auto-save failed:', err)
+          const message = getErrorMessage(err, 'Unable to save task inputs.')
+          setError(message)
+          addNotification({
+            title: 'Auto-save failed',
+            meta: 'Status update cancelled',
+          })
+          return
+        }
+      }
+    }
+
+    const taskIds = actionableRows.map((row) => row?.scvuTaskId || row?.id)
     try {
       setError(null)
       await api.client({ url: `${apiPath}`, method: 'post', data: { 'SCVU Task ID': taskIds } })
-      const actionTitle =
-        apiPath === '/tasking/startTasks' ? 'Tasks started' : apiPath === '/tasking/completeTasks' ? 'Tasks completed' : 'Tasks updated'
+      const nextStatusByPath = {
+        '/tasking/startTasks': 'In Progress',
+        '/tasking/endTasks': 'Incomplete',
+        '/tasking/completeTasks': 'Verifying',
+        '/tasking/verifyPass': 'Completed',
+        '/tasking/verifyFail': 'Incomplete',
+      }
+      const nextStatusLabel = nextStatusByPath[apiPath]
+
+      const isStartVerification = apiPath === '/tasking/startVerification'
+      const isUnstartVerification = apiPath === '/tasking/unstartVerification'
+      const isVerifyAction = apiPath === '/tasking/verifyPass' || apiPath === '/tasking/verifyFail'
+
+      if (nextStatusLabel || isStartVerification || isUnstartVerification) {
+        setWorkingData((prev) => {
+          if (!prev) return prev
+          const next = { ...prev }
+          actionableRows.forEach((row) => {
+            const rowKey = String(row.id)
+            const taskKey = String(row?.scvuTaskId || '')
+            const applyPatch = (existing) => {
+              if (!existing) return existing
+              const updated = { ...existing }
+              if (nextStatusLabel) {
+                updated['Task Status'] = nextStatusLabel
+                updated.taskStatus = nextStatusLabel
+              }
+              if (apiPath === '/tasking/verifyFail') {
+                updated['Remarks'] = ''
+                updated.remarks = ''
+                updated['Report'] = ''
+                updated.report = ''
+                updated['Cloud Cover'] = ''
+                updated.cloudCover = ''
+                updated['Image Quality'] = ''
+                updated.imageQuality = ''
+                updated['Vetter Keycloak ID'] = null
+                updated['Vetter'] = null
+              }
+              if (isVerifyAction) {
+                updated['Vetter Keycloak ID'] = null
+                updated['Vetter'] = null
+              }
+              if (isStartVerification) {
+                updated['Vetter Keycloak ID'] = currentUserKeycloakId
+                updated['Vetter'] = UserService.getUsername()
+              }
+              if (isUnstartVerification) {
+                updated['Vetter Keycloak ID'] = null
+                updated['Vetter'] = null
+              }
+              return updated
+            }
+            if (next[rowKey]) {
+              next[rowKey] = applyPatch(next[rowKey])
+            }
+            if (taskKey && next[taskKey] && next[taskKey]['Parent ID'] !== undefined) {
+              next[taskKey] = applyPatch(next[taskKey])
+            }
+          })
+          return next
+        })
+      }
+      let actionTitle =
+        apiPath === '/tasking/startTasks' ? 'Tasks started' :
+        apiPath === '/tasking/endTasks' ? 'Tasks ended' :
+        apiPath === '/tasking/completeTasks' ? 'Tasks completed' :
+        apiPath === '/tasking/startVerification' ? 'Verification started' :
+        apiPath === '/tasking/unstartVerification' ? 'Verification unstarted' : 'Tasks updated'
+      if (apiPath === '/tasking/completeTasks') {
+        const reportTypes = new Set(
+          actionableRows
+            .map((row) => {
+              const rowId = row?.id
+              const report = normalizeSelectValue(getWorkingValue(rowId, 'Report') ?? row?.report ?? '')
+              const normalized = String(report || '').trim().toUpperCase()
+              if (normalized === 'DS(SF)') return 'SF'
+              if (normalized === 'IIR') return 'IIR'
+              return null
+            })
+            .filter(Boolean),
+        )
+        if (reportTypes.size === 1) {
+          actionTitle = reportTypes.has('IIR') ? 'IIR Reported' : 'SF Reported'
+        } else if (reportTypes.size > 1) {
+          actionTitle = 'IIR/SF Reported'
+        }
+      }
       addNotification({
         title: actionTitle,
         meta: `Just now · ${taskIds.length} tasks`,
@@ -889,10 +1493,12 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     } catch (err) {
       console.error('Tasking Summary task update failed:', err)
       const message = getErrorMessage(err, 'Unable to update tasks.')
-      setError(message)
+      if (!verificationOnlyActions) {
+        setError(message)
+      }
       addNotification({
         title: 'Task update failed',
-        meta: 'Just now · Please try again',
+        meta: `Just now · ${message}`,
       })
     }
   }
@@ -906,12 +1512,22 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       return
     }
 
-    const imageIds = selection.filter((rowId) => {
-      const row = rows.find((item) => item.id === rowId)
-      return row?.parentId === undefined && row?.childId
-    })
+    const selectedParentRows = selection
+      .map((rowId) => rows.find((item) => item.id === rowId))
+      .filter((row) => row?.parentId === undefined && row?.childId)
 
-    if (imageIds.length === 0) {
+    const imageIds = [...new Set(
+      selectedParentRows.flatMap((row) => {
+        const values = Array.isArray(row?.childImageIds) ? row.childImageIds : []
+        return values.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+      }),
+    )]
+
+    const selectedParentIds = new Set(
+      selectedParentRows.map((row) => row.id),
+    )
+
+    if (selectedParentRows.length === 0 || imageIds.length === 0) {
       addNotification({
         title: 'Selection required',
         meta: 'Please select only image rows',
@@ -919,8 +1535,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       return
     }
 
-    const incomplete = imageIds
-      .map((rowId) => rows.find((item) => item.id === rowId))
+    const incomplete = selectedParentRows
       .filter((row) => {
         const progressValue = parseProgress(row?.taskCompleted)
         return progressValue !== null && progressValue < 100
@@ -935,22 +1550,33 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
 
     const dataToSave = {}
     let hasChanges = false
-    imageIds.forEach((rowId) => {
-      const dataRow = workingData?.[String(rowId)]
-      if (dataRow && dataRow['Child ID']) {
-        dataToSave[rowId] = dataRow
-        hasChanges = true
-      }
-    })
-
     Object.keys(workingData || {}).forEach((key) => {
       const dataRow = workingData?.[key]
       if (dataRow && dataRow['Parent ID'] !== undefined) {
-        const parentId = dataRow['Parent ID']
-        if (imageIds.includes(parentId)) {
+        const uiRow = rows.find((item) => String(item.id) === String(key))
+        const passParentId = uiRow?.parentId
+        if (passParentId && selectedParentIds.has(passParentId)) {
           const taskId = toBackendTaskId(key)
-          dataToSave[taskId] = { ...(dataToSave[taskId] || {}), Remarks: normalizeRemarksValue(dataRow['Remarks'] ?? '') }
-          hasChanges = true
+          const baseRow = inputData?.[key] || {}
+          const patch = { ...(dataToSave[taskId] || {}) }
+          const currentRemarks = normalizeRemarksValue(dataRow['Remarks'] ?? '')
+          const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
+          const currentReport = normalizeSelectValue(dataRow['Report'] ?? dataRow.report ?? '')
+          const baseReport = normalizeSelectValue(baseRow['Report'] ?? baseRow.report ?? '')
+          const currentCloudCover = normalizeSelectValue(dataRow['Cloud Cover'] ?? dataRow.cloudCover ?? '')
+          const baseCloudCover = normalizeSelectValue(baseRow['Cloud Cover'] ?? baseRow.cloudCover ?? '')
+          const currentImageQuality = dataRow['Image Quality'] ?? dataRow.imageQuality ?? null
+          const baseImageQuality = baseRow['Image Quality'] ?? baseRow.imageQuality ?? null
+
+          if (currentRemarks !== baseRemarks) patch.Remarks = currentRemarks
+          if (currentReport !== baseReport) patch.Report = currentReport
+          if (currentCloudCover !== baseCloudCover) patch['Cloud Cover'] = currentCloudCover
+          if (currentImageQuality !== baseImageQuality) patch['Image Quality'] = currentImageQuality
+
+          if (Object.keys(patch).length > 0) {
+            dataToSave[taskId] = patch
+            hasChanges = true
+          }
         }
       }
     })
@@ -1012,91 +1638,70 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     }
 
     const payload = {}
-    let hasNull = false
+    const selectedParentIds = new Set()
+    const selectedTaskRowKeys = new Set()
     selection.forEach((rowId) => {
       const dataRow = workingData?.[String(rowId)]
       if (!dataRow) return
       if (dataRow['Child ID']) {
+        selectedParentIds.add(Number(rowId))
         const baseRow = inputData?.[String(rowId)] || {}
         const hasImageChanges = JSON.stringify(dataRow) !== JSON.stringify(baseRow)
         if (!hasImageChanges) return
-        if (dataRow['Report'] == null || dataRow['Cloud Cover'] == null) {
-          hasNull = true
-        }
         payload[rowId] = dataRow
         return
       }
       if (dataRow['Parent ID'] !== undefined) {
+        selectedTaskRowKeys.add(String(rowId))
         const taskId = dataRow['SCVU Task ID'] ?? toBackendTaskId(rowId)
         const baseRow = inputData?.[String(rowId)] || {}
         const currentRemarks = normalizeRemarksValue(dataRow['Remarks'] ?? '')
         const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
+        const currentReport = normalizeSelectValue(dataRow['Report'] ?? dataRow.report ?? '')
+        const baseReport = normalizeSelectValue(baseRow['Report'] ?? baseRow.report ?? '')
+        const currentCloudCover = normalizeSelectValue(dataRow['Cloud Cover'] ?? dataRow.cloudCover ?? '')
+        const baseCloudCover = normalizeSelectValue(baseRow['Cloud Cover'] ?? baseRow.cloudCover ?? '')
         const currentImageQuality = dataRow['Image Quality'] ?? dataRow.imageQuality ?? null
         const baseImageQuality = baseRow['Image Quality'] ?? baseRow.imageQuality ?? null
-        const currentIrReported = dataRow['IR Reported'] ?? dataRow.irReported ?? null
-        const baseIrReported = baseRow['IR Reported'] ?? baseRow.irReported ?? null
-        const currentSfReported = dataRow['SF Reported'] ?? dataRow.sfReported ?? null
-        const baseSfReported = baseRow['SF Reported'] ?? baseRow.sfReported ?? null
         const patch = { ...(payload[taskId] || {}) }
         if (currentRemarks !== baseRemarks) patch['Remarks'] = currentRemarks
-        if (currentIrReported !== baseIrReported) patch['IR Reported'] = Boolean(currentIrReported)
-        if (currentSfReported !== baseSfReported) patch['SF Reported'] = Boolean(currentSfReported)
+        if (currentReport !== baseReport) patch['Report'] = currentReport
+        if (currentCloudCover !== baseCloudCover) patch['Cloud Cover'] = currentCloudCover
+        if (currentImageQuality !== baseImageQuality) patch['Image Quality'] = currentImageQuality
         if (Object.keys(patch).length > 0) payload[taskId] = patch
-
-        // Image Quality is persisted on the parent image row in backend.
-        if (currentImageQuality !== baseImageQuality) {
-          const parentId = dataRow['Parent ID']
-          const parentRow = workingData?.[String(parentId)] || {}
-          if (parentRow['Report'] == null || parentRow['Cloud Cover'] == null) {
-            hasNull = true
-          }
-          payload[parentId] = {
-            ...(payload[parentId] || {}),
-            Report: parentRow['Report'] ?? null,
-            'Image Category': parentRow['Image Category'] ?? null,
-            'Cloud Cover': parentRow['Cloud Cover'] ?? null,
-            'Target Tracing': parentRow['Target Tracing'] ?? null,
-            'Image Quality': currentImageQuality,
-          }
-        }
       }
     })
 
-    // Always persist edited task remarks, even if the user selected only image rows.
+    // If parent image rows are selected, include their child task rows in scope.
     Object.keys(workingData || {}).forEach((key) => {
+      const row = workingData?.[key]
+      if (!row || row['Parent ID'] === undefined) return
+      const parentId = Number(row['Parent ID'])
+      if (selectedParentIds.has(parentId)) {
+        selectedTaskRowKeys.add(String(key))
+      }
+    })
+
+    // Persist edited task fields only for selected task scope.
+    selectedTaskRowKeys.forEach((key) => {
       const currentRow = workingData?.[key]
       if (!currentRow || currentRow['Parent ID'] === undefined) return
       const currentRemarks = normalizeRemarksValue(currentRow['Remarks'] ?? '')
       const baseRow = inputData?.[key] || {}
       const baseRemarks = normalizeRemarksValue(baseRow['Remarks'] ?? baseRow.remarks ?? '')
+      const currentReport = normalizeSelectValue(currentRow['Report'] ?? currentRow.report ?? '')
+      const baseReport = normalizeSelectValue(baseRow['Report'] ?? baseRow.report ?? '')
+      const currentCloudCover = normalizeSelectValue(currentRow['Cloud Cover'] ?? currentRow.cloudCover ?? '')
+      const baseCloudCover = normalizeSelectValue(baseRow['Cloud Cover'] ?? baseRow.cloudCover ?? '')
       const currentImageQuality = currentRow['Image Quality'] ?? currentRow.imageQuality ?? null
       const baseImageQuality = baseRow['Image Quality'] ?? baseRow.imageQuality ?? null
-      const currentIrReported = currentRow['IR Reported'] ?? currentRow.irReported ?? null
-      const baseIrReported = baseRow['IR Reported'] ?? baseRow.irReported ?? null
-      const currentSfReported = currentRow['SF Reported'] ?? currentRow.sfReported ?? null
-      const baseSfReported = baseRow['SF Reported'] ?? baseRow.sfReported ?? null
       const taskId = currentRow['SCVU Task ID'] ?? toBackendTaskId(key)
       const patch = { ...(payload[taskId] || {}) }
       if (currentRemarks !== baseRemarks) patch['Remarks'] = currentRemarks
-      if (currentIrReported !== baseIrReported) patch['IR Reported'] = Boolean(currentIrReported)
-      if (currentSfReported !== baseSfReported) patch['SF Reported'] = Boolean(currentSfReported)
+      if (currentReport !== baseReport) patch['Report'] = currentReport
+      if (currentCloudCover !== baseCloudCover) patch['Cloud Cover'] = currentCloudCover
+      if (currentImageQuality !== baseImageQuality) patch['Image Quality'] = currentImageQuality
       if (Object.keys(patch).length > 0) payload[taskId] = patch
-
-      if (currentImageQuality !== baseImageQuality) {
-        const parentId = currentRow['Parent ID']
-        const parentRow = workingData?.[String(parentId)] || {}
-        if (parentRow['Report'] == null || parentRow['Cloud Cover'] == null) {
-          hasNull = true
-        }
-        payload[parentId] = {
-          ...(payload[parentId] || {}),
-          Report: parentRow['Report'] ?? null,
-          'Image Category': parentRow['Image Category'] ?? null,
-          'Cloud Cover': parentRow['Cloud Cover'] ?? null,
-          'Target Tracing': parentRow['Target Tracing'] ?? null,
-          'Image Quality': currentImageQuality,
-        }
-      }
     })
 
     if (Object.keys(payload).length === 0) {
@@ -1107,17 +1712,10 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       return
     }
 
-    if (hasNull) {
-      addNotification({
-        title: 'Missing values',
-        meta: 'Fill all dropdowns before saving',
-      })
-      return
-    }
-
     try {
       setError(null)
       await api.postUpdateTaskingSummaryData(payload)
+      setHasPendingEdits(false)
       addNotification({
         title: 'Tasking Summary updated',
         meta: `Just now · ${selection.length} rows updated`,
@@ -1146,7 +1744,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
 
   const processRowUpdate = (newRow) => {
     if (!newRow?.id) return newRow
-    setWorkingData((prev) => {
+    applyWorkingDataChange((prev) => {
       let next = prev
       if (newRow.remarks !== undefined) {
         next = updateWorkingRow(next, newRow.id, 'Remarks', newRow.remarks)
@@ -1202,16 +1800,33 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     role === 'II'
       ? { CT: true, VF: false, VP: false, CI: false }
       : role === 'Senior II' || role === 'IA'
-        ? { CT: true, VF: true, VP: true, CI: true }
-        : { CT: true, VF: true, VP: true, CI: true }
+        ? { CT: true, VF: showVerificationActions, VP: showVerificationActions, CI: showVerificationActions }
+        : { CT: true, VF: showVerificationActions, VP: showVerificationActions, CI: showVerificationActions }
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      if (!hasPendingEdits) {
+        setRefreshKey((prev) => prev + 1)
+      }
+    }, TABLE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timerId)
+  }, [hasPendingEdits])
 
   useEffect(() => {
     fetchSummary()
+    fetchCompletedCountsByPass()
   }, [refreshKey, dateRange])
+
+  useEffect(() => {
+    passBaselineTotalsRef.current = {}
+    completedImageCountByPassRef.current = {}
+    setCompletedImageCountByPass({})
+  }, [dateRange])
 
   useEffect(() => {
     if (inputData) {
       setWorkingData(inputData)
+      setHasPendingEdits(false)
     }
   }, [inputData])
 
@@ -1266,8 +1881,8 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
     <div className="tasking-summary">
       <div className="content__topbar">
         <div className="content__heading">
-          <div className="content__title">Tasking Summary</div>
-          <div className="content__subtitle">Task status overview for the selected date range.</div>
+          <div className="content__title">{title}</div>
+          <div className="content__subtitle">{subtitle}</div>
         </div>
         <div className="content__controls">
           <div className="action-bar">
@@ -1289,28 +1904,57 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       <div className="tasking-summary__actions">
         <div className="tasking-summary__actions-left">
           <div className="tasking-summary__action-buttons">
-            <ClickAwayListener onClickAway={handleTooltipClose}>
-              <Tooltip
-                PopperProps={{ disablePortal: true }}
-                onClose={handleTooltipClose}
-                open={openCopy}
-                disableFocusListener
-                disableHoverListener
-                disableTouchListener
-                title={clipboardValue}
+            {!verificationOnlyActions ? (
+              <ClickAwayListener onClickAway={handleTooltipClose}>
+                <Tooltip
+                  PopperProps={{ disablePortal: true }}
+                  onClose={handleTooltipClose}
+                  open={openCopy}
+                  disableFocusListener
+                  disableHoverListener
+                  disableTouchListener
+                  title={clipboardValue}
+                >
+                  <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
+                    Start Task
+                  </Button>
+                </Tooltip>
+              </ClickAwayListener>
+            ) : null}
+            {!verificationOnlyActions ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/tasking/endTasks')}
+                disabled={!selection.length}
               >
-                <Button className="tasking-summary__button" onClick={copyClipboard} disabled={!selection.length}>
-                  Start Task
-                </Button>
-              </Tooltip>
-            </ClickAwayListener>
-            {isShow.CT ? (
+                End Task
+              </Button>
+            ) : null}
+            {!verificationOnlyActions && isShow.CT ? (
               <Button
                 className="tasking-summary__button"
                 onClick={() => processTask('/tasking/completeTasks')}
                 disabled={!selection.length}
               >
                 Complete Task
+              </Button>
+            ) : null}
+            {verificationOnlyActions && (role === 'Senior II' || role === 'IA') ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/tasking/startVerification')}
+                disabled={!selection.length}
+              >
+                Start Verification
+              </Button>
+            ) : null}
+            {verificationOnlyActions && (role === 'Senior II' || role === 'IA') ? (
+              <Button
+                className="tasking-summary__button"
+                onClick={() => processTask('/tasking/unstartVerification')}
+                disabled={!selection.length}
+              >
+                Unstart Verification
               </Button>
             ) : null}
             {isShow.VF ? (
@@ -1331,7 +1975,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
                 Verify Pass
               </Button>
             ) : null}
-            {isShow.CI ? (
+            {!verificationOnlyActions && isShow.CI ? (
               <Button
                 className="tasking-summary__button"
                 onClick={() => processImage('/tasking/completeImages')}
@@ -1340,9 +1984,11 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
                 Complete Image
               </Button>
             ) : null}
-            <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
-              Apply Change
-            </Button>
+            {!verificationOnlyActions ? (
+              <Button className="tasking-summary__button" onClick={processSendData} disabled={!selection.length}>
+                Apply Change
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -1358,12 +2004,11 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
       <div className="tasking-summary__grid">
         <DataGridPro
           treeData
-          rows={rows}
+          rows={displayedRows}
           columns={columns}
-          disableColumnResize
           getTreeDataPath={getTreeDataPath}
           groupingColDef={{
-            headerName: 'Image/Area Name',
+            headerName: 'Pass ID/Image',
             minWidth: 200,
             flex: 1.3,
             hideDescendantCount: true,
@@ -1393,11 +2038,13 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
             setSelection([])
           }}
           rowHeight={56}
+          getRowHeight={() => 'auto'}
           columnHeaderHeight={40}
           isCellEditable={isCellEditable}
           processRowUpdate={processRowUpdate}
           onProcessRowUpdateError={(err) => console.error(err)}
           columnVisibilityModel={columnVisibilityModel}
+          onColumnVisibilityModelChange={setColumnVisibilityModel}
           loading={loading}
           hideFooter
           sx={{
@@ -1485,7 +2132,9 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnSeparator': {
-              display: 'none',
+              display: 'flex',
+              visibility: 'visible',
+              opacity: 1,
             },
             '& .MuiDataGrid-scrollbarFiller': {
               backgroundColor: 'transparent',
@@ -1522,7 +2171,7 @@ function TaskingSummaryTab({ dateRange, isCollapsed }) {
           <div className="tasking-summary__total-rows-left">
             {selection.length > 0 ? `${selection.length} row(s) selected` : ''}
           </div>
-          <div className="tasking-summary__total-rows-right">Total Rows: {rows.length}</div>
+          <div className="tasking-summary__total-rows-right">Total Rows: {displayedRows.length}</div>
         </div>
         {error && <div className="tasking-summary__error">{error}</div>}
       </div>

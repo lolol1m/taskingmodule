@@ -27,15 +27,8 @@ function UploadsTab({ userRole }) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [inputKey, setInputKey] = useState(0)
-  const [confirmOpen, setConfirmOpen] = useState(false)
   const { addNotification } = useNotifications()
   const inputRef = useRef(null)
-  useEffect(() => {
-    document.body.classList.toggle('modal-blocked', confirmOpen)
-    return () => {
-      document.body.classList.remove('modal-blocked')
-    }
-  }, [confirmOpen])
 
 
   // Senior II and IA can upload parade state CSV
@@ -79,7 +72,7 @@ function UploadsTab({ userRole }) {
     setInputKey((prev) => prev + 1)
   }
 
-  const startTaskUpload = async (autoAssign) => {
+  const startTaskUpload = async () => {
     if (!taskFiles.length) return
 
     setLoading(true)
@@ -93,7 +86,7 @@ function UploadsTab({ userRole }) {
         const file = uploadQueue[i]
         const formData = new FormData()
         formData.append('file', file)
-        const result = await api.insertDSTAData(formData, autoAssign)
+        const result = await api.insertDSTAData(formData, true)
         if (result?.success === false || result?.error) {
           throw new Error(result?.error || result?.message || 'Upload failed')
         }
@@ -135,9 +128,12 @@ function UploadsTab({ userRole }) {
       setTaskFiles([])
       setInputKey((prev) => prev + 1)
     } catch (error) {
+      const timeout = error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')
       addNotification({
         title: 'Upload failed',
-        meta: error?.response?.data?.detail || error?.message || 'Please try again',
+        meta: timeout
+          ? 'Upload timed out. Server may still be processing; try again with fewer files.'
+          : (error?.response?.data?.detail || error?.message || 'Please try again'),
       })
     } finally {
       setLoading(false)
@@ -182,7 +178,7 @@ function UploadsTab({ userRole }) {
   const handleUpload = () => {
     if (!selectedFiles.length) return
     if (activeSection === 'tasks') {
-      setConfirmOpen(true)
+      startTaskUpload()
       return
     }
     startPSUpload()
@@ -336,53 +332,6 @@ function UploadsTab({ userRole }) {
         </div>
       </div>
 
-      <div className={`uploads-confirm ${confirmOpen ? 'is-open' : ''}`}>
-        <div className="uploads-confirm__backdrop" />
-        <div className="uploads-confirm__content">
-          <button
-            className="uploads-confirm__close"
-            type="button"
-            onClick={() => setConfirmOpen(false)}
-            aria-label="Close"
-          >
-            <img src="/src/assets/close.png" alt="" />
-          </button>
-          <div className="uploads-confirm__header">
-            <div className="uploads-confirm__icon">
-              <img src="/src/assets/warning.png" alt="" />
-            </div>
-            <div>
-              <div className="uploads-confirm__title">Apply auto assignment?</div>
-              <div className="uploads-confirm__subtitle">
-                Auto assignment will distribute newly uploaded tasks. You can also continue without auto assignment
-                and manually assign later.
-              </div>
-            </div>
-          </div>
-          <div className="uploads-confirm__actions">
-            <Button
-              className="uploads-confirm__button uploads-confirm__button--ghost"
-              onClick={() => {
-                setConfirmOpen(false)
-                startTaskUpload(false)
-              }}
-              disabled={loading}
-            >
-              No auto assignment
-            </Button>
-            <Button
-              className="uploads-confirm__button uploads-confirm__button--primary"
-              onClick={() => {
-                setConfirmOpen(false)
-                startTaskUpload(true)
-              }}
-              disabled={loading}
-            >
-              Continue
-            </Button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

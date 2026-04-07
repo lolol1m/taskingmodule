@@ -12,7 +12,7 @@ const roles = [
   { value: 'IA', label: 'IA', badge: 'IA', description: 'Image analyst with admin access' },
 ]
 
-function CreateUserTab() {
+function CreateUserTab({ onSuccess }) {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -45,6 +45,7 @@ function CreateUserTab() {
         meta: `Just now · ${formData.username} (${formData.role})`,
       })
       setFormData({ username: '', password: '', role: 'II' })
+      onSuccess?.()
     } catch (err) {
       const message = err.response?.data?.detail || err.response?.data?.message || 'Failed to create user'
       addNotification({
@@ -186,21 +187,22 @@ function CreateUserTab() {
               {formData.role === 'II' && (
                 <ul className="create-user__info-list">
                   <li>View Tasking Summary</li>
-                  <li>View Completed Images</li>
+                  <li>View completed task tabs</li>
                   <li>Start and complete assigned tasks</li>
                 </ul>
               )}
               {formData.role === 'Senior II' && (
                 <ul className="create-user__info-list">
                   <li>All II permissions</li>
-                  <li>Access Tasking Manager</li>
+                  <li>Access Tasking Assignments</li>
                   <li>Verify tasks (pass/fail)</li>
-                  <li>Admin panel (uploads only)</li>
+                  <li>Admin panel (including Uploads)</li>
                 </ul>
               )}
               {formData.role === 'IA' && (
                 <ul className="create-user__info-list">
                   <li>All Senior II permissions</li>
+                  <li>Access Submission tab</li>
                   <li>Create new users</li>
                   <li>Full system administration</li>
                 </ul>

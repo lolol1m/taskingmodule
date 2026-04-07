@@ -7,6 +7,7 @@ import exitIcon from '../../../assets/exit.png'
 import layerIcon from '../../../assets/layer.png'
 import layoutIcon from '../../../assets/layouting.png'
 import nightIcon from '../../../assets/dark-mode.png'
+import removeIcon from '../../../assets/remove.png'
 import reportIcon from '../../../assets/report.png'
 import sensorIcon from '../../../assets/sensor.png'
 import settingIcon from '../../../assets/gear.png'
@@ -27,8 +28,10 @@ function SidebarSection({
   userRole,
   username,
 }) {
-  // II role has limited access - no Tasking Manager or Admin
+  // II role has limited access - no Tasking Assignments or Admin
   const isBasicUser = userRole === 'II'
+  const isIaUser = userRole === 'IA'
+  const isSeniorIIUser = userRole === 'Senior II'
   // Only IA can create users
   const canCreateUsers = userRole === 'IA'
   const settingsButtonRef = useRef(null)
@@ -150,14 +153,24 @@ function SidebarSection({
             <span className="sidebar__text">Tasking Summary</span>
           </button>
           <button
-            className={`sidebar__item ${activeTab === 'completed' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('completed')}
+            className={`sidebar__item ${activeTab === 'completed-unverified' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('completed-unverified')}
+
+          >
+            <span className="sidebar__icon">
+              <img src={removeIcon} alt="" />
+            </span>
+            <span className="sidebar__text">Unverified Tasks</span>
+          </button>
+          <button
+            className={`sidebar__item ${activeTab === 'completed-verified' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('completed-verified')}
 
           >
             <span className="sidebar__icon">
               <img src={checkMarkIcon} alt="" />
             </span>
-            <span className="sidebar__text">Completed Images</span>
+            <span className="sidebar__text">Verified Tasks</span>
           </button>
           {!isBasicUser && (
             <button
@@ -167,7 +180,18 @@ function SidebarSection({
               <span className="sidebar__icon">
                 <img src={layerIcon} alt="" />
               </span>
-              <span className="sidebar__text">Tasking Manager</span>
+              <span className="sidebar__text">Tasking Assignments</span>
+            </button>
+          )}
+          {(isIaUser || isSeniorIIUser) && (
+            <button
+              className={`sidebar__item ${activeTab === 'submission' ? 'is-active' : ''}`}
+              onClick={() => setActiveTab('submission')}
+            >
+              <span className="sidebar__icon">
+                <img src={uploadIcon} alt="" />
+              </span>
+              <span className="sidebar__text">Submission</span>
             </button>
           )}
         </div>
@@ -184,7 +208,7 @@ function SidebarSection({
               <span className="sidebar__icon">
                 <img src={checkIcon} alt="" />
               </span>
-              <span className="sidebar__text">User Presence</span>
+              <span className="sidebar__text">Users</span>
             </button>
             <button
               className={`sidebar__item ${activeTab === 'admin-bin' ? 'is-active' : ''}`}
@@ -213,17 +237,6 @@ function SidebarSection({
               </span>
               <span className="sidebar__text">Uploads</span>
             </button>
-            {canCreateUsers && (
-              <button
-                className={`sidebar__item ${activeTab === 'admin-create-user' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('admin-create-user')}
-              >
-                <span className="sidebar__icon">
-                  <img src={addUserIcon} alt="" />
-                </span>
-                <span className="sidebar__text">Create User</span>
-              </button>
-            )}
           </div>
         )}
         <div className="sidebar__section sidebar__section--bottom">

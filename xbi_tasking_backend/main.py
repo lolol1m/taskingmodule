@@ -15,13 +15,11 @@ from fastapi.openapi.docs import (
 from fastapi.staticfiles import StaticFiles
 from config import load_config 
 from main_classes.KeycloakAuth import KeycloakAuth
-from main_classes.ConfigClass import ConfigClass
 from app_state import init_app_state
 from api_utils import error_response
 from security import KEYCLOAK_ENABLED
 import os
 
-# config= ConfigClass()
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -55,8 +53,6 @@ else:
         config.getFrontendURL(),
         "https://localhost:5173",
         "https://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
     ]
 
 raw_methods = os.getenv("CORS_ALLOW_METHODS")

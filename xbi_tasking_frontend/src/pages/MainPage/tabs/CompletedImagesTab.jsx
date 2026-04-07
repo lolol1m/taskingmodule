@@ -10,6 +10,8 @@ const api = new API()
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
   err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback
 
+const TABLE_AUTO_REFRESH_MS = 5000
+
 const normalizeImageName = (value) => {
   if (!value || typeof value !== 'string') return value
   return value.replace(/(\.(?:jpg|jpeg|png|gif|tif|tiff))_\d+$/i, '$1')
@@ -58,7 +60,11 @@ const buildRows = (inputData) => {
   return rows
 }
 
-function CompletedImagesTab({ dateRange }) {
+function CompletedImagesTab({
+  dateRange,
+  title = 'Completed Images',
+  subtitle = 'Review completed imagery for the selected date range.',
+}) {
   const [inputData, setInputData] = useState(null)
   const [rows, setRows] = useState([])
   const [selection, setSelection] = useState([])
@@ -68,6 +74,7 @@ function CompletedImagesTab({ dateRange }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
+  const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
   const { addNotification } = useNotifications()
 
   const role = UserService.readUserRoleSingle()
@@ -95,8 +102,38 @@ function CompletedImagesTab({ dateRange }) {
       { field: 'cloudCover', headerName: 'Cloud Cover', minWidth: 120, flex: 0.7 },
       { field: 'priority', headerName: 'Priority', minWidth: 100, flex: 0.6 },
     ],
-    [],
+    [dateFormatter],
   )
+  const defaultColumnOrder = useMemo(() => columns.map((column) => column.field), [columns])
+  const [columnOrder, setColumnOrder] = useState(defaultColumnOrder)
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState(() =>
+    Object.fromEntries(defaultColumnOrder.map((field) => [field, true])),
+  )
+  const columnLookup = useMemo(() => new Map(columns.map((column) => [column.field, column])), [columns])
+  const orderedColumns = useMemo(() => {
+    const ordered = columnOrder
+      .map((field) => columnLookup.get(field))
+      .filter(Boolean)
+    const missing = columns.filter((column) => !columnOrder.includes(column.field))
+    return [...ordered, ...missing]
+  }, [columnLookup, columnOrder, columns])
+
+  useEffect(() => {
+    setColumnOrder((prev) => {
+      const preserved = prev.filter((field) => defaultColumnOrder.includes(field))
+      const missing = defaultColumnOrder.filter((field) => !preserved.includes(field))
+      return [...preserved, ...missing]
+    })
+    setColumnVisibilityModel((prev) => {
+      const next = { ...prev }
+      defaultColumnOrder.forEach((field) => {
+        if (next[field] === undefined) {
+          next[field] = true
+        }
+      })
+      return next
+    })
+  }, [defaultColumnOrder])
 
   useEffect(() => {
     setFilterModel((prev) => ({
@@ -104,6 +141,13 @@ function CompletedImagesTab({ dateRange }) {
       quickFilterValues: searchText ? [searchText] : [],
     }))
   }, [searchText])
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setRefreshKey((prev) => prev + 1)
+    }, TABLE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timerId)
+  }, [])
 
   useEffect(() => {
     if (!dateRange) return
@@ -236,12 +280,24 @@ function CompletedImagesTab({ dateRange }) {
     }
   }
 
+  const moveColumn = (field, direction) => {
+    setColumnOrder((prev) => {
+      const index = prev.indexOf(field)
+      if (index === -1) return prev
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev
+      const next = [...prev]
+      ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
+      return next
+    })
+  }
+
   return (
     <div className="completed-images">
       <div className="content__topbar">
         <div className="content__heading">
-          <div className="content__title">Completed Images</div>
-          <div className="content__subtitle">Review completed imagery for the selected date range.</div>
+          <div className="content__title">{title}</div>
+          <div className="content__subtitle">{subtitle}</div>
         </div>
         <div className="content__controls">
           <div className="action-bar">
@@ -271,18 +327,87 @@ function CompletedImagesTab({ dateRange }) {
           Uncomplete Image
         </Button>
         {error ? <Typography className="completed-images__error">{error}</Typography> : null}
-        <Box sx={{ marginLeft: 'auto' }}>
+        <Box sx={{ marginLeft: 'auto', display: 'flex', gap: 1, position: 'relative' }}>
+          <Button className="tasking-summary__button" onClick={() => setColumnsPanelOpen((prev) => !prev)}>
+            {columnsPanelOpen ? 'Close Columns' : 'Manage Columns'}
+          </Button>
           <Button className="tasking-summary__button" onClick={handleExportCsv} disabled={!rows.length || exporting}>
             {exporting ? 'Exporting...' : 'Export CSV'}
           </Button>
+          {columnsPanelOpen ? (
+            <Box
+              sx={{
+                position: 'absolute',
+                right: 0,
+                top: 'calc(100% + 8px)',
+                zIndex: 30,
+                minWidth: 280,
+                maxHeight: 360,
+                overflowY: 'auto',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '10px',
+                backgroundColor: 'var(--panel)',
+                padding: 1,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+              }}
+            >
+              {columnOrder.map((field, index) => {
+                const column = columnLookup.get(field)
+                if (!column) return null
+                return (
+                  <Box
+                    key={field}
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      paddingY: 0.4,
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={columnVisibilityModel[field] !== false}
+                        onChange={() =>
+                          setColumnVisibilityModel((prev) => ({
+                            ...prev,
+                            [field]: prev[field] === false,
+                          }))
+                        }
+                      />
+                      {column.headerName}
+                    </label>
+                    <Button
+                      size="small"
+                      className="tasking-summary__button"
+                      onClick={() => moveColumn(field, 'up')}
+                      disabled={index === 0}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      size="small"
+                      className="tasking-summary__button"
+                      onClick={() => moveColumn(field, 'down')}
+                      disabled={index === columnOrder.length - 1}
+                    >
+                      ↓
+                    </Button>
+                  </Box>
+                )
+              })}
+            </Box>
+          ) : null}
         </Box>
       </div>
 
       <div className="completed-images__grid">
         <DataGridPro
           rows={rows}
-          columns={columns}
-          disableColumnResize
+          columns={orderedColumns}
+          columnVisibilityModel={columnVisibilityModel}
+          onColumnVisibilityModelChange={setColumnVisibilityModel}
           checkboxSelection
           disableRowSelectionOnClick
           filterModel={filterModel}
@@ -355,7 +480,9 @@ function CompletedImagesTab({ dateRange }) {
               backgroundColor: 'transparent',
             },
             '& .MuiDataGrid-columnSeparator': {
-              display: 'none',
+              display: 'flex',
+              visibility: 'visible',
+              opacity: 1,
             },
             '& .MuiDataGrid-scrollbarFiller': {
               backgroundColor: 'transparent',

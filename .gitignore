@@ -13,3 +13,4 @@ dev_server.config
 docker-compose.yml
 .env
 taskingmodule-redesign/
+taskingmodule-redesign-latest/

@@ -83,6 +83,16 @@ class API {
         return response.data
     }
 
+    async deleteUser(body) {
+        const response = await this.client.post("/users/deleteUser", body)
+        return response.data
+    }
+
+    async editUser(body) {
+        const response = await this.client.post("/users/editUser", body)
+        return response.data
+    }
+
     async getAreas() {
         const response = await this.client.get("/lookup/getAreas")
         return response.data
@@ -119,8 +129,33 @@ class API {
 
     }
 
-    async postAssignTask(body){ 
+    async postDeleteImageArea(body){
+        const response = await this.client.post("/images/deleteImageArea", body)
+        return response.data
+    }
+
+    async postAssignTask(body){
               const response = await this.client.post("/tasking/assignTask",  body)
+        return response.data
+    }
+
+    async postAutoAssignTasks(body){
+        const response = await this.client.post("/tasking/autoAssignTasks", body)
+        return response.data
+    }
+
+    async postEndTasks(body){
+        const response = await this.client.post("/tasking/endTasks", body)
+        return response.data
+    }
+
+    async postStartVerification(body) {
+        const response = await this.client.post("/tasking/startVerification", body)
+        return response.data
+    }
+
+    async postUnstartVerification(body) {
+        const response = await this.client.post("/tasking/unstartVerification", body)
         return response.data
     }
 
@@ -134,10 +169,29 @@ class API {
         return response.data
     }
 
+    async updatePassEntry(body) {
+        const response = await this.client.post("/images/updatePassEntry", body)
+        return response.data
+    }
+
+    async getPasses() {
+        const response = await this.client.get("/images/getPasses")
+        return response.data
+    }
+
+    async insertManualEntry(payload) {
+        const jsonStr = JSON.stringify(payload)
+        const blob = new Blob([jsonStr], { type: 'application/json' })
+        const formData = new FormData()
+        formData.append('file', blob, 'manual_entry.json')
+        return this.insertDSTAData(formData)
+    }
+
     async insertDSTAData(formData, autoAssign = true) {
         const response = await this.client.post("/images/insertDSTAData", formData, {
             headers: { "Content-Type": "multipart/form-data" },
             params: { auto_assign: autoAssign },
+            timeout: 120000,
         })
         return response.data
     }

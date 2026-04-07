@@ -20,7 +20,6 @@ class KeycloakAuth:
         self._config = config or get_config()
         self.keycloak_public_url = self._config.getKeycloakPublicURL()
         self.keycloak_internal_url = self._config.getKeycloakInternalURL()
-        self.keycloak_public_url = self._config.getKeycloakPublicURL()
         self.realm = self._config.getKeycloakRealm()
         self.client_id = self._config.getKeycloakClientID()
         self.client_secret = self._config.getKeycloakClientSecret()
@@ -42,7 +41,7 @@ class KeycloakAuth:
         """
         try:
             # Get the JWKS URL from well-known configuration
-            with httpx.Client(verify = False) as client:
+            with httpx.Client() as client:
                 response = client.get(self.well_known_url, timeout=5.0)
                 if response.status_code == 200:
                     config = response.json()
@@ -87,7 +86,7 @@ class KeycloakAuth:
             self._load_public_key()
         if not self.jwks_url:
             return None
-        async with httpx.AsyncClient(verify = False) as client:
+        async with httpx.AsyncClient() as client:
             response = await client.get(self.jwks_url, timeout=5.0)
             if response.status_code == 200:
                 self.jwks_cache = response.json()
@@ -172,7 +171,7 @@ class KeycloakAuth:
             # Use token introspection endpoint (more reliable than JWKS for validation)
             introspection_url = f"{self.keycloak_internal_url}/realms/{self.realm}/protocol/openid-connect/token/introspect"
             
-            async with httpx.AsyncClient(verify = False) as client:
+            async with httpx.AsyncClient() as client:
                 # Use client credentials from config
                 data = {
                     'token': token,
@@ -196,7 +195,6 @@ class KeycloakAuth:
                         realm_roles = realm_access.get('roles', [])
                         
                         # Determine account type from roles (priority: IA > Senior II > II)
-                        #TODO hardcode
                         account_type = None
                         if 'IA' in realm_roles:
                             account_type = 'IA'
@@ -219,13 +217,7 @@ class KeycloakAuth:
                         logger.info("Token introspection returned active=False")
                         return None
                 else:
-                    logger.warning(
-                        "Keycloak introspection failed status=%s text=%s",
-                        response.status_code,
-                        response.text,
-                    )
-                    logger.debug("Introspection URL: %s", introspection_url)
-                    logger.debug("Client ID: %s", self.client_id)
+                    logger.warning("Keycloak introspection failed status=%s", response.status_code)
                     return None
                     
         except Exception as e:

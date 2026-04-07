@@ -6,6 +6,8 @@ def format_complete_image_area(area_data, image_id):
         "Area Name" : area_data[1],
         "Remarks" : area_data[2],
         "Assignee" : area_data[3],
+        "Priority": area_data[4],
+        "SCVU Task ID": area_data[0],
         "Parent ID" : image_id,
     }
 

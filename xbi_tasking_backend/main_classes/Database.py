@@ -143,6 +143,8 @@ class Database():
                 cursor.execute(query, values)
             else:
                 cursor.execute(query)
+            row_count = cursor.rowcount
+        return row_count
     
     def executeDelete(self, query, values=None):
         '''

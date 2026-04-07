@@ -95,16 +95,36 @@ class DatabaseSchemaManager:
                         logger.info("Added last_updated to user_cache table")
 
             with self._db._get_cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS pass (
+                        scvu_pass_id SERIAL PRIMARY KEY,
+                        pass_id_file_name VARCHAR(255) UNIQUE NOT NULL,
+                        sensor_id INTEGER REFERENCES sensor(id),
+                        upload_date TIMESTAMP,
+                        image_datetime TIMESTAMP
+                    )
+                """)
                 cursor.execute("ALTER TABLE task DROP COLUMN IF EXISTS assignee_id")
                 cursor.execute("ALTER TABLE image DROP COLUMN IF EXISTS vetter_id")
                 cursor.execute("DROP TABLE IF EXISTS users")
-                cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS external_area_id BIGINT")
+                cursor.execute("ALTER TABLE image ADD COLUMN IF NOT EXISTS scvu_pass_id INTEGER REFERENCES pass(scvu_pass_id)")
+                cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS external_area_id TEXT")
+                cursor.execute(
+                    "ALTER TABLE image_area ALTER COLUMN external_area_id TYPE TEXT USING external_area_id::TEXT"
+                )
                 cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS color VARCHAR(255)")
                 cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS service VARCHAR(255)")
+                cursor.execute("ALTER TABLE image_area ADD COLUMN IF NOT EXISTS child_image_id BIGINT")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_start_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
-                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS ir_reported BOOLEAN DEFAULT FALSE")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS vetter_keycloak_id VARCHAR(255)")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS proposed_assignee_keycloak_id VARCHAR(255)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS sf_reported BOOLEAN DEFAULT FALSE")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS iir_reported BOOLEAN DEFAULT FALSE")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS priority_id INTEGER REFERENCES priority(id)")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS report_id INTEGER REFERENCES report(id)")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS cloud_cover_id INTEGER REFERENCES cloud_cover(id)")
+                cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS image_quality VARCHAR(255)")
                 cursor.execute("ALTER TABLE image DROP CONSTRAINT IF EXISTS image_image_id_key")
                 cursor.execute("""
                     SELECT 1
@@ -115,6 +135,30 @@ class DatabaseSchemaManager:
                     cursor.execute(
                         "ALTER TABLE image ADD CONSTRAINT image_image_id_name_key UNIQUE (image_id, image_file_name)"
                     )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_pass_id_file_name ON pass(pass_id_file_name)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_image_scvu_pass_id ON image(scvu_pass_id)"
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO pass(pass_id_file_name, sensor_id, upload_date, image_datetime)
+                    SELECT DISTINCT image_file_name, sensor_id, upload_date, image_datetime
+                    FROM image
+                    WHERE image_file_name IS NOT NULL
+                    ON CONFLICT (pass_id_file_name) DO NOTHING
+                    """
+                )
+                cursor.execute(
+                    """
+                    UPDATE image i
+                    SET scvu_pass_id = p.scvu_pass_id
+                    FROM pass p
+                    WHERE i.scvu_pass_id IS NULL
+                      AND i.image_file_name = p.pass_id_file_name
+                    """
+                )
         except Exception as e:
             logger.warning("Could not check/initialize database schema: %s", e)
 
@@ -191,8 +235,19 @@ class DatabaseSchemaManager:
             """)
 
             cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pass (
+                    scvu_pass_id SERIAL PRIMARY KEY,
+                    pass_id_file_name VARCHAR(255) UNIQUE NOT NULL,
+                    sensor_id INTEGER REFERENCES sensor(id),
+                    upload_date TIMESTAMP,
+                    image_datetime TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS image (
                     scvu_image_id SERIAL PRIMARY KEY,
+                    scvu_pass_id INTEGER REFERENCES pass(scvu_pass_id),
                     image_id BIGINT,
                     image_file_name VARCHAR(255),
                     sensor_id INTEGER REFERENCES sensor(id),
@@ -216,9 +271,10 @@ class DatabaseSchemaManager:
                     scvu_image_area_id SERIAL PRIMARY KEY,
                     scvu_image_id INTEGER REFERENCES image(scvu_image_id),
                     scvu_area_id INTEGER REFERENCES area(scvu_area_id),
-                    external_area_id BIGINT,
+                    external_area_id TEXT,
                     color VARCHAR(255),
                     service VARCHAR(255),
+                    child_image_id BIGINT,
                     UNIQUE(scvu_image_id, scvu_area_id)
                 )
             """)
@@ -235,12 +291,17 @@ class DatabaseSchemaManager:
                     scvu_task_id SERIAL PRIMARY KEY,
                     scvu_image_area_id INTEGER UNIQUE REFERENCES image_area(scvu_image_area_id),
                     assignee_keycloak_id VARCHAR(255),
+                    proposed_assignee_keycloak_id VARCHAR(255),
+                    sf_reported BOOLEAN DEFAULT FALSE,
+                    iir_reported BOOLEAN DEFAULT FALSE,
                     task_status_id INTEGER REFERENCES task_status(id),
+                    priority_id INTEGER REFERENCES priority(id),
+                    report_id INTEGER REFERENCES report(id),
+                    cloud_cover_id INTEGER REFERENCES cloud_cover(id),
+                    image_quality VARCHAR(255),
                     remarks TEXT,
                     exploit_start_time TIMESTAMP,
-                    exploit_end_time TIMESTAMP,
-                    ir_reported BOOLEAN DEFAULT FALSE,
-                    sf_reported BOOLEAN DEFAULT FALSE
+                    exploit_end_time TIMESTAMP
                 )
             """)
 

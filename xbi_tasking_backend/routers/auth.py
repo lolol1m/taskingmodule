@@ -110,11 +110,6 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
     
     try:
         logger.debug("auth_callback exchanging code for tokens")
-        logger.debug("Token URL: %s", token_url)
-        logger.debug("Redirect URI: %s", redirect_uri)
-        logger.debug("Client ID: %s", client_id)
-        logger.debug("Client secret present: %s", client_secret is not None and len(client_secret) > 0)
-        logger.debug("Code present: %s", code is not None)
         
         if not client_secret:
             error_msg = "Client secret is missing in configuration. Please check dev_server.config"
@@ -144,15 +139,13 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
             logger.debug("auth_callback response status: %s", response.status_code)
             
             if response.status_code != 200:
-                error_detail = response.text
                 logger.warning("auth_callback token exchange failed: %s", response.status_code)
-                logger.warning("auth_callback error response: %s", error_detail)
                 
                 # Parse error to provide helpful message
                 try:
                     error_json = response.json()
                     error_type = error_json.get("error", "unknown")
-                    error_desc = error_json.get("error_description", error_detail)
+                    error_desc = error_json.get("error_description", "Token exchange failed")
                     
                     if error_type == "unauthorized_client":
                         help_msg = (
@@ -180,7 +173,7 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
                 except Exception:
                     return error_response(
                         500,
-                        error_detail,
+                        "Token exchange failed",
                         "token_exchange_failed",
                         {
                             "status_code": response.status_code,

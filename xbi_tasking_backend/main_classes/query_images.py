@@ -5,9 +5,19 @@ from main_classes.sql_utils import build_in_clause
 
 SQL_INSERT_SENSOR = "INSERT INTO sensor (name) VALUES (%s) ON CONFLICT (name) DO NOTHING"
 
+SQL_UPSERT_PASS_RETURNING_ID = (
+    "INSERT INTO pass (pass_id_file_name, sensor_id, upload_date, image_datetime) "
+    "VALUES (%s, (SELECT id FROM sensor WHERE name=%s), %s, %s) "
+    "ON CONFLICT (pass_id_file_name) DO UPDATE "
+    "SET sensor_id = COALESCE(EXCLUDED.sensor_id, pass.sensor_id), "
+    "    upload_date = COALESCE(EXCLUDED.upload_date, pass.upload_date), "
+    "    image_datetime = COALESCE(EXCLUDED.image_datetime, pass.image_datetime) "
+    "RETURNING scvu_pass_id"
+)
+
 SQL_INSERT_IMAGE = (
-    "INSERT INTO image (image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) "
-    "VALUES (%s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) "
+    "INSERT INTO image (scvu_pass_id, image_id, image_file_name, sensor_id, upload_date, image_datetime, ew_status_id, report_id, priority_id, image_category_id, cloud_cover_id) "
+    "VALUES (%s, %s, %s, (SELECT id FROM sensor WHERE name=%s), %s, %s, (SELECT id FROM ew_status WHERE name = 'xbi done'), 0, 0, 0, 0) "
     "ON CONFLICT (image_id, image_file_name) DO NOTHING"
 )
 
@@ -27,7 +37,8 @@ SQL_UPDATE_IMAGE_AREA_METADATA_BY_NAME = (
     "UPDATE image_area "
     "SET external_area_id = COALESCE(%s, external_area_id), "
     "    color = COALESCE(%s, color), "
-    "    service = COALESCE(%s, service) "
+    "    service = COALESCE(%s, service), "
+    "    child_image_id = COALESCE(%s, child_image_id) "
     "WHERE scvu_image_id = (SELECT scvu_image_id FROM image WHERE image_id = %s) "
     "  AND scvu_area_id = (SELECT scvu_area_id FROM area WHERE area_name = %s)"
 )
@@ -36,9 +47,27 @@ SQL_UPDATE_IMAGE_AREA_METADATA_BY_EXTERNAL_ID = (
     "UPDATE image_area "
     "SET external_area_id = %s, "
     "    color = COALESCE(%s, color), "
-    "    service = COALESCE(%s, service) "
+    "    service = COALESCE(%s, service), "
+    "    child_image_id = COALESCE(%s, child_image_id) "
     "WHERE scvu_image_id = (SELECT scvu_image_id FROM image WHERE image_id = %s) "
     "  AND external_area_id = %s"
+)
+
+SQL_UPDATE_PASS = (
+    "UPDATE pass SET "
+    "pass_id_file_name = COALESCE(%s, pass_id_file_name), "
+    "sensor_id = COALESCE((SELECT id FROM sensor WHERE name = %s), sensor_id), "
+    "upload_date = COALESCE(%s, upload_date), "
+    "image_datetime = COALESCE(%s, image_datetime) "
+    "WHERE pass_id_file_name = %s"
+)
+
+SQL_UPDATE_IMAGES_FOR_PASS = (
+    "UPDATE image SET "
+    "sensor_id = COALESCE((SELECT id FROM sensor WHERE name = %s), sensor_id), "
+    "upload_date = COALESCE(%s, upload_date), "
+    "image_datetime = COALESCE(%s, image_datetime) "
+    "WHERE scvu_pass_id = (SELECT scvu_pass_id FROM pass WHERE pass_id_file_name = %s)"
 )
 
 SQL_INSERT_TTG_IMAGE_RETURNING_ID = (
@@ -59,32 +88,39 @@ SQL_GET_IMAGE_COMPLETE_DATE = "SELECT completed_date FROM image WHERE scvu_image
 SQL_GET_IMAGE_BY_ID_AND_NAME = "SELECT image_id, image_file_name FROM image WHERE image_id = %s AND image_file_name = %s"
 
 SQL_GET_IMAGE_AREA_DATA = (
-    "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id "
+    "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, "
+    "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
     "JOIN area ON image_area.scvu_area_id = area.scvu_area_id "
     "JOIN image ON image_area.scvu_image_id = image.scvu_image_id "
+    "LEFT JOIN priority task_priority ON task_priority.id = task.priority_id "
+    "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "WHERE image.scvu_image_id = %s "
     "ORDER BY area.area_name"
 )
 
 SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES = """
     SELECT image.scvu_image_id, task.scvu_task_id, area.area_name,
-        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id
+        COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id,
+        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name
     FROM task
     JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id
     JOIN area ON image_area.scvu_area_id = area.scvu_area_id
     JOIN image ON image_area.scvu_image_id = image.scvu_image_id
+    LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
+    LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image.scvu_image_id IN ({placeholders})
     ORDER BY image.scvu_image_id, area.area_name
 """
 
 SQL_GET_IMAGE_DATA = (
-    "SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime, "
+    "SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id, image.upload_date, image.image_datetime, "
     "COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, "
     "COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, "
     "COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id "
     "FROM image "
+    "LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id "
     "LEFT JOIN sensor ON sensor.id = image.sensor_id "
     "LEFT JOIN ew_status ON ew_status.id = image.ew_status_id "
     "LEFT JOIN report ON report.id = image.report_id "
@@ -97,11 +133,12 @@ SQL_GET_IMAGE_DATA = (
 )
 
 SQL_GET_IMAGE_DATA_FOR_USER = """
-    SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, image.image_file_name, image.image_id, image.upload_date, image.image_datetime,
+    SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id, image.upload_date, image.image_datetime,
         COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
         COALESCE(image_category.name, NULL) as image_category_name, image.image_quality,
         COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id
     FROM image
+    LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id
     LEFT JOIN sensor ON sensor.id = image.sensor_id
     LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
     LEFT JOIN report ON report.id = image.report_id
@@ -120,11 +157,20 @@ SQL_GET_IMAGE_DATA_FOR_USER = """
         )
 """
 
+SQL_GET_PASSES = (
+    "SELECT pass.pass_id_file_name, COALESCE(sensor.name, '') as sensor_name "
+    "FROM pass "
+    "LEFT JOIN sensor ON sensor.id = pass.sensor_id "
+    "ORDER BY pass.pass_id_file_name"
+)
+
 SQL_DELETE_TASKS_FOR_IMAGE = (
     "DELETE FROM task WHERE scvu_image_area_id IN (SELECT scvu_image_area_id FROM image_area WHERE scvu_image_id = %s)"
 )
 SQL_DELETE_IMAGE_AREAS_FOR_IMAGE = "DELETE FROM image_area WHERE scvu_image_id = %s"
 SQL_DELETE_IMAGE = "DELETE FROM image WHERE scvu_image_id = %s"
+SQL_DELETE_TASK_FOR_IMAGE_AREA = "DELETE FROM task WHERE scvu_image_area_id = %s"
+SQL_DELETE_IMAGE_AREA = "DELETE FROM image_area WHERE scvu_image_area_id = %s"
 
 
 class ImageQueries:
@@ -140,7 +186,18 @@ class ImageQueries:
         '''
         self.db.executeInsert(SQL_INSERT_SENSOR, (sensor_name,))
 
-    def insertImage(self, image_id, image_file_name, sensor_name, upload_date, image_datetime):
+    def upsertPassReturningId(self, pass_id_file_name, sensor_name, upload_date, image_datetime):
+        '''
+        Function:   Inserts or updates pass metadata and returns pass primary key
+        Input:      pass_id_file_name, sensor_name, upload_date, image_datetime
+        Output:     scvu_pass_id
+        '''
+        return self.db.executeInsertReturningID(
+            SQL_UPSERT_PASS_RETURNING_ID,
+            (pass_id_file_name, sensor_name, upload_date, image_datetime),
+        )
+
+    def insertImage(self, image_id, image_file_name, sensor_name, upload_date, image_datetime, scvu_pass_id=None):
         '''
         Function:   Inserts image from DSTA into db
         Input:      image_id, image_file_name, sensor_name, upload_date, image_datetime
@@ -149,7 +206,7 @@ class ImageQueries:
         # Set default values for required foreign keys (0 = null in lookup tables)
         rows = self.db.executeInsert(
             SQL_INSERT_IMAGE,
-            (image_id, image_file_name, sensor_name, upload_date, image_datetime),
+            (scvu_pass_id, image_id, image_file_name, sensor_name, upload_date, image_datetime),
         )
 
         return rows > 0
@@ -170,7 +227,15 @@ class ImageQueries:
         '''
         self.db.executeInsert(SQL_INSERT_IMAGE_AREA_DSTA, (image_id, area_name))
 
-    def updateImageAreaMetadataByName(self, image_id, area_name, external_area_id=None, color=None, service=None):
+    def updateImageAreaMetadataByName(
+        self,
+        image_id,
+        area_name,
+        external_area_id=None,
+        color=None,
+        service=None,
+        child_image_id=None,
+    ):
         '''
         Function:   Updates metadata for a DSTA image_area row by image_id + area_name
         Input:      image_id, area_name, external_area_id, color, service
@@ -178,10 +243,17 @@ class ImageQueries:
         '''
         return self.db.executeUpdate(
             SQL_UPDATE_IMAGE_AREA_METADATA_BY_NAME,
-            (external_area_id, color, service, image_id, area_name),
+            (external_area_id, color, service, child_image_id, image_id, area_name),
         )
 
-    def updateImageAreaMetadataByExternalId(self, image_id, external_area_id, color=None, service=None):
+    def updateImageAreaMetadataByExternalId(
+        self,
+        image_id,
+        external_area_id,
+        color=None,
+        service=None,
+        child_image_id=None,
+    ):
         '''
         Function:   Updates metadata for a DSTA image_area row by image_id + external_area_id
         Input:      image_id, external_area_id, color, service
@@ -189,7 +261,7 @@ class ImageQueries:
         '''
         return self.db.executeUpdate(
             SQL_UPDATE_IMAGE_AREA_METADATA_BY_EXTERNAL_ID,
-            (external_area_id, color, service, image_id, external_area_id),
+            (external_area_id, color, service, child_image_id, image_id, external_area_id),
         )
 
     def insertTTGImageReturnsId(self, image_file_name, sensor_name, upload_date, image_datetime):
@@ -246,30 +318,50 @@ class ImageQueries:
         '''
         return self.db.executeSelect(SQL_GET_IMAGE_BY_ID_AND_NAME, (image_id, image_file_name))
 
+    def updatePassEntry(self, old_pass_id, new_pass_id=None, sensor_name=None, upload_date=None, image_datetime=None):
+        if sensor_name:
+            self.db.executeInsert(SQL_INSERT_SENSOR, (sensor_name,))
+        self.db.executeInsert(
+            SQL_UPDATE_IMAGES_FOR_PASS,
+            (sensor_name, upload_date, image_datetime, old_pass_id),
+        )
+        return self.db.executeInsert(
+            SQL_UPDATE_PASS,
+            (new_pass_id, sensor_name, upload_date, image_datetime, old_pass_id),
+        )
+
+    def getPasses(self):
+        '''
+        Function:   Returns all existing passes (pass_id_file_name + sensor_name)
+        Output:     list of dicts
+        '''
+        rows = self.db.executeSelect(SQL_GET_PASSES)
+        return [{"passIdFileName": row[0], "sensorName": row[1]} for row in rows]
+
     def getImageAreaData(self, scvu_image_id):
         '''
         Function: Gets image area data for completed images
         Input: scvu_image_id
-        Output: scvu_task_id, area name, remarks, assignee name
+        Output: scvu_task_id, area name, remarks, assignee name, priority
         '''
         results = self.db.executeSelect(SQL_GET_IMAGE_AREA_DATA, (scvu_image_id,))
         assignee_ids = [row[3] for row in results if row[3]]
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
         for row in results:
-            task_id, area_name, remarks, assignee_keycloak_id = row
+            task_id, area_name, remarks, assignee_keycloak_id, priority_name = row
             if assignee_keycloak_id:
                 assignee = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
             else:
                 assignee = AssigneeLabel.UNASSIGNED
-            formatted.append((task_id, area_name, remarks, assignee))
+            formatted.append((task_id, area_name, remarks, assignee, priority_name))
         return formatted
 
     def getImageAreaDataForImages(self, scvu_image_ids):
         '''
         Function: Gets image area data for completed images (batch)
         Input: scvu_image_ids
-        Output: list of tuples with image_id, task_id, area_name, remarks, assignee
+        Output: list of tuples with image_id, task_id, area_name, remarks, assignee, priority
         '''
         if not scvu_image_ids:
             return []
@@ -281,12 +373,12 @@ class ImageQueries:
         usernames = self.keycloak.get_keycloak_usernames_bulk(assignee_ids)
         formatted = []
         for row in results:
-            image_id, task_id, area_name, remarks, assignee_keycloak_id = row
+            image_id, task_id, area_name, remarks, assignee_keycloak_id, priority_name = row
             if assignee_keycloak_id:
                 assignee = usernames.get(assignee_keycloak_id, assignee_keycloak_id)
             else:
                 assignee = AssigneeLabel.UNASSIGNED
-            formatted.append((image_id, task_id, area_name, remarks, assignee))
+            formatted.append((image_id, task_id, area_name, remarks, assignee, priority_name))
         return formatted
 
     def getImageData(self, start_date, end_date, limit=None, offset=None):
@@ -362,3 +454,19 @@ class ImageQueries:
         Output: NIL
         '''
         self.db.executeDelete(SQL_DELETE_IMAGE, (scvu_image_id,))
+
+    def deleteTaskForImageArea(self, scvu_image_area_id):
+        '''
+        Function: Deletes task for a specific image_area
+        Input: scvu_image_area_id
+        Output: NIL
+        '''
+        self.db.executeDelete(SQL_DELETE_TASK_FOR_IMAGE_AREA, (scvu_image_area_id,))
+
+    def deleteImageArea(self, scvu_image_area_id):
+        '''
+        Function: Deletes a specific image_area
+        Input: scvu_image_area_id
+        Output: NIL
+        '''
+        self.db.executeDelete(SQL_DELETE_IMAGE_AREA, (scvu_image_area_id,))

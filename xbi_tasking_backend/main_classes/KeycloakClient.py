@@ -1,5 +1,8 @@
+import logging
 from urllib.parse import urlparse
 import requests
+
+logger = logging.getLogger("xbi_tasking_backend.keycloak_client")
 
 from config import get_config
 
@@ -27,7 +30,7 @@ class KeycloakClient:
             "client_id": admin_client_id,
             "client_secret": admin_client_secret,
         }
-        response = requests.post(url, data=data, timeout=5, verify="/usr/local/share/ca-certificates/keycloak.crt")
+        response = requests.post(url, data=data, timeout=5)
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
@@ -112,6 +115,61 @@ class KeycloakClient:
             "temporary": temporary,
         }
         response = requests.put(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+
+    def delete_user(self, token, user_id):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.delete(url, headers=headers, timeout=5)
+        response.raise_for_status()
+
+    def get_user_realm_roles(self, token, user_id):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/realm"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
+    def remove_realm_role(self, token, user_id, role_representation):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/realm"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        response = requests.delete(url, headers=headers, json=[role_representation], timeout=5)
+        response.raise_for_status()
+
+    def get_user(self, token, user_id):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
+    def update_user_info(self, token, user_id, username):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        current = self.get_user(token, user_id)
+        if current.get("username") == username:
+            return
+        # Only include mutable fields — sending read-only fields (access,
+        # disableableCredentialTypes, etc.) causes Keycloak to return 400.
+        payload = {
+            "username": username,
+            "enabled": current.get("enabled", True),
+            "emailVerified": current.get("emailVerified", False),
+        }
+        for optional in ("firstName", "lastName", "email", "attributes"):
+            if current.get(optional) is not None:
+                payload[optional] = current[optional]
+        response = requests.put(url, headers=headers, json=payload, timeout=5)
+        if not response.ok:
+            logger.error(
+                "Keycloak PUT /users/%s returned %s: %s",
+                user_id, response.status_code, response.text,
+            )
         response.raise_for_status()
 
     def verify_user_credentials(self, username, password):
