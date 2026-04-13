@@ -284,6 +284,7 @@ function TaskingSummaryTab({
     const reportPriority = (report) => {
       const r = String(report || '').trim().toUpperCase()
       if (r === 'IIR') return 0
+      if (r === 'IIR+SF') return 0
       if (r === 'DS(SF)') return 1
       return 2
     }
@@ -341,6 +342,7 @@ function TaskingSummaryTab({
         return 'rgba(105, 181, 248, 0.5)'
       case 'DS(SF)':
       case 'IIR':
+      case 'IIR+SF':
         return 'rgba(105, 248, 139, 0.68)'
       case 'Research':
       case 'Re-DL':
@@ -1010,7 +1012,7 @@ function TaskingSummaryTab({
               renderCell: (params) => {
                 if (params?.row?.parentId === undefined) return '—'
                 const report = String(params?.row?.report || '').trim().toUpperCase()
-                if (report !== 'DS(SF)' && report !== 'IIR') return '—'
+                if (report !== 'DS(SF)' && report !== 'IIR' && report !== 'IIR+SF') return '—'
                 return params?.row?.sfReported ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img
@@ -1037,7 +1039,7 @@ function TaskingSummaryTab({
               renderCell: (params) => {
                 if (params?.row?.parentId === undefined) return '—'
                 const report = String(params?.row?.report || '').trim().toUpperCase()
-                if (report !== 'IIR') return '—'
+                if (report !== 'IIR' && report !== 'IIR+SF') return '—'
                 return params?.row?.iirReported ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img
@@ -1319,6 +1321,31 @@ function TaskingSummaryTab({
       }
     }
 
+    if (apiPath === '/tasking/verifyPass') {
+      const missingSubmissions = eligibleRows.filter((row) => {
+        const report = String(row?.report || '').trim().toUpperCase()
+        if (report === 'IIR') return !row.iirReported
+        if (report === 'DS(SF)') return !row.sfReported
+        if (report === 'IIR+SF') return !row.iirReported || !row.sfReported
+        return false
+      })
+      if (missingSubmissions.length === eligibleRows.length) {
+        addNotification({
+          title: 'Submission incomplete',
+          meta: 'IIR and SF reported must both be submitted before verification can pass',
+        })
+        return
+      }
+      if (missingSubmissions.length > 0) {
+        const missingIds = new Set(missingSubmissions.map((row) => row.id))
+        eligibleRows = eligibleRows.filter((row) => !missingIds.has(row.id))
+        addNotification({
+          title: 'Some rows skipped',
+          meta: `${missingSubmissions.length} task(s) have incomplete submissions`,
+        })
+      }
+    }
+
     let actionableRows = eligibleRows
     if (apiPath === '/tasking/completeTasks') {
       const missingInputs = eligibleRows.filter((row) => {
@@ -1475,6 +1502,7 @@ function TaskingSummaryTab({
               const normalized = String(report || '').trim().toUpperCase()
               if (normalized === 'DS(SF)') return 'SF'
               if (normalized === 'IIR') return 'IIR'
+              if (normalized === 'IIR+SF') return 'IIR+SF'
               return null
             })
             .filter(Boolean),

@@ -88,10 +88,11 @@ def _normalize_dsta_payload(payload):
                     continue
 
                 raw_area_id = img.get("areaId", img.get("areaID"))
-                # Display label for child rows should use imgName when available.
-                area_name = img.get("imgName") or img.get("areaName")
+                area_name = img.get("areaName")
                 if not area_name and raw_area_id is not None and str(raw_area_id).strip() != "":
                     area_name = str(raw_area_id)
+                if not area_name:
+                    area_name = img.get("imgName")
                 if not area_name:
                     continue
 

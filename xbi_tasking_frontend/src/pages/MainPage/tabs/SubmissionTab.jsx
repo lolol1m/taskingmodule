@@ -30,11 +30,10 @@ const readField = (entry, keys, fallback = '') => {
   return fallback
 }
 
-// A task is "submitted" when its primary reporting checkbox is checked.
-// IIR tasks → iirReported; DS(SF) tasks → sfReported.
 const isSubmitted = (row) => {
   if (row.report === 'IIR') return Boolean(row.iirReported)
   if (row.report === 'DS(SF)') return Boolean(row.sfReported)
+  if (row.report === 'IIR+SF') return Boolean(row.iirReported) || Boolean(row.sfReported)
   return false
 }
 
@@ -57,7 +56,7 @@ const buildRows = (inputData) => {
     if (taskStatus !== 'verifying' && taskStatus !== 'completed') return
     const report = String(readField(entry, ['Report', 'report'], '')).trim()
     if (!report) return
-    if (report !== 'IIR' && report !== 'DS(SF)') return
+    if (report !== 'IIR' && report !== 'DS(SF)' && report !== 'IIR+SF') return
 
     const parentId = readField(entry, ['Parent ID'])
     const parentEntry = parentMap[Number(parentId)] || null
@@ -118,14 +117,22 @@ function SubmissionTab({
     if (tab === 'submitted') {
       return allRows.filter((row) => {
         if (!isSubmitted(row)) return false
-        // Senior II only sees SF submitted tasks
         if (!canViewIIR && row.report === 'IIR') return false
         return true
       })
     }
-    if (tab === 'iir') return allRows.filter((row) => row.report === 'IIR' && !isSubmitted(row))
-    // SF tab: only unsubmitted DS(SF) tasks
-    return allRows.filter((row) => row.report === 'DS(SF)' && !isSubmitted(row))
+    if (tab === 'iir') {
+      return allRows.filter((row) => {
+        if (row.report === 'IIR') return !row.iirReported
+        if (row.report === 'IIR+SF') return !row.iirReported
+        return false
+      })
+    }
+    return allRows.filter((row) => {
+      if (row.report === 'DS(SF)') return !row.sfReported
+      if (row.report === 'IIR+SF') return !row.sfReported
+      return false
+    })
   }, [allRows, tab, canViewIIR])
 
   const columns = useMemo(() => {
@@ -222,8 +229,7 @@ function SubmissionTab({
       },
     }
 
-    if (tab === 'iir') return [...baseColumns, sfColumn, iirColumn]
-    // SF tab: always show SF column only
+    if (tab === 'iir') return [...baseColumns, iirColumn]
     return [...baseColumns, sfColumn]
   }, [tab, canViewIIR, editingRows])
 
@@ -306,6 +312,10 @@ function SubmissionTab({
         payload[row.taskId] = {}
         if (row.report === 'IIR') payload[row.taskId]['IIR Reported'] = false
         if (row.report === 'DS(SF)') payload[row.taskId]['SF Reported'] = false
+        if (row.report === 'IIR+SF') {
+          payload[row.taskId]['IIR Reported'] = false
+          payload[row.taskId]['SF Reported'] = false
+        }
       })
 
     if (!Object.keys(payload).length) {

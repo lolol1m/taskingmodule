@@ -118,6 +118,7 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_start_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS vetter_keycloak_id VARCHAR(255)")
+                cursor.execute("INSERT INTO report(id, name) VALUES (12, 'IIR+SF') ON CONFLICT DO NOTHING")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS proposed_assignee_keycloak_id VARCHAR(255)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS sf_reported BOOLEAN DEFAULT FALSE")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS iir_reported BOOLEAN DEFAULT FALSE")
@@ -349,6 +350,7 @@ class DatabaseSchemaManager:
             cursor.execute("INSERT INTO report(id, name) VALUES (9, 'Downgrade') ON CONFLICT DO NOTHING")
             cursor.execute("INSERT INTO report(id, name) VALUES (10, 'Failed') ON CONFLICT DO NOTHING")
             cursor.execute("INSERT INTO report(id, name) VALUES (11, 'Img Error') ON CONFLICT DO NOTHING")
+            cursor.execute("INSERT INTO report(id, name) VALUES (12, 'IIR+SF') ON CONFLICT DO NOTHING")
 
             cursor.execute("INSERT INTO task_status(id, name) VALUES (1, 'Incomplete') ON CONFLICT DO NOTHING")
             cursor.execute("INSERT INTO task_status(id, name) VALUES (2, 'In Progress') ON CONFLICT DO NOTHING")

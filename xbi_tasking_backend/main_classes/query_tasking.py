@@ -61,14 +61,14 @@ SQL_GET_INCOMPLETE_IMAGES = (
 )
 
 SQL_GET_TASKING_MANAGER_IMAGE = (
-    "SELECT image_area.scvu_image_area_id, area.area_name "
+    "SELECT image_area.scvu_image_area_id, COALESCE(image_area.external_area_id, area.area_name) as area_name "
     "FROM image_area "
     "JOIN area ON area.scvu_area_id = image_area.scvu_area_id "
     "WHERE image_area.scvu_image_id = %s"
 )
 
 SQL_GET_TASKING_MANAGER_IMAGE_FOR_IMAGES = """
-    SELECT image_area.scvu_image_id, image_area.scvu_image_area_id, area.area_name
+    SELECT image_area.scvu_image_id, image_area.scvu_image_area_id, COALESCE(image_area.external_area_id, area.area_name) as area_name
     FROM image_area
     JOIN area ON area.scvu_area_id = image_area.scvu_area_id
     WHERE image_area.scvu_image_id IN ({placeholders})
@@ -184,7 +184,7 @@ SQL_GET_TASKING_SUMMARY_IMAGE_FOR_USER = """
 """
 
 SQL_GET_TASKING_SUMMARY_AREA = (
-    "SELECT task.scvu_task_id, area.area_name, task_status.name, COALESCE(task.remarks, '') as remarks, "
+    "SELECT task.scvu_task_id, COALESCE(image_area.external_area_id, area.area_name) as area_name, task_status.name, COALESCE(task.remarks, '') as remarks, "
     "task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv, "
     "COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id, "
     "COALESCE(image_area.child_image_id, image.image_id) as child_image_id, "
@@ -209,11 +209,11 @@ SQL_GET_TASKING_SUMMARY_AREA = (
     "WHERE image.scvu_image_id = %s "
     "AND task.assignee_keycloak_id IS NOT NULL "
     "AND task.assignee_keycloak_id <> '' "
-    "ORDER BY area.area_name"
+    "ORDER BY area_name"
 )
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
-    SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
+    SELECT image.scvu_image_id, task.scvu_task_id, COALESCE(image_area.external_area_id, area.area_name) as area_name, task_status.name,
         COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv,
         COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id,
         COALESCE(image_area.child_image_id, image.image_id) as child_image_id,
@@ -238,11 +238,11 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES = """
     WHERE image.scvu_image_id IN ({placeholders})
         AND task.assignee_keycloak_id IS NOT NULL
         AND task.assignee_keycloak_id <> ''
-    ORDER BY image.scvu_image_id, area.area_name
+    ORDER BY image.scvu_image_id, area_name
 """
 
 SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
-    SELECT image.scvu_image_id, task.scvu_task_id, area.area_name, task_status.name,
+    SELECT image.scvu_image_id, task.scvu_task_id, COALESCE(image_area.external_area_id, area.area_name) as area_name, task_status.name,
         COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, task.sf_reported, task.iir_reported, area.v10, area.opsv,
         COALESCE(NULLIF(image_area.external_area_id, ''), image_area.scvu_image_area_id::TEXT) as area_id,
         COALESCE(image_area.child_image_id, image.image_id) as child_image_id,
@@ -266,7 +266,7 @@ SQL_GET_TASKING_SUMMARY_AREA_FOR_IMAGES_FOR_USER = """
     LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image.scvu_image_id IN ({placeholders})
         AND task.assignee_keycloak_id = %s
-    ORDER BY image.scvu_image_id, area.area_name
+    ORDER BY image.scvu_image_id, area_name
 """
 
 SQL_UPDATE_TASK_STATUS = (

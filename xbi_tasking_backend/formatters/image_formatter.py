@@ -29,7 +29,9 @@ def format_complete_image_image(image_data, area_data):
         'Image Quality' : image_data[9],
         'Cloud Cover' : image_data[10],
         'EW Status' : image_data[11],
-        'Vetter': image_data[12]
+        'Vetter': image_data[12],
+        'Pass ID': image_data[13] if len(image_data) > 13 else '',
+        'Image Filename': image_data[14] if len(image_data) > 14 else '',
     }
     for area in area_data:
         childList.append(area[0])

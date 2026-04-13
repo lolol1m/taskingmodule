@@ -88,7 +88,7 @@ SQL_GET_IMAGE_COMPLETE_DATE = "SELECT completed_date FROM image WHERE scvu_image
 SQL_GET_IMAGE_BY_ID_AND_NAME = "SELECT image_id, image_file_name FROM image WHERE image_id = %s AND image_file_name = %s"
 
 SQL_GET_IMAGE_AREA_DATA = (
-    "SELECT task.scvu_task_id, area.area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, "
+    "SELECT task.scvu_task_id, COALESCE(image_area.external_area_id, area.area_name) as area_name, COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id, "
     "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name "
     "FROM task "
     "JOIN image_area ON task.scvu_image_area_id = image_area.scvu_image_area_id "
@@ -97,11 +97,11 @@ SQL_GET_IMAGE_AREA_DATA = (
     "LEFT JOIN priority task_priority ON task_priority.id = task.priority_id "
     "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "WHERE image.scvu_image_id = %s "
-    "ORDER BY area.area_name"
+    "ORDER BY area_name"
 )
 
 SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES = """
-    SELECT image.scvu_image_id, task.scvu_task_id, area.area_name,
+    SELECT image.scvu_image_id, task.scvu_task_id, COALESCE(image_area.external_area_id, area.area_name) as area_name,
         COALESCE(task.remarks, '') as remarks, task.assignee_keycloak_id,
         COALESCE(task_priority.name, image_priority.name, NULL) as priority_name
     FROM task
@@ -111,22 +111,34 @@ SQL_GET_IMAGE_AREA_DATA_FOR_IMAGES = """
     LEFT JOIN priority task_priority ON task_priority.id = task.priority_id
     LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     WHERE image.scvu_image_id IN ({placeholders})
-    ORDER BY image.scvu_image_id, area.area_name
+    ORDER BY image.scvu_image_id, area_name
 """
 
 SQL_GET_IMAGE_DATA = (
     "SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id, image.upload_date, image.image_datetime, "
-    "COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name, "
-    "COALESCE(image_category.name, NULL) as image_category_name, image.image_quality, "
-    "COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id "
+    "COALESCE(task_report.name, image_report.name, NULL) as report_name, "
+    "COALESCE(task_priority.name, image_priority.name, NULL) as priority_name, "
+    "COALESCE(image_category.name, NULL) as image_category_name, "
+    "COALESCE(first_task.image_quality, image.image_quality) as image_quality, "
+    "COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name, "
+    "COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id, "
+    "pass.pass_id_file_name, image.image_file_name "
     "FROM image "
     "LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id "
     "LEFT JOIN sensor ON sensor.id = image.sensor_id "
     "LEFT JOIN ew_status ON ew_status.id = image.ew_status_id "
-    "LEFT JOIN report ON report.id = image.report_id "
-    "LEFT JOIN priority ON priority.id = image.priority_id "
+    "LEFT JOIN LATERAL ("
+    "  SELECT t.report_id, t.priority_id, t.cloud_cover_id, t.image_quality "
+    "  FROM task t JOIN image_area ia ON t.scvu_image_area_id = ia.scvu_image_area_id "
+    "  WHERE ia.scvu_image_id = image.scvu_image_id LIMIT 1"
+    ") first_task ON true "
+    "LEFT JOIN report task_report ON task_report.id = first_task.report_id "
+    "LEFT JOIN report image_report ON image_report.id = image.report_id "
+    "LEFT JOIN priority task_priority ON task_priority.id = first_task.priority_id "
+    "LEFT JOIN priority image_priority ON image_priority.id = image.priority_id "
     "LEFT JOIN image_category ON image_category.id = image.image_category_id "
-    "LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id "
+    "LEFT JOIN cloud_cover task_cloud_cover ON task_cloud_cover.id = first_task.cloud_cover_id "
+    "LEFT JOIN cloud_cover image_cloud_cover ON image_cloud_cover.id = image.cloud_cover_id "
     "WHERE image.completed_date IS NOT NULL "
     "AND ((image.completed_date >= %s AND image.completed_date <= %s) "
     "OR (image.upload_date >= %s AND image.upload_date <= %s))"
@@ -134,17 +146,29 @@ SQL_GET_IMAGE_DATA = (
 
 SQL_GET_IMAGE_DATA_FOR_USER = """
     SELECT image.scvu_image_id, COALESCE(sensor.name, NULL) as sensor_name, COALESCE(pass.pass_id_file_name, image.image_file_name), image.image_id, image.upload_date, image.image_datetime,
-        COALESCE(report.name, NULL) as report_name, COALESCE(priority.name, NULL) as priority_name,
-        COALESCE(image_category.name, NULL) as image_category_name, image.image_quality,
-        COALESCE(cloud_cover.name, NULL) as cloud_cover_name, COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id
+        COALESCE(task_report.name, image_report.name, NULL) as report_name,
+        COALESCE(task_priority.name, image_priority.name, NULL) as priority_name,
+        COALESCE(image_category.name, NULL) as image_category_name,
+        COALESCE(first_task.image_quality, image.image_quality) as image_quality,
+        COALESCE(task_cloud_cover.name, image_cloud_cover.name, NULL) as cloud_cover_name,
+        COALESCE(ew_status.name, NULL) as ew_status_name, image.vetter_keycloak_id,
+        pass.pass_id_file_name, image.image_file_name
     FROM image
     LEFT JOIN pass ON pass.scvu_pass_id = image.scvu_pass_id
     LEFT JOIN sensor ON sensor.id = image.sensor_id
     LEFT JOIN ew_status ON ew_status.id = image.ew_status_id
-    LEFT JOIN report ON report.id = image.report_id
-    LEFT JOIN priority ON priority.id = image.priority_id
+    LEFT JOIN LATERAL (
+        SELECT t.report_id, t.priority_id, t.cloud_cover_id, t.image_quality
+        FROM task t JOIN image_area ia ON t.scvu_image_area_id = ia.scvu_image_area_id
+        WHERE ia.scvu_image_id = image.scvu_image_id LIMIT 1
+    ) first_task ON true
+    LEFT JOIN report task_report ON task_report.id = first_task.report_id
+    LEFT JOIN report image_report ON image_report.id = image.report_id
+    LEFT JOIN priority task_priority ON task_priority.id = first_task.priority_id
+    LEFT JOIN priority image_priority ON image_priority.id = image.priority_id
     LEFT JOIN image_category ON image_category.id = image.image_category_id
-    LEFT JOIN cloud_cover ON cloud_cover.id = image.cloud_cover_id
+    LEFT JOIN cloud_cover task_cloud_cover ON task_cloud_cover.id = first_task.cloud_cover_id
+    LEFT JOIN cloud_cover image_cloud_cover ON image_cloud_cover.id = image.cloud_cover_id
     WHERE image.completed_date IS NOT NULL
         AND ((image.completed_date >= %s AND image.completed_date <= %s)
              OR (image.upload_date >= %s AND image.upload_date <= %s))

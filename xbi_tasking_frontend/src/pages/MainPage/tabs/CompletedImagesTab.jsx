@@ -39,7 +39,12 @@ const buildRows = (inputData) => {
 
     rows.push({
       id: Number(key),
-      imageFileName: normalizeImageName(entry['Image File Name'] || `Image_${key}`),
+      passId: readField(entry, ['Pass ID', 'passId']),
+      imageFileName: normalizeImageName(
+        readField(entry, ['Image Filename', 'imageFilename']) ||
+        entry['Image File Name'] ||
+        `Image_${key}`
+      ),
       sensorName: readField(entry, ['Sensor Name', 'sensorName']),
       imageId: readField(entry, ['Image ID', 'imageId']),
       uploadDate: readField(entry, ['Upload Date', 'uploadDate']),
@@ -87,7 +92,8 @@ function CompletedImagesTab({
 
   const columns = useMemo(
     () => [
-      { field: 'imageFileName', headerName: 'Image File Name', minWidth: 180, flex: 1.2 },
+      { field: 'passId', headerName: 'Pass ID', minWidth: 120, flex: 0.7 },
+      { field: 'imageFileName', headerName: 'Image Filename', minWidth: 180, flex: 1.2 },
       { field: 'sensorName', headerName: 'Sensor Name', minWidth: 120, flex: 0.7 },
       { field: 'imageId', headerName: 'Image ID', minWidth: 90, flex: 0.5 },
       { field: 'uploadDate', headerName: 'Upload Date', minWidth: 140, flex: 0.8, valueFormatter: dateFormatter },
@@ -97,7 +103,6 @@ function CompletedImagesTab({
       { field: 'vetter', headerName: 'Vetter', minWidth: 110, flex: 0.6 },
       { field: 'report', headerName: 'Report', minWidth: 120, flex: 0.6 },
       { field: 'remarks', headerName: 'Remarks', minWidth: 160, flex: 0.9 },
-      { field: 'imageCategory', headerName: 'Image Category', minWidth: 140, flex: 0.8 },
       { field: 'imageQuality', headerName: 'Image Quality', minWidth: 130, flex: 0.7 },
       { field: 'cloudCover', headerName: 'Cloud Cover', minWidth: 120, flex: 0.7 },
       { field: 'priority', headerName: 'Priority', minWidth: 100, flex: 0.6 },
@@ -223,7 +228,8 @@ function CompletedImagesTab({
     try {
       setExporting(true)
       const exportColumns = [
-        { field: 'imageFileName', headerName: 'Image File Name' },
+        { field: 'passId', headerName: 'Pass ID' },
+        { field: 'imageFileName', headerName: 'Image Filename' },
         { field: 'sensorName', headerName: 'Sensor Name' },
         { field: 'imageId', headerName: 'Image ID' },
         { field: 'uploadDate', headerName: 'Upload Date' },
@@ -233,7 +239,6 @@ function CompletedImagesTab({
         { field: 'vetter', headerName: 'Vetter' },
         { field: 'report', headerName: 'Report' },
         { field: 'remarks', headerName: 'Remarks' },
-        { field: 'imageCategory', headerName: 'Image Category' },
         { field: 'imageQuality', headerName: 'Image Quality' },
         { field: 'cloudCover', headerName: 'Cloud Cover' },
         { field: 'priority', headerName: 'Priority' },
