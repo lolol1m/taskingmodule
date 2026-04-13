@@ -1352,14 +1352,13 @@ function TaskingSummaryTab({
         const rowId = row?.id
         const report = normalizeSelectValue(getWorkingValue(rowId, 'Report') ?? row?.report ?? '')
         const cloudCover = normalizeSelectValue(getWorkingValue(rowId, 'Cloud Cover') ?? row?.cloudCover ?? '')
-        const imageQuality = normalizeSelectValue(getWorkingValue(rowId, 'Image Quality') ?? row?.imageQuality ?? '')
-        return !report || !cloudCover || !imageQuality
+        return !report || !cloudCover
       })
 
       if (missingInputs.length === eligibleRows.length) {
         addNotification({
           title: 'Missing required inputs',
-          meta: 'Fill Report, Cloud Cover, and Image Quality before Complete Task',
+          meta: 'Fill Report and Cloud Cover before Complete Task',
         })
         return
       }
