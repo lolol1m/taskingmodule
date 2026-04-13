@@ -12,7 +12,7 @@ const formatDateValue = (value) => {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('en-CA')
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
 }
 
 const parseFilename = (contentDisposition) => {
@@ -35,6 +35,7 @@ const formatDateRange = (range) => {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'Asia/Singapore',
   })
   return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
 }
@@ -228,7 +229,7 @@ function GenerateBinCountTab({ dateRange }) {
         </div>
 
         {lastRun ? (
-          <div className="admin-bin__note">Last run: {lastRun.toLocaleString()}</div>
+          <div className="admin-bin__note">Last run: {lastRun.toLocaleString('en-GB', { timeZone: 'Asia/Singapore', hour12: false })}</div>
         ) : (
           <div className="admin-bin__note">Run a report to see results.</div>
         )}

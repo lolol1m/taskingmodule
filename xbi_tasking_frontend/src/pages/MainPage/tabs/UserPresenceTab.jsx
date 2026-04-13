@@ -31,7 +31,7 @@ const formatTimestamp = (value) => {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString()
+  return date.toLocaleString('en-GB', { timeZone: 'Asia/Singapore', hour12: false })
 }
 
 const buildRows = (users) => {

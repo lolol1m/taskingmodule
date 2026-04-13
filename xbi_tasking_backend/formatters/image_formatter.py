@@ -1,4 +1,4 @@
-from GlobalUtils import datetime_format
+from GlobalUtils import format_sgt
 
 
 def format_complete_image_area(area_data, image_id):
@@ -19,8 +19,8 @@ def format_complete_image_image(image_data, area_data):
         'Sensor Name' : image_data[1],
         'Image File Name' : image_data[2],
         'Image ID' : image_data[3],
-        'Upload Date' : image_data[4].strftime(datetime_format),
-        'Image Datetime' : image_data[5].strftime(datetime_format),
+        'Upload Date' : format_sgt(image_data[4]),
+        'Image Datetime' : format_sgt(image_data[5]),
         'Area' : area_data[0][1] if area_data and len(area_data) > 0 else '',
         'Assignee' : area_data[0][3] if area_data and len(area_data) > 0 else 'Unassigned',
         'Report' : image_data[6],

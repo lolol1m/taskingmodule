@@ -2,12 +2,19 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
 import '@fontsource/roboto/300.css'
 import '@fontsource/roboto/400.css'
 import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
 import './index.css'
 import App from './App.jsx'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.tz.setDefault('Asia/Singapore')
 
 const theme = createTheme({
   palette: {

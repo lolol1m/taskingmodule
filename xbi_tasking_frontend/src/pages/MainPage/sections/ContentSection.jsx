@@ -50,6 +50,7 @@ const formatDateRange = (range) => {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'Asia/Singapore',
   })
   return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
 }

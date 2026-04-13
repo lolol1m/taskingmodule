@@ -1,4 +1,4 @@
-from GlobalUtils import datetime_format
+from GlobalUtils import format_sgt
 
 
 def format_tasking_summary_image(image, areas):
@@ -7,8 +7,8 @@ def format_tasking_summary_image(image, areas):
             "Sensor Name": image[1],
             "Image File Name": image[2],
             "Image ID": image[3],
-            "Upload Date": image[4].strftime(datetime_format),
-            "Image Datetime": image[5].strftime(datetime_format),
+            "Upload Date": format_sgt(image[4]),
+            "Image Datetime": format_sgt(image[5]),
             "Report": image[6],
             "Priority": image[7],
             "Image Category": image[8],
@@ -45,8 +45,8 @@ def format_tasking_summary_image(image, areas):
         "Sensor Name": image[1],
         "Image File Name": image[2],
         "Image ID": image[3],
-        "Upload Date": image[4].strftime(datetime_format),
-        "Image Datetime": image[5].strftime(datetime_format),
+        "Upload Date": format_sgt(image[4]),
+        "Image Datetime": format_sgt(image[5]),
         "Report": image[6],
         "Priority": image[7],
         "Image Category": image[8],
@@ -80,8 +80,8 @@ def format_tasking_summary_area(area, parent_id):
         "Cloud Cover": area[14],
         "Image Quality": area[15],
         "Priority": area[16],
-        "Exploit Start Time": area[17].strftime(datetime_format) if area[17] else None,
-        "Exploit End Time": area[18].strftime(datetime_format) if area[18] else None,
+        "Exploit Start Time": format_sgt(area[17]) if area[17] else None,
+        "Exploit End Time": format_sgt(area[18]) if area[18] else None,
         "Vetter Keycloak ID": area[19] if len(area) > 19 else None,
         "Vetter": area[20] if len(area) > 20 else None,
         "SCVU Task ID": area[0],
@@ -100,8 +100,8 @@ def format_tasking_manager_image(image_data, image_areas_data):
         'Sensor Name': image_data[1],
         'Image File Name': image_data[2],
         'Image ID': image_data[3],
-        'Upload Date': image_data[4].strftime(datetime_format),
-        'Image Datetime': image_data[5].strftime(datetime_format),
+        'Upload Date': format_sgt(image_data[4]),
+        'Image Datetime': format_sgt(image_data[5]),
         'Priority': image_data[6],
         'TTG': image_data[3] == None,
         'Assignee': assignee

@@ -312,7 +312,8 @@ class KeycloakQueries:
             presence = presence_map.get(entry["id"], {})
             last_updated = presence.get("last_updated")
             if last_updated is not None:
-                last_updated = last_updated.isoformat()
+                from GlobalUtils import to_sgt
+                last_updated = to_sgt(last_updated).isoformat()
             output.append({
                 "id": entry["id"],
                 "name": username,
