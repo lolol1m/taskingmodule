@@ -1,11 +1,19 @@
 import logging
 import os
 from fastapi import HTTPException, Request, status
+from config import get_config
 
 
 logger = logging.getLogger("xbi_tasking_backend.security")
 
 KEYCLOAK_ENABLED = os.getenv("KEYCLOAK_ENABLED", "true").lower() == "true"
+
+
+def is_dev_mode() -> bool:
+    try:
+        return get_config().getKeycloakMode() == "dev"
+    except Exception:
+        return False
 
 
 def is_admin_user(user: dict) -> bool:

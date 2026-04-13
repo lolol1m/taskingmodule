@@ -5,11 +5,16 @@ from fastapi import APIRouter, Depends, Request, UploadFile
 from api_utils import error_response, model_to_dict, run_blocking
 from constants import ContentType, MAX_UPLOAD_BYTES
 from schemas import AdminResetPasswordPayload, ChangePasswordPayload, CreateUserPayload, DeleteUserPayload, EditUserPayload, StatusResponse, UsersResponse
-from security import can_upload_parade_state, get_current_user, is_admin_user
+from security import can_upload_parade_state, get_current_user, is_admin_user, is_dev_mode
 
 
 logger = logging.getLogger("xbi_tasking_backend.users")
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/getMode")
+async def get_mode(user: dict = Depends(get_current_user)):
+    return {"mode": "dev" if is_dev_mode() else "prod"}
 
 
 @router.get("/getUsers")
@@ -34,9 +39,10 @@ async def get_users(request: Request, user: dict = Depends(get_current_user)) ->
 
 @router.post("/createUser")
 async def create_user(request: Request, payload: CreateUserPayload, user: dict = Depends(get_current_user)):
+    if not is_dev_mode():
+        return error_response(403, "User creation is only available in dev mode", "dev_only")
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
-
     if not is_admin_user(user):
         return error_response(403, "Insufficient permissions", "insufficient_permissions")
 
@@ -68,6 +74,8 @@ async def create_user(request: Request, payload: CreateUserPayload, user: dict =
 
 @router.post("/deleteUser")
 async def delete_user(request: Request, payload: DeleteUserPayload, user: dict = Depends(get_current_user)):
+    if not is_dev_mode():
+        return error_response(403, "User deletion is only available in dev mode", "dev_only")
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
     if not is_admin_user(user):
@@ -151,10 +159,8 @@ async def update_users(request: Request, file: UploadFile, user: dict = Depends(
 
 @router.post("/changePassword")
 async def change_password(request: Request, payload: ChangePasswordPayload, user: dict = Depends(get_current_user)):
-    """
-    Change the current user's password.
-    Requires the current password for verification.
-    """
+    if not is_dev_mode():
+        return error_response(403, "Password change is only available in dev mode", "dev_only")
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
 
@@ -189,11 +195,8 @@ async def change_password(request: Request, payload: ChangePasswordPayload, user
 
 @router.post("/adminResetPassword")
 async def admin_reset_password(request: Request, payload: AdminResetPasswordPayload, user: dict = Depends(get_current_user)):
-    """
-    Admin endpoint to reset another user's password.
-    Only IA users can use this endpoint.
-    Does not require knowing the current password.
-    """
+    if not is_dev_mode():
+        return error_response(403, "Password reset is only available in dev mode", "dev_only")
     if not user:
         return error_response(401, "Not authenticated", "not_authenticated")
 
