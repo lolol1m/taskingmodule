@@ -31,6 +31,7 @@ class UserService:
         username = payload.get("username", "").strip()
         password = payload.get("password", "").strip()
         role = payload.get("role", "").strip()
+        coy = (payload.get("coy") or "").strip() or None
 
         if not username or not password or not role:
             return {"error": "username, password, and role are required"}
@@ -39,7 +40,7 @@ class UserService:
         if role not in valid_roles:
             return {"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}
 
-        result = self.keycloak.createKeycloakUser(username, password, role)
+        result = self.keycloak.createKeycloakUser(username, password, role, coy=coy)
         return {"success": True, "user": result}
 
     def delete_user(self, payload):
@@ -68,8 +69,9 @@ class UserService:
         new_username = payload.get("username") or None
         new_role = payload.get("role") or None
         new_status = payload.get("status") or None
+        new_coy = payload.get("coy")
         try:
-            result = self.keycloak.editKeycloakUser(user_id, new_username, new_role, new_status) or {}
+            result = self.keycloak.editKeycloakUser(user_id, new_username, new_role, new_status, new_coy=new_coy) or {}
             response = {"success": True}
             warnings = result.get("warnings")
             if warnings:
@@ -84,12 +86,14 @@ class UserService:
     def update_users(self, csv_text):
         user_list = []
         present_list = []
+        coy_list = []
         ps_status = ParadeStateStatus
         file = StringIO(csv_text)
         reader = csv.DictReader(file)
         fieldnames = reader.fieldnames or []
         if "Name" not in fieldnames or "Status" not in fieldnames:
             raise ValueError("CSV must include Name and Status columns")
+        has_coy = "Coy" in fieldnames
         for row in reader:
             name = (row.get("Name") or "").strip()
             if not name:
@@ -101,6 +105,10 @@ class UserService:
                 present_list.append((name,))
             elif status_value:
                 logger.warning("Unknown parade state status: %s", status_value)
+            if has_coy:
+                coy_value = (row.get("Coy") or "").strip()
+                if coy_value:
+                    coy_list.append((name, coy_value))
         
         user_list = tuple(user_list)
         present_list = tuple(present_list)
@@ -108,6 +116,8 @@ class UserService:
             self.keycloak.resetRecentUsers()
             self.keycloak.addUsers(user_list)
             self.keycloak.updateExistingUsers(present_list)
+            if coy_list:
+                self.keycloak.updateUserCoy(coy_list)
 
     def change_password(self, user, current_password, new_password):
         """

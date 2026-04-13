@@ -119,6 +119,16 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS exploit_end_time TIMESTAMP")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS vetter_keycloak_id VARCHAR(255)")
                 cursor.execute("INSERT INTO report(id, name) VALUES (12, 'IIR+SF') ON CONFLICT DO NOTHING")
+                cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS coy VARCHAR(50)")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS coy_option (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(50) UNIQUE NOT NULL
+                    )
+                """)
+                cursor.execute("INSERT INTO coy_option(name) VALUES ('A') ON CONFLICT DO NOTHING")
+                cursor.execute("INSERT INTO coy_option(name) VALUES ('B') ON CONFLICT DO NOTHING")
+                cursor.execute("INSERT INTO coy_option(name) VALUES ('C') ON CONFLICT DO NOTHING")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS proposed_assignee_keycloak_id VARCHAR(255)")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS sf_reported BOOLEAN DEFAULT FALSE")
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS iir_reported BOOLEAN DEFAULT FALSE")
@@ -222,7 +232,15 @@ class DatabaseSchemaManager:
                 CREATE TABLE IF NOT EXISTS user_cache (
                     keycloak_user_id VARCHAR(255) PRIMARY KEY,
                     is_present BOOLEAN DEFAULT FALSE,
-                    last_updated TIMESTAMP
+                    last_updated TIMESTAMP,
+                    coy VARCHAR(50)
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS coy_option (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(50) UNIQUE NOT NULL
                 )
             """)
 
@@ -362,6 +380,10 @@ class DatabaseSchemaManager:
             cursor.execute("INSERT INTO sensor_category(id, name) VALUES (3, 'AB') ON CONFLICT DO NOTHING")
             cursor.execute("INSERT INTO sensor_category(id, name) VALUES (4, 'HB') ON CONFLICT DO NOTHING")
             cursor.execute("INSERT INTO sensor_category(id, name) VALUES (5, 'AVIS') ON CONFLICT DO NOTHING")
+
+            cursor.execute("INSERT INTO coy_option(name) VALUES ('A') ON CONFLICT DO NOTHING")
+            cursor.execute("INSERT INTO coy_option(name) VALUES ('B') ON CONFLICT DO NOTHING")
+            cursor.execute("INSERT INTO coy_option(name) VALUES ('C') ON CONFLICT DO NOTHING")
 
             cursor.execute("INSERT INTO area(scvu_area_id, area_name, v10) VALUES (0, 'OTHERS', false) ON CONFLICT DO NOTHING")
 

@@ -8,6 +8,7 @@ SQL_GET_AREAS = "SELECT area.scvu_area_id, area.area_name, area.opsv FROM area O
 SQL_SET_OPSV_FALSE = "UPDATE area SET opsv = False"
 SQL_SET_OPSV_AREAS = "UPDATE area SET opsv = True WHERE area_name = %s"
 SQL_UPDATE_SENSOR_CATEGORY = "UPDATE sensor SET category_id = (SELECT id FROM sensor_category WHERE name = %s) WHERE name = %s"
+SQL_GET_COY_OPTIONS = "SELECT name FROM coy_option ORDER BY name ASC"
 
 
 class LookupQueries:
@@ -96,3 +97,11 @@ class LookupQueries:
         Output: NIL
         '''
         self.db.executeUpdateMany(SQL_UPDATE_SENSOR_CATEGORY, category_sensor_list)
+
+    def getCoyOptions(self):
+        '''
+        Function:   Gets COY options from the db
+        Input:      None
+        Output:     nested list of all COY option names
+        '''
+        return self.db.executeSelect(SQL_GET_COY_OPTIONS)

@@ -174,6 +174,15 @@ async def update_sensor_category(request: Request, payload: UpdateSensorCategory
         return error_response(500, "Failed to update sensor categories", "update_sensor_category_failed")
 
 
+@router.get("/getCoyOptions")
+async def get_coy_options(request: Request, user: dict = Depends(get_current_user)):
+    try:
+        return await run_blocking(request.app.state.lookup_service.get_coy_options)
+    except Exception:
+        logger.exception("getCoyOptions failed")
+        return error_response(500, "Failed to load COY options", "get_coy_options_failed")
+
+
 @router.get("/getAreas")
 async def get_areas(request: Request, user: dict = Depends(get_current_user)):
     '''

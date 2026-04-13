@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@mui/material'
 import API from '../../../api/api'
 import useNotifications from '../../../components/notifications/useNotifications.js'
@@ -17,10 +17,24 @@ function CreateUserTab({ onSuccess }) {
     username: '',
     password: '',
     role: 'II',
+    coy: '',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [coyOptions, setCoyOptions] = useState([])
   const { addNotification } = useNotifications()
+
+  useEffect(() => {
+    const fetchCoyOptions = async () => {
+      try {
+        const data = await api.getCoyOptions()
+        setCoyOptions(data?.CoyOptions || [])
+      } catch {
+        setCoyOptions([])
+      }
+    }
+    fetchCoyOptions()
+  }, [])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -44,7 +58,7 @@ function CreateUserTab({ onSuccess }) {
         title: 'User created',
         meta: `Just now · ${formData.username} (${formData.role})`,
       })
-      setFormData({ username: '', password: '', role: 'II' })
+      setFormData({ username: '', password: '', role: 'II', coy: '' })
       onSuccess?.()
     } catch (err) {
       const message = err.response?.data?.detail || err.response?.data?.message || 'Failed to create user'
@@ -160,6 +174,28 @@ function CreateUserTab({ onSuccess }) {
                   </div>
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* COY Selection */}
+          <div className="create-user__field">
+            <label className="create-user__label" htmlFor="coy">
+              COY
+            </label>
+            <div className="create-user__input-wrap">
+              <select
+                id="coy"
+                name="coy"
+                className="create-user__input"
+                value={formData.coy}
+                onChange={handleChange}
+                style={{ appearance: 'auto', paddingLeft: 12 }}
+              >
+                <option value="">— Select COY —</option>
+                {coyOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
             </div>
           </div>
 

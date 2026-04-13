@@ -47,12 +47,14 @@ const buildRows = (users) => {
       ? (isPresent ? 'Present' : 'Absent')
       : readField(entry, ['status', 'Status']) || 'Absent'
     const lastUpdated = readField(entry, ['last_updated', 'lastUpdated', 'Last Updated', 'LastUpdated'])
+    const coy = readField(entry, ['coy', 'Coy', 'COY'])
     const resolvedUser = username ?? '—'
     return {
       id: entry?.id ?? `${resolvedUser}-${index}`,
       keycloakId: entry?.id ?? null,
       user: resolvedUser,
       role: role ?? '—',
+      coy: coy ?? '—',
       status: status ?? 'Unknown',
       lastUpdated: formatTimestamp(lastUpdated),
     }
@@ -157,6 +159,30 @@ function EditableStatusCell({ value, rowId, editingRows, setEditingRows }) {
   )
 }
 
+function EditableCoyCell({ value, rowId, editingRows, setEditingRows, coyOptions }) {
+  const pending = editingRows[rowId]
+  const displayed = pending?.coy !== undefined ? pending.coy : value
+  return (
+    <TextField
+      select
+      size="small"
+      fullWidth
+      value={displayed}
+      onChange={(e) =>
+        setEditingRows((prev) => ({ ...prev, [rowId]: { ...(prev[rowId] || {}), coy: e.target.value } }))
+      }
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      sx={dropdownSx}
+    >
+      <MenuItem value="">—</MenuItem>
+      {coyOptions.map((c) => (
+        <MenuItem key={c} value={c}>{c}</MenuItem>
+      ))}
+    </TextField>
+  )
+}
+
 // ── Modal ──────────────────────────────────────────────────────────────────────
 function CreateUserModal({ open, onClose, onSuccess, resetKey }) {
   return (
@@ -208,7 +234,20 @@ function UserPresenceTab({ userRole }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [modalKey, setModalKey] = useState(0)
+  const [coyOptions, setCoyOptions] = useState([])
   const { addNotification } = useNotifications()
+
+  useEffect(() => {
+    const fetchCoyOptions = async () => {
+      try {
+        const data = await api.getCoyOptions()
+        setCoyOptions(data?.CoyOptions || [])
+      } catch {
+        setCoyOptions([])
+      }
+    }
+    fetchCoyOptions()
+  }, [])
 
   const canCreateUsers = userRole === 'IA'
   const canEditUsers = userRole === 'IA'
@@ -250,6 +289,24 @@ function UserPresenceTab({ userRole }) {
               rowId={params.row.id}
               editingRows={editingRows}
               setEditingRows={setEditingRows}
+            />
+          )
+        },
+      },
+      {
+        field: 'coy',
+        headerName: 'COY',
+        minWidth: 100,
+        flex: 0.4,
+        renderCell: (params) => {
+          if (!editingRows[params.row.id]) return <span>{params.value}</span>
+          return (
+            <EditableCoyCell
+              value={params.value}
+              rowId={params.row.id}
+              editingRows={editingRows}
+              setEditingRows={setEditingRows}
+              coyOptions={coyOptions}
             />
           )
         },
@@ -303,6 +360,7 @@ function UserPresenceTab({ userRole }) {
                               [params.row.id]: {
                                 user: params.row.user,
                                 role: params.row.role,
+                                coy: params.row.coy,
                                 status: params.row.status,
                               },
                             }))
@@ -332,7 +390,7 @@ function UserPresenceTab({ userRole }) {
           ]
         : []),
     ],
-    [editingRows, canEditUsers],
+    [editingRows, canEditUsers, coyOptions],
   )
 
   useEffect(() => {
@@ -413,6 +471,7 @@ function UserPresenceTab({ userRole }) {
         const payload = { user_id: original.keycloakId }
         if (pending.user !== undefined && pending.user !== original.user) payload.username = pending.user
         if (pending.role !== undefined && pending.role !== original.role) payload.role = pending.role
+        if (pending.coy !== undefined && pending.coy !== original.coy) payload.coy = pending.coy
         if (pending.status !== undefined && pending.status !== original.status) payload.status = pending.status
         const result = await api.editUser(payload)
         if (result?.error) throw new Error(result.error)

@@ -55,6 +55,11 @@ class LookupService:
             output["Areas"].append(area_dict)
         return output
 
+    def get_coy_options(self):
+        output = {}
+        output["CoyOptions"] = [i[0] for i in self.lookup.getCoyOptions()]
+        return output
+
     def set_opsv_areas(self, payload):
         self.lookup.setOpsvFalse()
 

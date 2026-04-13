@@ -16,8 +16,14 @@ SQL_INSERT_USER_CACHE_DEFAULT = """
     ON CONFLICT (keycloak_user_id) DO NOTHING
 """
 
+SQL_INSERT_USER_CACHE_WITH_COY = """
+    INSERT INTO user_cache (keycloak_user_id, is_present, coy)
+    VALUES (%s, FALSE, %s)
+    ON CONFLICT (keycloak_user_id) DO UPDATE SET coy = EXCLUDED.coy
+"""
+
 SQL_SELECT_USER_CACHE_PRESENCE = """
-    SELECT keycloak_user_id, is_present, last_updated
+    SELECT keycloak_user_id, is_present, last_updated, coy
     FROM user_cache
     WHERE keycloak_user_id IN ({placeholders})
 """
@@ -48,6 +54,8 @@ SQL_UPDATE_USER_CACHE_PRESENT = "UPDATE user_cache SET is_present = True WHERE k
 SQL_UPDATE_USER_CACHE_PRESENCE = "UPDATE user_cache SET is_present = %s, last_updated = NOW() WHERE keycloak_user_id = %s"
 
 SQL_DELETE_USER_CACHE = "DELETE FROM user_cache WHERE keycloak_user_id = %s"
+
+SQL_UPDATE_USER_CACHE_COY = "UPDATE user_cache SET coy = %s WHERE keycloak_user_id = %s"
 
 
 class KeycloakQueries:
@@ -162,7 +170,7 @@ class KeycloakQueries:
         token = self.get_keycloak_admin_token()
         self.kc.assign_realm_role(token, user_id, role_representation)
 
-    def createKeycloakUser(self, username, password, role_name):
+    def createKeycloakUser(self, username, password, role_name, coy=None):
         # Check for existing user
         token = self.get_keycloak_admin_token()
         existing = self.kc.find_user_id(token, username)
@@ -180,8 +188,11 @@ class KeycloakQueries:
         role_rep = self._get_keycloak_role(role_name)
         self._assign_realm_role(user_id, role_rep)
 
-        # Ensure user exists in cache (default to not present)
-        self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (user_id,))
+        # Ensure user exists in cache with optional coy
+        if coy:
+            self.db.executeInsert(SQL_INSERT_USER_CACHE_WITH_COY, (user_id, coy))
+        else:
+            self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (user_id,))
         return {"id": user_id, "username": username, "role": role_name}
 
     def deleteKeycloakUser(self, user_id):
@@ -189,7 +200,7 @@ class KeycloakQueries:
         self.kc.delete_user(token, user_id)
         self.db.executeDelete(SQL_DELETE_USER_CACHE, (user_id,))
 
-    def editKeycloakUser(self, user_id, new_username, new_role, new_status):
+    def editKeycloakUser(self, user_id, new_username, new_role, new_status, new_coy=None):
         token = self.get_keycloak_admin_token()
         warnings = []
 
@@ -222,6 +233,9 @@ class KeycloakQueries:
         if new_status is not None:
             is_present = new_status.lower() == "present"
             self.db.executeUpdate(SQL_UPDATE_USER_CACHE_PRESENCE, (is_present, user_id))
+
+        if new_coy is not None:
+            self.db.executeUpdate(SQL_UPDATE_USER_CACHE_COY, (new_coy, user_id))
 
         return {"warnings": warnings}
 
@@ -304,7 +318,7 @@ class KeycloakQueries:
         placeholders, values = build_in_clause(user_ids)
         query = SQL_SELECT_USER_CACHE_PRESENCE.format(placeholders=placeholders)
         result = self.db.executeSelect(query, values)
-        presence_map = {row[0]: {"is_present": row[1], "last_updated": row[2]} for row in result}
+        presence_map = {row[0]: {"is_present": row[1], "last_updated": row[2], "coy": row[3]} for row in result}
 
         output = []
         for username, entry in user_map.items():
@@ -318,6 +332,7 @@ class KeycloakQueries:
                 "id": entry["id"],
                 "name": username,
                 "role": ", ".join(roles_for_user) if roles_for_user else None,
+                "coy": presence.get("coy") or "",
                 "is_present": bool(presence.get("is_present", False)),
                 "last_updated": last_updated,
             })
@@ -477,3 +492,18 @@ class KeycloakQueries:
             user_id_tuples.append((user_id,))
 
         self.db.executeUpdateMany(SQL_UPDATE_USER_CACHE_PRESENT, user_id_tuples)
+
+    def updateUserCoy(self, coy_list):
+        '''
+        Function: Updates coy field for users in the cache
+        Input: List of (username, coy) tuples
+        Output: NIL
+        '''
+        update_tuples = []
+        for username, coy in coy_list:
+            user_id = self.map_keycloak_username_to_keycloak_id(username)
+            if not user_id:
+                continue
+            update_tuples.append((coy, user_id))
+        if update_tuples:
+            self.db.executeUpdateMany(SQL_UPDATE_USER_CACHE_COY, update_tuples)

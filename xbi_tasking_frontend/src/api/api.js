@@ -93,6 +93,11 @@ class API {
         return response.data
     }
 
+    async getCoyOptions() {
+        const response = await this.client.get("/lookup/getCoyOptions")
+        return response.data
+    }
+
     async getAreas() {
         const response = await this.client.get("/lookup/getAreas")
         return response.data

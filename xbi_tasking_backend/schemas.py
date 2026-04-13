@@ -76,6 +76,7 @@ class CreateUserPayload(BaseModel):
     username: str
     password: str
     role: str
+    coy: str | None = None
 
 
 class DeleteUserPayload(BaseModel):
@@ -87,6 +88,7 @@ class EditUserPayload(BaseModel):
     username: str | None = None
     role: str | None = None
     status: str | None = None
+    coy: str | None = None
 
 
 class InsertTTGPayload(BaseModel):
