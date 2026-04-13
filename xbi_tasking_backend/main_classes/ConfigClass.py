@@ -50,3 +50,12 @@ class ConfigClass:
         if not raw:
             return [self.getKeycloakClientID()]
         return [client_id.strip() for client_id in raw.split(',') if client_id.strip()]
+
+    def getKeycloakRolesClientID(self):
+        return self.config.get('Keycloak', 'roles_client_id', fallback='xbi-tasking-frontend')
+
+    def getKeycloakRequiredGroup(self):
+        return self.config.get('Keycloak', 'required_group', fallback='xbi-tasking-users')
+
+    def getKeycloakMode(self):
+        return self.config.get('Keycloak', 'mode', fallback='dev').strip().lower()
