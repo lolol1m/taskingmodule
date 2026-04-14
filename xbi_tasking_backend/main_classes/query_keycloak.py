@@ -178,33 +178,30 @@ class KeycloakQueries:
         token = self.get_keycloak_admin_token()
         return self.kc.find_user_id(token, keycloak_username)
 
-    def _get_keycloak_role(self, role_name):
-        token = self.get_keycloak_admin_token()
-        return self.kc.get_role(token, role_name)
-
-    def _assign_realm_role(self, user_id, role_representation):
-        token = self.get_keycloak_admin_token()
-        self.kc.assign_realm_role(token, user_id, role_representation)
+    def _get_roles_client_uuid(self, token):
+        from config import get_config
+        roles_client_id = get_config().getKeycloakRolesClientID()
+        client_uuid = self.kc.client.get_client_uuid(token, roles_client_id)
+        if not client_uuid:
+            raise ValueError(f"Could not find Keycloak client '{roles_client_id}'")
+        return client_uuid
 
     def createKeycloakUser(self, username, password, role_name, coy=None):
-        # Check for existing user
         token = self.get_keycloak_admin_token()
         existing = self.kc.find_user_id(token, username)
         if existing:
             raise ValueError("Username already exists")
 
-        # Create user
         user_id = self.kc.create_user(token, username, password)
         if not user_id:
             user_id = self.kc.find_user_id(token, username)
         if not user_id:
             raise ValueError("User creation failed")
 
-        # Assign role
-        role_rep = self._get_keycloak_role(role_name)
-        self._assign_realm_role(user_id, role_rep)
+        client_uuid = self._get_roles_client_uuid(token)
+        role_rep = self.kc.client.get_client_role(token, client_uuid, role_name)
+        self.kc.client.assign_client_role(token, user_id, client_uuid, role_rep)
 
-        # Ensure user exists in cache with optional coy
         if coy:
             self.db.executeInsert(SQL_INSERT_USER_CACHE_WITH_COY, (user_id, coy))
         else:
@@ -217,6 +214,7 @@ class KeycloakQueries:
         self.db.executeDelete(SQL_DELETE_USER_CACHE, (user_id,))
 
     def editKeycloakUser(self, user_id, new_username, new_role, new_status, new_coy=None):
+        from config import get_config
         token = self.get_keycloak_admin_token()
         warnings = []
 
@@ -236,15 +234,22 @@ class KeycloakQueries:
             valid_roles = {r.value for r in EnumClasses.Role}
             if new_role not in valid_roles:
                 raise ValueError(f"Invalid role: {new_role}. Must be one of: {', '.join(sorted(valid_roles))}")
-            current_roles = self.kc.get_user_realm_roles(token, user_id)
-            for role_rep in current_roles:
+
+            roles_client_id = get_config().getKeycloakRolesClientID()
+            client_uuid = self.kc.client.get_client_uuid(token, roles_client_id)
+            if not client_uuid:
+                raise ValueError(f"Could not find Keycloak client '{roles_client_id}'")
+
+            current_client_roles = self.kc.client.get_user_client_roles(token, user_id, client_uuid)
+            for role_rep in current_client_roles:
                 if role_rep.get("name") in valid_roles:
                     try:
-                        self.kc.remove_realm_role(token, user_id, role_rep)
+                        self.kc.client.remove_client_role(token, user_id, client_uuid, role_rep)
                     except requests.exceptions.RequestException as e:
-                        logger.warning("Could not remove role %s from user %s: %s", role_rep.get("name"), user_id, e)
-            new_role_rep = self.kc.get_role(token, new_role)
-            self.kc.assign_realm_role(token, user_id, new_role_rep)
+                        logger.warning("Could not remove client role %s from user %s: %s", role_rep.get("name"), user_id, e)
+
+            new_role_rep = self.kc.client.get_client_role(token, client_uuid, new_role)
+            self.kc.client.assign_client_role(token, user_id, client_uuid, new_role_rep)
 
         if new_status is not None:
             is_present = new_status.lower() == "present"
@@ -357,7 +362,7 @@ class KeycloakQueries:
 
     def getUsers(self):
         '''
-        Function:   Gets users from Keycloak (II, Senior II, IA roles) with presence from cache
+        Function:   Gets users from Keycloak (II, Senior II, IA client roles) with presence from cache
         Input:      None
         Output:     list of dicts with id, name, role, is_present
         Note:       Keycloak is the source of truth for users/roles; cache stores is_present
@@ -368,13 +373,19 @@ class KeycloakQueries:
             logger.warning("Could not get Keycloak admin token: %s", e)
             return []
 
+        try:
+            client_uuid = self._get_roles_client_uuid(token)
+        except ValueError as e:
+            logger.warning("Could not resolve roles client: %s", e)
+            return []
+
         role_enum = EnumClasses.Role
         role_names = [role_enum.II.value, role_enum.SENIOR_II.value, role_enum.IA.value]
         user_map = {}
 
         for role_name in role_names:
             try:
-                users = self.kc.get_users_for_role(token, role_name)
+                users = self.kc.client.get_users_for_client_role(token, client_uuid, role_name)
                 for user in users:
                     username = user.get("username")
                     user_id = user.get("id")
@@ -383,7 +394,7 @@ class KeycloakQueries:
                     entry = user_map.setdefault(username, {"id": user_id, "roles": set()})
                     entry["roles"].add(role_name)
             except requests.exceptions.RequestException as e:
-                logger.warning("Could not fetch users with role %s from Keycloak: %s", role_name, e)
+                logger.warning("Could not fetch users with client role %s: %s", role_name, e)
                 continue
 
         if not user_map:
@@ -421,18 +432,18 @@ class KeycloakQueries:
 
     def getUserIds(self):
         '''
-        Function:   Gets Keycloak user IDs for users with II role who are present
+        Function:   Gets Keycloak user IDs for users with II client role who are present
         Input:      None
         Output:     Set of Keycloak user IDs
         '''
         try:
             token = self.get_keycloak_admin_token()
+            client_uuid = self._get_roles_client_uuid(token)
         except (ValueError, requests.exceptions.RequestException):
             return set()
 
-        # Get Keycloak user IDs for II role
         try:
-            users = self.kc.get_users_for_role(token, EnumClasses.Role.II.value)
+            users = self.kc.client.get_users_for_client_role(token, client_uuid, EnumClasses.Role.II.value)
             keycloak_ids = {user.get("id") for user in users if user.get("id")}
         except requests.exceptions.RequestException:
             return set()
@@ -475,9 +486,8 @@ class KeycloakQueries:
 
         try:
             token = self.get_keycloak_admin_token()
+            client_uuid = self._get_roles_client_uuid(token)
         except (ValueError, requests.exceptions.RequestException):
-            # Fallback: if Keycloak is temporarily unavailable, still auto-assign
-            # from present users in cache.
             present_ids = self.get_all_present_user_ids()
             random.shuffle(present_ids)
             return {
@@ -489,7 +499,7 @@ class KeycloakQueries:
         role_to_ids = {role: set() for role in role_order}
         for role in role_order:
             try:
-                users = self.kc.get_users_for_role(token, role)
+                users = self.kc.client.get_users_for_client_role(token, client_uuid, role)
                 role_to_ids[role] = {user.get("id") for user in users if user.get("id")}
             except requests.exceptions.RequestException:
                 role_to_ids[role] = set()

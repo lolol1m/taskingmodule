@@ -172,6 +172,59 @@ class KeycloakClient:
             )
         response.raise_for_status()
 
+    # ── Client role methods ─────────────────────────────────────────────────
+
+    def get_client_uuid(self, token, client_id):
+        """Get the internal UUID of a client by its clientId string."""
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/clients"
+        headers = {"Authorization": f"Bearer {token}"}
+        params = {"clientId": client_id}
+        response = requests.get(url, headers=headers, params=params, timeout=5)
+        response.raise_for_status()
+        clients = response.json()
+        if not clients:
+            return None
+        return clients[0]["id"]
+
+    def get_client_role(self, token, client_uuid, role_name):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/clients/{client_uuid}/roles/{role_name}"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
+    def get_user_client_roles(self, token, user_id, client_uuid):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/clients/{client_uuid}"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
+    def assign_client_role(self, token, user_id, client_uuid, role_representation):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/clients/{client_uuid}"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        response = requests.post(url, headers=headers, json=[role_representation], timeout=5)
+        response.raise_for_status()
+
+    def remove_client_role(self, token, user_id, client_uuid, role_representation):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/users/{user_id}/role-mappings/clients/{client_uuid}"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        response = requests.delete(url, headers=headers, json=[role_representation], timeout=5)
+        response.raise_for_status()
+
+    def get_users_for_client_role(self, token, client_uuid, role_name):
+        keycloak_url, realm = self._base()
+        url = f"{keycloak_url}/admin/realms/{realm}/clients/{client_uuid}/roles/{role_name}/users"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        return response.json()
+
     def verify_user_credentials(self, username, password):
         """Verify user credentials by attempting to get a token using admin client"""
         keycloak_url, realm = self._base()
