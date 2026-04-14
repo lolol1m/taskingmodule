@@ -174,10 +174,15 @@ async def keycloak_auth_middleware(request: Request, call_next):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Attach user info to request state for use in route handlers
         request.state.user = token_info
-        
-        # Continue with the request
+
+        try:
+            user_service = getattr(request.app.state, "user_service", None)
+            if user_service and token_info.get("sub"):
+                user_service.ensure_user_cache(token_info)
+        except Exception as reg_err:
+            logger.debug("Auto-register cache update skipped: %s", reg_err)
+
         response = await call_next(request)
         return response
         

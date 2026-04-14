@@ -57,6 +57,21 @@ SQL_DELETE_USER_CACHE = "DELETE FROM user_cache WHERE keycloak_user_id = %s"
 
 SQL_UPDATE_USER_CACHE_COY = "UPDATE user_cache SET coy = %s WHERE keycloak_user_id = %s"
 
+SQL_UPSERT_USER_CACHE_LOGIN = """
+    INSERT INTO user_cache (keycloak_user_id, username, role, is_present)
+    VALUES (%s, %s, %s, FALSE)
+    ON CONFLICT (keycloak_user_id) DO UPDATE SET
+        username = EXCLUDED.username,
+        role = EXCLUDED.role
+"""
+
+SQL_SELECT_ALL_CACHED_USERS = """
+    SELECT keycloak_user_id, username, role, is_present, last_updated, coy
+    FROM user_cache
+    WHERE username IS NOT NULL
+    ORDER BY username ASC
+"""
+
 
 class KeycloakQueries:
     def __init__(self, db, keycloak_user_cache, keycloak_service=None):
@@ -273,8 +288,38 @@ class KeycloakQueries:
         Output:     NIL
         Note:       We only store keycloak_user_id and is_present - display names come from Keycloak
         '''
-        # Just ensure user exists in cache - we don't store display_name
         self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (keycloak_user_id,))
+
+    def ensureUserCacheEntry(self, keycloak_user_id, username=None, role=None):
+        '''
+        Function:   Upserts user into cache on login (updates username/role from JWT)
+        '''
+        if username and role:
+            self.db.executeInsert(SQL_UPSERT_USER_CACHE_LOGIN, (keycloak_user_id, username, role))
+        else:
+            self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (keycloak_user_id,))
+
+    def getUsersFromCache(self):
+        '''
+        Function:   Gets all users from the local user_cache table
+        Output:     list of dicts with id, name, role, coy, is_present, last_updated
+        '''
+        from GlobalUtils import to_sgt
+        rows = self.db.executeSelect(SQL_SELECT_ALL_CACHED_USERS)
+        output = []
+        for row in rows:
+            last_updated = row[4]
+            if last_updated is not None:
+                last_updated = to_sgt(last_updated).isoformat()
+            output.append({
+                "id": row[0],
+                "name": row[1] or "",
+                "role": row[2] or "",
+                "coy": row[5] or "",
+                "is_present": bool(row[3]),
+                "last_updated": last_updated,
+            })
+        return output
 
     def getUsers(self):
         '''

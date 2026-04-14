@@ -120,6 +120,8 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS vetter_keycloak_id VARCHAR(255)")
                 cursor.execute("INSERT INTO report(id, name) VALUES (12, 'IIR+SF') ON CONFLICT DO NOTHING")
                 cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS coy VARCHAR(50)")
+                cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS username VARCHAR(255)")
+                cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS role VARCHAR(255)")
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS coy_option (
                         id SERIAL PRIMARY KEY,
@@ -233,7 +235,9 @@ class DatabaseSchemaManager:
                     keycloak_user_id VARCHAR(255) PRIMARY KEY,
                     is_present BOOLEAN DEFAULT FALSE,
                     last_updated TIMESTAMP,
-                    coy VARCHAR(50)
+                    coy VARCHAR(50),
+                    username VARCHAR(255),
+                    role VARCHAR(255)
                 )
             """)
 

@@ -3,6 +3,7 @@ from io import StringIO
 import csv
 from main_classes.EnumClasses import Role, ParadeStateStatus
 from main_classes.KeycloakClient import KeycloakClient
+from security import is_dev_mode
 
 
 logger = logging.getLogger("xbi_tasking_backend.user_service")
@@ -15,15 +16,27 @@ class UserService:
         self.tasking = tasking_queries
         self.kc = keycloak_client or KeycloakClient()
 
+    def ensure_user_cache(self, token_info):
+        user_id = token_info.get("sub")
+        if not user_id:
+            return
+        username = token_info.get("preferred_username")
+        account_type = token_info.get("account_type")
+        self.keycloak.ensureUserCacheEntry(user_id, username=username, role=account_type)
+
     def get_users(self):
         output = {}
-        users = self.keycloak.getUsers()
+        if is_dev_mode():
+            users = self.keycloak.getUsers()
+        else:
+            users = self.keycloak.getUsersFromCache()
 
         if not users:
             output["Users"] = []
-            output["Warning"] = "No users available from Keycloak."
+            if is_dev_mode():
+                output["Warning"] = "No users available from Keycloak."
             return output
-        
+
         output["Users"] = users
         return output
 
