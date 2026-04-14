@@ -255,6 +255,15 @@ class KeycloakQueries:
 
         return {"warnings": warnings}
 
+    def editUserCacheOnly(self, user_id, new_status=None, new_coy=None):
+        """Edit only local cache fields (status, COY). No Keycloak Admin API calls."""
+        if new_status is not None:
+            is_present = new_status.lower() == "present"
+            self.db.executeUpdate(SQL_UPDATE_USER_CACHE_PRESENCE, (is_present, user_id))
+
+        if new_coy is not None:
+            self.db.executeUpdate(SQL_UPDATE_USER_CACHE_COY, (new_coy, user_id))
+
     def get_keycloak_admin_token(self):
         '''
         Obtain Keycloak admin token of xbi-tasking-admin client

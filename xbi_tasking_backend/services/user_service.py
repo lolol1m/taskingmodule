@@ -83,6 +83,17 @@ class UserService:
         new_role = payload.get("role") or None
         new_status = payload.get("status") or None
         new_coy = payload.get("coy")
+
+        if not is_dev_mode():
+            if new_username or new_role:
+                return {"error": "Username and role changes are not available in production mode"}
+            try:
+                self.keycloak.editUserCacheOnly(user_id, new_status=new_status, new_coy=new_coy)
+                return {"success": True}
+            except Exception as e:
+                logger.exception("editUserCacheOnly failed for user_id=%s", user_id)
+                return {"error": str(e)}
+
         try:
             result = self.keycloak.editKeycloakUser(user_id, new_username, new_role, new_status, new_coy=new_coy) or {}
             response = {"success": True}
