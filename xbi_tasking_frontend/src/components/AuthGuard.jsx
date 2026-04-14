@@ -111,29 +111,90 @@ const refreshTokens = async () => {
 
 export function KeycloakAuthGuard({ children }) {
   const [isInitialized, setIsInitialized] = useState(false);
+  const [accessVerified, setAccessVerified] = useState(false);
   const [error, setError] = useState(null);
-  const isInitializing = useRef(false); 
+  const isInitializing = useRef(false);
+
   useEffect(() => {
-    
+    const storedError = sessionStorage.getItem('auth_error');
+    if (storedError) {
+      sessionStorage.removeItem('auth_error');
+      setError(storedError);
+      return;
+    }
+
     if (isInitializing.current) return;
     isInitializing.current = true;
 
     const initialize = async () => {
       try {
         await UserService.initKeycloak();
-        console.log("AAAAAAAAAAAAAA")
-        setIsInitialized(true); 
 
+        if (!UserService.isLoggedIn()) {
+          UserService.doLogin();
+          return;
+        }
+
+        const token = UserService.getToken();
+        if (!token) {
+          UserService.doLogin();
+          return;
+        }
+
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        const res = await fetch(`${backendUrl}/users/getMode`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.status === 403) {
+          const data = await res.json().catch(() => ({}));
+          if (data.error_code === 'group_access_denied') {
+            setError(data.detail || 'Access denied. You are not authorised to use this application.');
+            return;
+          }
+        }
+
+        if (res.status === 401) {
+          UserService.doLogin();
+          return;
+        }
+
+        setAccessVerified(true);
+        setIsInitialized(true);
       } catch (err) {
-       console.log(err)
-        setError(err.message || "Failed to connect to auth server");
+        console.error('Auth init error:', err);
+        setError(err.message || 'Failed to connect to auth server');
       }
     };
 
     initialize();
   }, []);
 
-  if (!isInitialized && !error) {
+  if (error) {
+    return (
+      <Container component="main" maxWidth="sm">
+        <CssBaseline />
+        <Box display="flex" flexDirection="column" alignItems="center" mt={8} gap={2}>
+          <Typography variant="h5" color="error">Access Denied</Typography>
+          <Typography variant="body1" textAlign="center">{error}</Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center">
+            Contact your administrator if you believe this is a mistake.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => {
+              sessionStorage.removeItem('auth_error');
+              UserService.doLogout({ redirectUri: window.location.origin });
+            }}
+          >
+            Login with a different account
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (!isInitialized || !accessVerified) {
     return (
       <Container component="main" maxWidth="xs">
         <CssBaseline />
@@ -144,27 +205,6 @@ export function KeycloakAuthGuard({ children }) {
       </Container>
     );
   }
-
-  if (error) {
-    return (
-      <Container component="main" maxWidth="xs">
-        <CssBaseline />
-        <Box display="flex" flexDirection="column" alignItems="center" mt={8} gap={2}>
-          <Typography variant="h6" color="error">Authentication Error</Typography>
-          <Typography variant="body2">{error}</Typography>
-          <Button variant="contained" onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
-        </Box>
-      </Container>
-    );
-  }
-
-  if (!UserService.isLoggedIn) {
-     UserService.doLogin(); 
-     return null;
-  }
-
 
   return children;
 }

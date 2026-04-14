@@ -15,7 +15,7 @@ set KEYCLOAK_ADMIN_CLIENT_SECRET=nOJMcD30RVTVkBgI1rJCdaGUref818cg
 set KEYCLOAK_ENABLED=true
 set FRONTEND_URL=http://localhost:5173
 
-.\venv\Scripts\python.exe main.py dev_server.config
+.\venv\Scripts\python.exe main.py testing.config
 pause
 
 

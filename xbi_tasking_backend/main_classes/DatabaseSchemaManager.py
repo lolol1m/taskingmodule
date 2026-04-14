@@ -122,6 +122,7 @@ class DatabaseSchemaManager:
                 cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS coy VARCHAR(50)")
                 cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS username VARCHAR(255)")
                 cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS role VARCHAR(255)")
+                cursor.execute("ALTER TABLE user_cache ADD COLUMN IF NOT EXISTS last_login TIMESTAMP")
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS coy_option (
                         id SERIAL PRIMARY KEY,

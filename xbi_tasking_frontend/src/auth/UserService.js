@@ -48,16 +48,16 @@ const updateToken = (successCallback) =>
 
 const getUsername = () => _kc.tokenParsed?.preferred_username;
 
-const hasRole = (roles) => roles.some((role) => _kc.hasRealmRole(role));
+const _clientId = import.meta.env.VITE_CLIENT_ID
 
-const readUserRoleSingle= () => {
-    try {
-   
-//note for realm 
-    if (UserService.hasRole(["IA"])) return 'IA'
+const hasRole = (roles) => roles.some((role) => _kc.hasResourceRole(role, _clientId));
+
+const readUserRoleSingle = () => {
+  try {
+    if (UserService.hasRole(['IA'])) return 'IA'
     if (UserService.hasRole(['Senior II'])) return 'Senior II'
     if (UserService.hasRole(['II'])) return 'II'
-    return roles[0] || null
+    return null
   } catch (error) {
     console.warn('Unable to read user role', error)
     return null

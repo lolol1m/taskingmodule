@@ -38,6 +38,15 @@ class API {
         async (error) => {
     const originalRequest = error.config;
     console.log("There is an error:", error)
+
+    if (error.response?.status === 403 &&
+        error.response?.data?.error_code === 'group_access_denied') {
+      sessionStorage.setItem('auth_error', error.response.data.detail ||
+        'Access denied. You are not authorised to use this application.')
+      UserService.doLogout({ redirectUri: window.location.origin })
+      return Promise.reject(error)
+    }
+
     if (error.response?.status === 401 && !originalRequest?._retry) {
       originalRequest._retry = true
       try {
@@ -71,6 +80,11 @@ class API {
   localStorage.removeItem('id_token')
   localStorage.removeItem('user')
   localStorage.removeItem('username')
+    }
+
+    async getMode() {
+        const response = await this.client.get("/users/getMode")
+        return response.data
     }
 
     async getUsers() {

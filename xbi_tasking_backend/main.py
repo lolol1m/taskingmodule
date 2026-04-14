@@ -14,7 +14,7 @@ from fastapi.openapi.docs import (
 )
 from fastapi.staticfiles import StaticFiles
 from config import load_config
-from main_classes.KeycloakAuth import KeycloakAuth
+from main_classes.KeycloakAuth import KeycloakAuth, GroupAccessDeniedError
 from app_state import init_app_state
 from api_utils import error_response
 from security import KEYCLOAK_ENABLED
@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser(description="runs xbi tasking backend server")
 parser.add_argument(
     "config_path",
     nargs="?",
-    default=os.getenv("CONFIG_PATH", "dev_server.config"),
+    default=os.getenv("CONFIG_PATH", "testing.config"),
     help="file path of the config file to be used",
 )
 args, _ = parser.parse_known_args()
@@ -167,7 +167,6 @@ async def keycloak_auth_middleware(request: Request, call_next):
             rate_limit_response = _rate_limit_auth_failure("invalid_token")
             if rate_limit_response:
                 return rate_limit_response
-            from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Invalid or expired token"},
@@ -186,6 +185,15 @@ async def keycloak_auth_middleware(request: Request, call_next):
         response = await call_next(request)
         return response
         
+    except GroupAccessDeniedError as e:
+        logger.warning("Group access denied for %s: %s", request.url.path, e)
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "Access denied. You are not authorised to use this application.",
+                "error_code": "group_access_denied",
+            },
+        )
     except HTTPException as e:
         logger.warning("HTTPException in middleware for %s: %s", request.url.path, e.detail)
         return JSONResponse(status_code=e.status_code, content={"detail": e.detail}, headers=e.headers)

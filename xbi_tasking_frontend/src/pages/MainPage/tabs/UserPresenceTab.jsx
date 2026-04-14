@@ -235,21 +235,26 @@ function UserPresenceTab({ userRole }) {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [modalKey, setModalKey] = useState(0)
   const [coyOptions, setCoyOptions] = useState([])
+  const [isDevMode, setIsDevMode] = useState(false)
   const { addNotification } = useNotifications()
 
   useEffect(() => {
-    const fetchCoyOptions = async () => {
+    const fetchInitData = async () => {
       try {
-        const data = await api.getCoyOptions()
-        setCoyOptions(data?.CoyOptions || [])
+        const [coyData, modeData] = await Promise.all([
+          api.getCoyOptions().catch(() => null),
+          api.getMode().catch(() => null),
+        ])
+        setCoyOptions(coyData?.CoyOptions || [])
+        setIsDevMode(modeData?.mode === 'dev')
       } catch {
         setCoyOptions([])
       }
     }
-    fetchCoyOptions()
+    fetchInitData()
   }, [])
 
-  const canCreateUsers = userRole === 'IA'
+  const canCreateUsers = userRole === 'IA' && isDevMode
   const canEditUsers = userRole === 'IA'
   const hasPendingEdits = useMemo(() => Object.keys(editingRows).length > 0, [editingRows])
   const hasSelectedPendingEdits = useMemo(() => {
@@ -265,7 +270,7 @@ function UserPresenceTab({ userRole }) {
         minWidth: 180,
         flex: 1,
         renderCell: (params) => {
-          if (!editingRows[params.row.id]) return <span>{params.value}</span>
+          if (!editingRows[params.row.id] || !isDevMode) return <span>{params.value}</span>
           return (
             <EditableUserCell
               value={params.value}
@@ -282,7 +287,7 @@ function UserPresenceTab({ userRole }) {
         minWidth: 140,
         flex: 0.7,
         renderCell: (params) => {
-          if (!editingRows[params.row.id]) return <span>{params.value}</span>
+          if (!editingRows[params.row.id] || !isDevMode) return <span>{params.value}</span>
           return (
             <EditableRoleCell
               value={params.value}
@@ -374,15 +379,17 @@ function UserPresenceTab({ userRole }) {
                         )}
                       </Button>
                     </Tooltip>
-                    <Tooltip title="Delete user">
-                      <Button
-                        className="tasking-manager__action-btn tasking-manager__action-btn--icon"
-                        size="small"
-                        onClick={() => handleDelete(params.row)}
-                      >
-                        <img src={binIcon} alt="Delete" className="tasking-manager__action-icon" />
-                      </Button>
-                    </Tooltip>
+                    {isDevMode && (
+                      <Tooltip title="Delete user">
+                        <Button
+                          className="tasking-manager__action-btn tasking-manager__action-btn--icon"
+                          size="small"
+                          onClick={() => handleDelete(params.row)}
+                        >
+                          <img src={binIcon} alt="Delete" className="tasking-manager__action-icon" />
+                        </Button>
+                      </Tooltip>
+                    )}
             </div>
                 )
               },
@@ -390,7 +397,7 @@ function UserPresenceTab({ userRole }) {
           ]
         : []),
     ],
-    [editingRows, canEditUsers, coyOptions],
+    [editingRows, canEditUsers, coyOptions, isDevMode],
   )
 
   useEffect(() => {

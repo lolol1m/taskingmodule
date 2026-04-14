@@ -21,6 +21,11 @@ from config import get_config
 logger = logging.getLogger("xbi_tasking_backend.keycloak_auth")
 
 
+class GroupAccessDeniedError(Exception):
+    """Raised when a user's JWT is valid but they are not in the required application group."""
+    pass
+
+
 class KeycloakAuth:
     def __init__(self, config=None, eager=True):
         self._config = config or get_config()
@@ -162,7 +167,10 @@ class KeycloakAuth:
                 return None
 
             if not self._validate_group(decoded):
-                return None
+                raise GroupAccessDeniedError(
+                    f"User '{decoded.get('preferred_username')}' is not a member of "
+                    f"required group '{self.required_group}'"
+                )
 
             client_roles = self._extract_client_roles(decoded)
 

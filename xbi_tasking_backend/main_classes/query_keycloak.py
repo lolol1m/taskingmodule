@@ -58,15 +58,16 @@ SQL_DELETE_USER_CACHE = "DELETE FROM user_cache WHERE keycloak_user_id = %s"
 SQL_UPDATE_USER_CACHE_COY = "UPDATE user_cache SET coy = %s WHERE keycloak_user_id = %s"
 
 SQL_UPSERT_USER_CACHE_LOGIN = """
-    INSERT INTO user_cache (keycloak_user_id, username, role, is_present)
-    VALUES (%s, %s, %s, FALSE)
+    INSERT INTO user_cache (keycloak_user_id, username, role, is_present, last_login)
+    VALUES (%s, %s, %s, FALSE, NOW())
     ON CONFLICT (keycloak_user_id) DO UPDATE SET
         username = EXCLUDED.username,
-        role = EXCLUDED.role
+        role = EXCLUDED.role,
+        last_login = NOW()
 """
 
 SQL_SELECT_ALL_CACHED_USERS = """
-    SELECT keycloak_user_id, username, role, is_present, last_updated, coy
+    SELECT keycloak_user_id, username, role, is_present, last_updated, coy, last_login
     FROM user_cache
     WHERE username IS NOT NULL
     ORDER BY username ASC
@@ -299,26 +300,50 @@ class KeycloakQueries:
         else:
             self.db.executeInsert(SQL_INSERT_USER_CACHE_DEFAULT, (keycloak_user_id,))
 
-    def getUsersFromCache(self):
+    def getUsersFromCache(self, stale_days=30):
         '''
-        Function:   Gets all users from the local user_cache table
+        Function:   Gets all users from the local user_cache table.
+                    Users who have not logged in within `stale_days` are
+                    automatically removed from the cache and excluded.
+                    Users who have never logged in (last_login IS NULL)
+                    are kept — they were added via parade-state upload
+                    and have not yet authenticated.
         Output:     list of dicts with id, name, role, coy, is_present, last_updated
         '''
         from GlobalUtils import to_sgt
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=stale_days)
         rows = self.db.executeSelect(SQL_SELECT_ALL_CACHED_USERS)
         output = []
+        stale_ids = []
         for row in rows:
+            user_id = row[0]
+            last_login = row[6]
+
+            if last_login is not None and last_login.replace(tzinfo=timezone.utc) < cutoff:
+                stale_ids.append(user_id)
+                continue
+
             last_updated = row[4]
             if last_updated is not None:
                 last_updated = to_sgt(last_updated).isoformat()
             output.append({
-                "id": row[0],
+                "id": user_id,
                 "name": row[1] or "",
                 "role": row[2] or "",
                 "coy": row[5] or "",
                 "is_present": bool(row[3]),
                 "last_updated": last_updated,
             })
+
+        for uid in stale_ids:
+            try:
+                self.db.executeDelete(SQL_DELETE_USER_CACHE, (uid,))
+                logger.info("Auto-removed stale cache entry for user_id=%s (last login older than %d days)", uid, stale_days)
+            except Exception as e:
+                logger.warning("Failed to auto-remove stale cache entry for user_id=%s: %s", uid, e)
+
         return output
 
     def getUsers(self):
