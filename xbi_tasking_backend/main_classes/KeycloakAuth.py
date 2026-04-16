@@ -41,7 +41,10 @@ class KeycloakAuth:
         """
         try:
             # Get the JWKS URL from well-known configuration
-            with httpx.Client() as client:
+            # TODO: remove the hardcoded cert path (problem with reading cert so shortcut)
+            cert_path = "/certs/keycloak.crt"
+            with httpx.Client(verify=cert_path, timeout = 10.0) as client:
+            # with httpx.Client(verify=False, timeout = 10.0) as client:
                 response = client.get(self.well_known_url, timeout=5.0)
                 if response.status_code == 200:
                     config = response.json()
@@ -86,7 +89,10 @@ class KeycloakAuth:
             self._load_public_key()
         if not self.jwks_url:
             return None
-        async with httpx.AsyncClient() as client:
+        
+        cert_path = "/certs/keycloak.crt"
+        async with httpx.AsyncClient(verify=cert_path, timeout=10.0) as client:
+        # async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
             response = await client.get(self.jwks_url, timeout=5.0)
             if response.status_code == 200:
                 self.jwks_cache = response.json()
@@ -171,7 +177,9 @@ class KeycloakAuth:
             # Use token introspection endpoint (more reliable than JWKS for validation)
             introspection_url = f"{self.keycloak_internal_url}/realms/{self.realm}/protocol/openid-connect/token/introspect"
             
-            async with httpx.AsyncClient() as client:
+            cert_path = "/certs/keycloak.crt"           
+            async with httpx.AsyncClient(verify=cert_path, timeout=10.0) as client:
+            # async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
                 # Use client credentials from config
                 data = {
                     'token': token,

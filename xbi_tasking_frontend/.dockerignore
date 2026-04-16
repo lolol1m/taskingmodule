@@ -1,4 +1,6 @@
 node_modules/
+certs/
+outdated_cert/
 
 .gitignore
 .env

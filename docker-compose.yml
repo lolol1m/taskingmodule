@@ -6,15 +6,16 @@ services:
     build: ./xbi_tasking_frontend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-frontend
-    container_name: xbi-frontend-trial
+    container_name: xbi-frontend-trial-2
     depends_on:
       - backend
     environment:
       VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
       # VITE_BACKEND_URL: https://localhost:5000
       # VITE_KEYCLOAK_URL: https://localhost:8443
-      VITE_BACKEND_URL: https://172.1.2.3:5000
-      VITE_KEYCLOAK_URL: https://172.1.2.3:8443
+      # VITE_BACKEND_URL: https://127.0.0.1:5000
+      VITE_BACKEND_URL: https://tangy.local:5000
+      VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
       # VITE_KEYCLOAK_URL: http://keycloak:8080
       VITE_KEYCLOAK_REALM: xbi-tasking
       VITE_CLIENT_ID: xbi-tasking-frontend
@@ -25,14 +26,18 @@ services:
     build: ./xbi_tasking_backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-backend
-    container_name: xbi-backend-trial
+    container_name: xbi-backend-trial-2
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
         condition: service_started
+
+    extra_hosts:
+      # - "tangy.local:host-gateway"
+      - "tangy.auth.local:host-gateway"
     environment:
-      FRONTEND_URL: https://172.1.2.3:5173      
+      FRONTEND_URL: https://tangy.local:5173      
       # FRONTEND_URL: https://localhost:5173
       # Database
       DB_HOST: postgres
@@ -44,8 +49,10 @@ services:
 
       # Keycloak 
       # KEYCLOAK_PUBLIC_URL: https://localhost:8443
-      KEYCLOAK_PUBLIC_URL: https://172.1.2.3:8443
-      KEYCLOAK_INTERNAL_URL: https://keycloak:8443
+      KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:8443
+      # KEYCLOAK_INTERNAL_URL: https://keycloak:8443
+      KEYCLOAK_INTERNAL_URL: https://tangy.auth.local:8443
+
       KEYCLOAK_REALM: xbi-tasking
       KEYCLOAK_CLIENT_ID: xbi-tasking-backend
       # KEYCLOAK_CLIENT_SECRET: Zj7CYgoGf7pOuW18fEcmNFwI7HIK1k0K
@@ -57,7 +64,7 @@ services:
       ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
     
     volumes:
-      - ./xbi_tasking_backend/certs:/certs
+      - ./xbi_tasking_backend/general_certs:/certs
 
     ports:
       - "5000:5000"
@@ -65,7 +72,7 @@ services:
 
   postgres:
     image: postgres:15.6
-    container_name: xbi-postgres-trial
+    container_name: xbi-postgres-trial-2
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -86,7 +93,7 @@ services:
     build: ./deployment_stuff/xbi-keycloak/
 
     # image: xbi-keycloak:2.7
-    container_name: xbi-keycloak-trial
+    container_name: xbi-keycloak-trial-2
     # command: 
     # - start-dev
     # - --import-realm

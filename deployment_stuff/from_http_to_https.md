@@ -11,7 +11,7 @@ choco install openssl
 Run the following command to generate self signed cert and private key:
 
 ```
-openssl req -x509 -new -key server.key -out server.crt -days 365 -config server.cnf -nodes
+openssl req -x509 -newkey rsa:2048  -keyout server.key -out server.crt -days 365 -config server.cnf -nodes
 ```
 
 ## For keycloak container (from port 8080 to 8443)

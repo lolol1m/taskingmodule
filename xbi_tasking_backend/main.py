@@ -103,7 +103,7 @@ async def keycloak_auth_middleware(request: Request, call_next):
     
     # List of paths that don't require authentication
     # Use exact match for most paths, but /static should match any path starting with /static
-    excluded_exact_paths = ["/docs", "/redoc", "/openapi.json", "/", "/auth/login", "/auth/callback", "/auth/logout", "/auth/refresh"]
+    excluded_exact_paths = ["/docs", "/redoc", "/openapi.json", "/", "/auth/login", "/auth/callback", "/auth/logout", "/auth/refresh", "favicon.ico"]
     excluded_prefix_paths = ["/static"]
     
     # Check if path is excluded (exact match or prefix match)
@@ -142,7 +142,6 @@ async def keycloak_auth_middleware(request: Request, call_next):
         rate_limit_response = _rate_limit_auth_failure("missing_or_invalid_header")
         if rate_limit_response:
             return rate_limit_response
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
             content={"detail": "Not authenticated. Missing or invalid Authorization header."},
@@ -154,7 +153,6 @@ async def keycloak_auth_middleware(request: Request, call_next):
         rate_limit_response = _rate_limit_auth_failure("empty_token")
         if rate_limit_response:
             return rate_limit_response
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
             content={"detail": "Not authenticated. Empty token."},
@@ -168,7 +166,6 @@ async def keycloak_auth_middleware(request: Request, call_next):
             rate_limit_response = _rate_limit_auth_failure("invalid_token")
             if rate_limit_response:
                 return rate_limit_response
-            from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Invalid or expired token"},
@@ -210,6 +207,7 @@ app.include_router(notifications.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    # allow_origins=["https://tangy.local:5173"],
     allow_credentials=True,
     allow_methods=allowed_methods,
     allow_headers=allowed_headers
@@ -243,6 +241,6 @@ async def redoc_html():
 async def index():
     return "it works"
 
-#TODO Hardcoded where certs are placed
+#TODO Hardcoded where certs are placed and host/port - make these configurable via env vars or config file
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="172.1.2.3", port=5000, reload=True, ssl_certfile = "/certs/server.crt", ssl_keyfile = "/certs/server.key")
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True, ssl_certfile = "/certs/server.crt", ssl_keyfile = "/certs/server.key")

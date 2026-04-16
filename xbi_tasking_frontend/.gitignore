@@ -9,8 +9,10 @@ lerna-debug.log*
 
 node_modules
 .env
-certs/
+certs/*.crt
+certs/*.key
 outdated_cert/
+certs_old/
 dist
 dist-ssr
 *.local
