@@ -1,0 +1,19 @@
+venv/
+code/
+*.bat
+dev_server.config
+
+.gitignore
+.env
+demo_backend/
+certs/
+
+
+# Testing stuff
+testing/
+testing.config
+unittesting.py
+
+# Extra
+*.json
+start_backend.bat

@@ -1,0 +1,16 @@
+[req]
+prompt = no
+x509_extensions = req_ext
+distinguished_name = dn
+
+[dn]
+CN = localhost
+
+[req_ext]
+subjectAltName = @alt_names
+basicConstraints = CA:TRUE
+keyUsage = keyCertSign, digitalSignature, keyEncipherment
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = keycloak

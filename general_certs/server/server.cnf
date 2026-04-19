@@ -1,0 +1,21 @@
+[req]
+prompt = no
+x509_extensions = req_ext
+distinguished_name = dn
+
+[dn]
+CN = tangy.local
+
+[req_ext]
+subjectAltName = @alt_names
+basicConstraints = CA:TRUE
+keyUsage = keyCertSign, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+
+
+[alt_names]
+DNS.1 = tangy.local
+DNS.2 = localhost
+DNS.3 = keycloak
+DNS.4 = tangy.auth.local
+IP.1 = 127.0.0.1
