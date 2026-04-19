@@ -7,8 +7,21 @@ import '../styles/ChangePasswordTab.css'
 
 const api = new API()
 
-function ChangePasswordTab({ userRole }) {
+function ChangePasswordTab({ userRole, isDevMode }) {
   const isAdmin = userRole === 'IA'
+
+  if (!isDevMode) {
+    return (
+      <div className="admin-tab change-password-tab">
+        <div className="content__topbar">
+          <div className="content__heading">
+            <div className="content__title">Change Password</div>
+            <div className="content__subtitle">Password management is not available in this environment. Passwords are managed by your organisation&apos;s identity provider.</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const [formData, setFormData] = useState({
     currentPassword: '',

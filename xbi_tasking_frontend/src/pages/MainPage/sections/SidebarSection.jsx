@@ -27,13 +27,11 @@ function SidebarSection({
   onLogout,
   userRole,
   username,
+  isDevMode,
 }) {
-  // II role has limited access - no Tasking Assignments or Admin
   const isBasicUser = userRole === 'II'
   const isIaUser = userRole === 'IA'
   const isSeniorIIUser = userRole === 'Senior II'
-  // Only IA can create users
-  const canCreateUsers = userRole === 'IA'
   const settingsButtonRef = useRef(null)
   const settingsPopoverRef = useRef(null)
   const settingsCloseTimerRef = useRef(null)
@@ -268,18 +266,22 @@ function SidebarSection({
             >
               <div className="sidebar__popover-title">Settings</div>
               <button className="sidebar__popover-item">Help</button>
-              <button className={`sidebar__popover-item${activeTab === 'settings-password' ? '-active' : ''}`} onClick={() => setActiveTab('settings-password')}>Change Password</button>
+              {isDevMode && (
+                <button className={`sidebar__popover-item${activeTab === 'settings-password' ? '-active' : ''}`} onClick={() => setActiveTab('settings-password')}>Change Password</button>
+              )}
               <button className="sidebar__popover-item">About</button>
             </div>
           </div>
           <div className={`sidebar__settings ${settingsOpen && !isCollapsed ? 'is-open' : ''}`}>
             <button className="sidebar__item sidebar__item--sub">Help</button>
-            <button
-              className={`sidebar__item sidebar__item--sub ${activeTab === 'settings-password' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('settings-password')}
-            >
-              Change Password
-            </button>
+            {isDevMode && (
+              <button
+                className={`sidebar__item sidebar__item--sub ${activeTab === 'settings-password' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('settings-password')}
+              >
+                Change Password
+              </button>
+            )}
             <button className="sidebar__item sidebar__item--sub">About</button>
           </div>
           <button

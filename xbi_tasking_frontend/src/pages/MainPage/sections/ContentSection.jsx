@@ -55,7 +55,7 @@ const formatDateRange = (range) => {
   return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
 }
 
-function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {
+function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole, isDevMode }) {
   const ActiveTab = tabMap[activeTab]
   const activeTabLabel = tabLabelMap[activeTab] || 'Overview'
   const sectionLabel = activeTab?.startsWith('admin-') ? 'ADMIN' : 'HOME'
@@ -106,6 +106,7 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
               onOpenDatePicker={onOpenDatePicker}
               isCollapsed={isCollapsed}
               userRole={userRole}
+              isDevMode={isDevMode}
               {...tabProps}
             />
           ) : (

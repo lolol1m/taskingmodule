@@ -8,6 +8,9 @@ venv/
 XBI_UI/
 xbi_tasking_backend/code/
 xbi_tasking_backend/dev_server.config
+xbi_tasking_backend/testing.config
+xbi_tasking_backend/*.config
+!xbi_tasking_backend/*.config.example
 mockui/
 dev_server.config
 keycloak_stuff/start_keycloak.bat

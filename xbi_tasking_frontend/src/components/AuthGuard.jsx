@@ -152,10 +152,17 @@ export function KeycloakAuthGuard({ children }) {
             setError(data.detail || 'Access denied. You are not authorised to use this application.');
             return;
           }
+          setError('Access denied. You do not have permission to use this application.');
+          return;
         }
 
         if (res.status === 401) {
           UserService.doLogin();
+          return;
+        }
+
+        if (!res.ok) {
+          setError(`Unable to verify access. Server returned ${res.status}. Please try again later.`);
           return;
         }
 

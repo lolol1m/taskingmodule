@@ -58,4 +58,4 @@ class ConfigClass:
         return self.config.get('Keycloak', 'required_group', fallback='xbi-tasking-users')
 
     def getKeycloakMode(self):
-        return self.config.get('Keycloak', 'mode', fallback='dev').strip().lower()
+        return self.config.get('Keycloak', 'mode', fallback='prod').strip().lower()
