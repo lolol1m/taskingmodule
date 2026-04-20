@@ -42,9 +42,6 @@ class MainController():
     def getUsers(self):
         return self.user_service.get_users()
 
-    def createUser(self, json):
-        return self.user_service.create_user(json)
-
     def getTaskingSummaryData(self, json):
         return self.tasking_service.get_tasking_summary(json)
 

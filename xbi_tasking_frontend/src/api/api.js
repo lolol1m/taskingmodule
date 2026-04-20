@@ -82,23 +82,8 @@ class API {
   localStorage.removeItem('username')
     }
 
-    async getMode() {
-        const response = await this.client.get("/users/getMode")
-        return response.data
-    }
-
     async getUsers() {
         const response = await this.client.get("/users/getUsers")
-        return response.data
-    }
-
-    async createUser(body) {
-        const response = await this.client.post("/users/createUser", body)
-        return response.data
-    }
-
-    async deleteUser(body) {
-        const response = await this.client.post("/users/deleteUser", body)
         return response.data
     }
 
@@ -242,22 +227,6 @@ class API {
 
     async updateSensorCategory(body) {
         const response = await this.client.post("/lookup/updateSensorCategory", body)
-        return response.data
-    }
-
-    async changePassword(currentPassword, newPassword) {
-        const response = await this.client.post("/users/changePassword", {
-            currentPassword,
-            newPassword,
-        })
-        return response.data
-    }
-
-    async adminResetPassword(targetUsername, newPassword) {
-        const response = await this.client.post("/users/adminResetPassword", {
-            targetUsername,
-            newPassword,
-        })
         return response.data
     }
 }

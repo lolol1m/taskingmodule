@@ -15,6 +15,7 @@ services:
       VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
       VITE_KEYCLOAK_REALM: xbi-tasking
       VITE_CLIENT_ID: xbi-tasking-frontend
+      VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     volumes:
       - ./xbi_tasking_backend/certs:/certs:ro
     ports:

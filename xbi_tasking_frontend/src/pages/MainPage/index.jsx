@@ -7,9 +7,6 @@ import SidebarSection from './sections/SidebarSection.jsx'
 import useUsername from './hooks/useUsername.js'
 import './styles/index.css'
 import UserService from '../../auth/UserService.js'
-import API from '../../api/api.js'
-
-const api = new API()
 
 function MainPage() {
   const [dateRange, setDateRange] = useState(() => {
@@ -25,15 +22,8 @@ function MainPage() {
   const [activeTab, setActiveTab] = useState('summary')
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [isDevMode, setIsDevMode] = useState(false)
   const username = useUsername()
   const userRole = UserService.readUserRoleSingle()
-
-  useEffect(() => {
-    api.getMode().then((data) => {
-      setIsDevMode(data?.mode === 'dev')
-    }).catch(() => setIsDevMode(false))
-  }, [])
 
   const handleLogout = () => {
   
@@ -94,7 +84,6 @@ function MainPage() {
                 onLogout={handleLogout}
                 userRole={userRole}
                 username={username}
-                isDevMode={isDevMode}
               />
 
               <ContentSection
@@ -103,7 +92,6 @@ function MainPage() {
                 onOpenDatePicker={() => setOpen(true)}
                 isCollapsed={isCollapsed}
                 userRole={userRole}
-                isDevMode={isDevMode}
               />
             </main>
           </NotificationsProvider>

@@ -27,7 +27,6 @@ function SidebarSection({
   onLogout,
   userRole,
   username,
-  isDevMode,
 }) {
   const isBasicUser = userRole === 'II'
   const isIaUser = userRole === 'IA'
@@ -266,22 +265,11 @@ function SidebarSection({
             >
               <div className="sidebar__popover-title">Settings</div>
               <button className="sidebar__popover-item">Help</button>
-              {isDevMode && (
-                <button className={`sidebar__popover-item${activeTab === 'settings-password' ? '-active' : ''}`} onClick={() => setActiveTab('settings-password')}>Change Password</button>
-              )}
               <button className="sidebar__popover-item">About</button>
             </div>
           </div>
           <div className={`sidebar__settings ${settingsOpen && !isCollapsed ? 'is-open' : ''}`}>
             <button className="sidebar__item sidebar__item--sub">Help</button>
-            {isDevMode && (
-              <button
-                className={`sidebar__item sidebar__item--sub ${activeTab === 'settings-password' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('settings-password')}
-              >
-                Change Password
-              </button>
-            )}
             <button className="sidebar__item sidebar__item--sub">About</button>
           </div>
           <button

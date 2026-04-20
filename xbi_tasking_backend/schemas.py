@@ -72,17 +72,6 @@ class KeyValueMapResponse(RootModel[dict]):
     pass
 
 
-class CreateUserPayload(BaseModel):
-    username: str
-    password: str
-    role: str
-    coy: str | None = None
-
-
-class DeleteUserPayload(BaseModel):
-    user_id: str
-
-
 class EditUserPayload(BaseModel):
     user_id: str
     username: str | None = None
@@ -130,17 +119,3 @@ class UpdateTaskingSummaryPayload(RootModel[dict]):
 
 class UpdateTaskingManagerPayload(RootModel[dict]):
     pass
-
-
-class ChangePasswordPayload(BaseModel):
-    current_password: str = Field(..., alias="currentPassword")
-    new_password: str = Field(..., alias="newPassword")
-
-    model_config = {"populate_by_name": True}
-
-
-class AdminResetPasswordPayload(BaseModel):
-    target_username: str = Field(..., alias="targetUsername")
-    new_password: str = Field(..., alias="newPassword")
-
-    model_config = {"populate_by_name": True}

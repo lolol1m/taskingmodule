@@ -142,7 +142,7 @@ export function KeycloakAuthGuard({ children }) {
         }
 
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-        const res = await fetch(`${backendUrl}/users/getMode`, {
+        const res = await fetch(`${backendUrl}/users/verify`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

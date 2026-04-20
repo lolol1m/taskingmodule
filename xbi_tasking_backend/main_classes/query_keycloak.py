@@ -99,7 +99,6 @@ class KeycloakQueries:
         if keycloak_user_id in self._keycloak_user_cache:
             return self._keycloak_user_cache[keycloak_user_id]
 
-        # Try local DB cache first (works in both dev and prod)
         try:
             rows = self.db.executeSelect(SQL_SELECT_CACHE_USERNAME_BY_ID, (keycloak_user_id,))
             if rows and rows[0][0]:
@@ -108,18 +107,6 @@ class KeycloakQueries:
                 return username
         except Exception as e:
             logger.debug("DB cache lookup failed for %s: %s", keycloak_user_id, e)
-
-        # Fall back to Admin API only in dev mode
-        from security import is_dev_mode
-        if is_dev_mode():
-            try:
-                token = self.get_keycloak_admin_token()
-                user_data = self.kc.get_user_by_id(token, keycloak_user_id)
-                username = user_data.get("username", keycloak_user_id)
-                self._keycloak_user_cache[keycloak_user_id] = username
-                return username
-            except (ValueError, requests.exceptions.RequestException) as e:
-                logger.warning("Could not resolve Keycloak user %s: %s", keycloak_user_id, e)
 
         return keycloak_user_id
 
@@ -137,7 +124,6 @@ class KeycloakQueries:
         if not missing:
             return resolved
 
-        # Resolve from local DB cache (works in both dev and prod)
         try:
             placeholders, values = build_in_clause(missing)
             query = SQL_SELECT_CACHE_USERNAMES_BY_IDS.format(placeholders=placeholders)
@@ -149,30 +135,6 @@ class KeycloakQueries:
                     self._keycloak_user_cache[uid] = uname
         except Exception as e:
             logger.debug("DB cache bulk lookup failed: %s", e)
-
-        missing = [user_id for user_id in ids if user_id not in resolved]
-        if not missing:
-            return resolved
-
-        # Fall back to Admin API only in dev mode
-        from security import is_dev_mode
-        if not is_dev_mode():
-            return resolved
-
-        try:
-            token = self.get_keycloak_admin_token()
-        except (ValueError, requests.exceptions.RequestException) as e:
-            logger.warning("Could not get Keycloak admin token for bulk lookup: %s", e)
-            return resolved
-
-        for user_id in missing:
-            try:
-                user_data = self.kc.get_user_by_id(token, user_id)
-                username = user_data.get("username", user_id)
-                resolved[user_id] = username
-                self._keycloak_user_cache[user_id] = username
-            except requests.exceptions.RequestException as e:
-                logger.warning("Could not resolve Keycloak user %s: %s", user_id, e)
 
         return resolved
     
@@ -199,7 +161,6 @@ class KeycloakQueries:
             if uname == keycloak_username:
                 return uid
 
-        # Try local DB cache (works in both dev and prod)
         try:
             rows = self.db.executeSelect(SQL_SELECT_CACHE_ID_BY_USERNAME, (keycloak_username,))
             if rows and rows[0][0]:
@@ -208,15 +169,6 @@ class KeycloakQueries:
                 return uid
         except Exception as e:
             logger.debug("DB cache username->id lookup failed for %s: %s", keycloak_username, e)
-
-        # Fall back to Admin API only in dev mode
-        from security import is_dev_mode
-        if is_dev_mode():
-            try:
-                token = self.get_keycloak_admin_token()
-                return self.kc.find_user_id(token, keycloak_username)
-            except (ValueError, requests.exceptions.RequestException) as e:
-                logger.warning("Could not resolve username %s to Keycloak ID: %s", keycloak_username, e)
 
         return None
 
@@ -478,30 +430,8 @@ class KeycloakQueries:
         Input:      None
         Output:     Set of Keycloak user IDs
         '''
-        from security import is_dev_mode
-        if not is_dev_mode():
-            rows = self.db.executeSelect(SQL_SELECT_PRESENT_USER_IDS_BY_ROLE, (EnumClasses.Role.II.value,))
-            return {row[0] for row in rows if row[0]}
-
-        try:
-            token = self.get_keycloak_admin_token()
-            client_uuid = self._get_roles_client_uuid(token)
-        except (ValueError, requests.exceptions.RequestException):
-            return set()
-
-        try:
-            users = self.kc.client.get_users_for_client_role(token, client_uuid, EnumClasses.Role.II.value)
-            keycloak_ids = {user.get("id") for user in users if user.get("id")}
-        except requests.exceptions.RequestException:
-            return set()
-        
-        if keycloak_ids:
-            placeholders, values = build_in_clause(keycloak_ids)
-            query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
-            result = self.db.executeSelect(query, values)
-            return set(row[0] for row in result)
-        
-        return set()
+        rows = self.db.executeSelect(SQL_SELECT_PRESENT_USER_IDS_BY_ROLE, (EnumClasses.Role.II.value,))
+        return {row[0] for row in rows if row[0]}
 
     def get_present_user_ids(self, keycloak_user_ids):
         '''
@@ -530,58 +460,10 @@ class KeycloakQueries:
             EnumClasses.Role.IA.value,
         ]
 
-        from security import is_dev_mode
-        if not is_dev_mode():
-            prioritized = {}
-            for role in role_order:
-                rows = self.db.executeSelect(SQL_SELECT_PRESENT_USER_IDS_BY_ROLE, (role,))
-                ids = [row[0] for row in rows if row[0]]
-                random.shuffle(ids)
-                prioritized[role] = ids
-            if not any(prioritized.values()):
-                fallback_ids = self.get_all_present_user_ids()
-                random.shuffle(fallback_ids)
-                prioritized[EnumClasses.Role.II.value] = fallback_ids
-            return prioritized
-
-        try:
-            token = self.get_keycloak_admin_token()
-            client_uuid = self._get_roles_client_uuid(token)
-        except (ValueError, requests.exceptions.RequestException):
-            present_ids = self.get_all_present_user_ids()
-            random.shuffle(present_ids)
-            return {
-                EnumClasses.Role.II.value: present_ids,
-                EnumClasses.Role.SENIOR_II.value: [],
-                EnumClasses.Role.IA.value: [],
-            }
-
-        role_to_ids = {role: set() for role in role_order}
-        for role in role_order:
-            try:
-                users = self.kc.client.get_users_for_client_role(token, client_uuid, role)
-                role_to_ids[role] = {user.get("id") for user in users if user.get("id")}
-            except requests.exceptions.RequestException:
-                role_to_ids[role] = set()
-
-        all_ids = set().union(*role_to_ids.values()) if role_to_ids else set()
-        if not all_ids:
-            present_ids = self.get_all_present_user_ids()
-            random.shuffle(present_ids)
-            return {
-                EnumClasses.Role.II.value: present_ids,
-                EnumClasses.Role.SENIOR_II.value: [],
-                EnumClasses.Role.IA.value: [],
-            }
-
-        placeholders, values = build_in_clause(all_ids)
-        query = SQL_SELECT_PRESENT_USER_IDS.format(placeholders=placeholders)
-        result = self.db.executeSelect(query, values)
-        present_ids = {row[0] for row in result}
-
         prioritized = {}
         for role in role_order:
-            ids = list(role_to_ids[role].intersection(present_ids))
+            rows = self.db.executeSelect(SQL_SELECT_PRESENT_USER_IDS_BY_ROLE, (role,))
+            ids = [row[0] for row in rows if row[0]]
             random.shuffle(ids)
             prioritized[role] = ids
         if not any(prioritized.values()):

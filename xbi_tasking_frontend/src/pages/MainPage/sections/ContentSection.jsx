@@ -6,7 +6,6 @@ import UserPresenceTab from '../tabs/UserPresenceTab.jsx'
 import UploadsTab from '../tabs/UploadsTab.jsx'
 import GenerateBinCountTab from '../tabs/GenerateBinCountTab.jsx'
 import UpdateSensorCategoryTab from '../tabs/UpdateSensorCategoryTab.jsx'
-import ChangePasswordTab from '../tabs/ChangePasswordTab.jsx'
 import SubmissionTab from '../tabs/SubmissionTab.jsx'
 import NotificationsPanel from '../../../components/notifications/NotificationsPanel.jsx'
 
@@ -20,7 +19,6 @@ const tabMap = {
   "admin-uploads": UploadsTab,
   "admin-bin": GenerateBinCountTab,
   "admin-sensor": UpdateSensorCategoryTab,
-  "settings-password": ChangePasswordTab
 }
 
 const tabLabelMap = {
@@ -33,7 +31,6 @@ const tabLabelMap = {
   'admin-uploads': 'Uploads',
   'admin-bin': 'Generate Bin Count',
   'admin-sensor': 'Update Sensor Category',
-  'settings-password': 'Change Password',
 }
 
 const formatDateRange = (range) => {
@@ -55,7 +52,7 @@ const formatDateRange = (range) => {
   return `${formatter.format(startDate)} - ${formatter.format(endDate)}`
 }
 
-function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole, isDevMode }) {
+function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, userRole }) {
   const ActiveTab = tabMap[activeTab]
   const activeTabLabel = tabLabelMap[activeTab] || 'Overview'
   const sectionLabel = activeTab?.startsWith('admin-') ? 'ADMIN' : 'HOME'
@@ -106,7 +103,6 @@ function ContentSection({ activeTab, dateRange, onOpenDatePicker, isCollapsed, u
               onOpenDatePicker={onOpenDatePicker}
               isCollapsed={isCollapsed}
               userRole={userRole}
-              isDevMode={isDevMode}
               {...tabProps}
             />
           ) : (

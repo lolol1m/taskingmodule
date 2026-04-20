@@ -2,18 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, MenuItem, TextField, Tooltip, Typography } from '@mui/material'
 import { DataGridPro } from '@mui/x-data-grid-pro'
 import API from '../../../api/api'
-import UserService from '../../../auth/UserService'
 import useNotifications from '../../../components/notifications/useNotifications.js'
-import CreateUserTab from './CreateUserTab.jsx'
-import addPng from '../../../assets/add.png'
 import editIcon from '../../../assets/edit.png'
-import binIcon from '../../../assets/bin.png'
-import '../styles/CreateUserTab.css'
 import '../styles/TaskingManagerTab.css'
 
 const api = new API()
 
-const ROLES = ['II', 'Senior II', 'IA']
 const TABLE_AUTO_REFRESH_MS = 5000
 
 const getErrorMessage = (err, fallback = 'Something went wrong.') =>
@@ -61,20 +55,6 @@ const buildRows = (users) => {
   })
 }
 
-// ── Inline cell components ─────────────────────────────────────────────────────
-const textInputStyle = {
-  width: '100%',
-  background: 'var(--panel-2)',
-  border: '1px solid var(--border-strong)',
-  borderRadius: 6,
-  color: 'var(--text)',
-  fontSize: 13,
-  padding: '5px 8px',
-  fontFamily: 'inherit',
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
 const dropdownSx = {
   width: '100%',
   '& .MuiOutlinedInput-root': {
@@ -97,44 +77,6 @@ const dropdownSx = {
     color: 'var(--text)',
   },
   '& .MuiSvgIcon-root': { color: 'var(--muted)' },
-}
-
-function EditableUserCell({ value, rowId, editingRows, setEditingRows }) {
-  const pending = editingRows[rowId]
-  const displayed = pending?.user !== undefined ? pending.user : value
-  return (
-    <input
-      type="text"
-      value={displayed}
-      style={textInputStyle}
-      onChange={(e) =>
-        setEditingRows((prev) => ({ ...prev, [rowId]: { ...(prev[rowId] || {}), user: e.target.value } }))
-      }
-    />
-  )
-}
-
-function EditableRoleCell({ value, rowId, editingRows, setEditingRows }) {
-  const pending = editingRows[rowId]
-  const displayed = pending?.role !== undefined ? pending.role : value
-  return (
-    <TextField
-      select
-      size="small"
-      fullWidth
-      value={displayed}
-      onChange={(e) =>
-        setEditingRows((prev) => ({ ...prev, [rowId]: { ...(prev[rowId] || {}), role: e.target.value } }))
-      }
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      sx={dropdownSx}
-    >
-      {ROLES.map((r) => (
-        <MenuItem key={r} value={r}>{r}</MenuItem>
-      ))}
-    </TextField>
-  )
 }
 
 function EditableStatusCell({ value, rowId, editingRows, setEditingRows }) {
@@ -183,48 +125,6 @@ function EditableCoyCell({ value, rowId, editingRows, setEditingRows, coyOptions
   )
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────────
-function CreateUserModal({ open, onClose, onSuccess, resetKey }) {
-  return (
-    <div
-      className={`tasking-manager__modal${open ? ' is-open' : ''}`}
-      style={{ alignItems: 'flex-start', overflowY: 'auto', padding: '40px 16px' }}
-    >
-      <div className="tasking-manager__modal-backdrop" onClick={onClose} />
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          width: 'min(820px, 94vw)',
-          background: 'var(--panel)',
-          border: '1px solid var(--border-strong)',
-          borderRadius: 16,
-        }}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          style={{
-            position: 'absolute', top: 16, right: 16, zIndex: 2,
-            width: 32, height: 32, padding: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 16, lineHeight: 1, color: 'var(--muted)',
-            borderRadius: 6,
-          }}
-        >
-          ✕
-        </button>
-        <div style={{ padding: '24px 20px 24px' }}>
-          <CreateUserTab key={resetKey} onSuccess={onSuccess} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Main component ─────────────────────────────────────────────────────────────
 function UserPresenceTab({ userRole }) {
   const [rows, setRows] = useState([])
   const [editingRows, setEditingRows] = useState({})
@@ -232,29 +132,15 @@ function UserPresenceTab({ userRole }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [modalKey, setModalKey] = useState(0)
   const [coyOptions, setCoyOptions] = useState([])
-  const [isDevMode, setIsDevMode] = useState(false)
   const { addNotification } = useNotifications()
 
   useEffect(() => {
-    const fetchInitData = async () => {
-      try {
-        const [coyData, modeData] = await Promise.all([
-          api.getCoyOptions().catch(() => null),
-          api.getMode().catch(() => null),
-        ])
-        setCoyOptions(coyData?.CoyOptions || [])
-        setIsDevMode(modeData?.mode === 'dev')
-      } catch {
-        setCoyOptions([])
-      }
-    }
-    fetchInitData()
+    api.getCoyOptions()
+      .then((data) => setCoyOptions(data?.CoyOptions || []))
+      .catch(() => setCoyOptions([]))
   }, [])
 
-  const canCreateUsers = userRole === 'IA' && isDevMode
   const canEditUsers = userRole === 'IA'
   const hasPendingEdits = useMemo(() => Object.keys(editingRows).length > 0, [editingRows])
   const hasSelectedPendingEdits = useMemo(() => {
@@ -264,40 +150,8 @@ function UserPresenceTab({ userRole }) {
 
   const columns = useMemo(
     () => [
-      {
-        field: 'user',
-        headerName: 'User',
-        minWidth: 180,
-        flex: 1,
-        renderCell: (params) => {
-          if (!editingRows[params.row.id] || !isDevMode) return <span>{params.value}</span>
-          return (
-            <EditableUserCell
-              value={params.value}
-              rowId={params.row.id}
-              editingRows={editingRows}
-              setEditingRows={setEditingRows}
-            />
-          )
-        },
-      },
-      {
-        field: 'role',
-        headerName: 'Role',
-        minWidth: 140,
-        flex: 0.7,
-        renderCell: (params) => {
-          if (!editingRows[params.row.id] || !isDevMode) return <span>{params.value}</span>
-          return (
-            <EditableRoleCell
-              value={params.value}
-              rowId={params.row.id}
-              editingRows={editingRows}
-              setEditingRows={setEditingRows}
-            />
-          )
-        },
-      },
+      { field: 'user', headerName: 'User', minWidth: 180, flex: 1 },
+      { field: 'role', headerName: 'Role', minWidth: 140, flex: 0.7 },
       {
         field: 'coy',
         headerName: 'COY',
@@ -363,8 +217,6 @@ function UserPresenceTab({ userRole }) {
                             setEditingRows((prev) => ({
                               ...prev,
                               [params.row.id]: {
-                                user: params.row.user,
-                                role: params.row.role,
                                 coy: params.row.coy,
                                 status: params.row.status,
                               },
@@ -379,25 +231,14 @@ function UserPresenceTab({ userRole }) {
                         )}
                       </Button>
                     </Tooltip>
-                    {isDevMode && (
-                      <Tooltip title="Delete user">
-                        <Button
-                          className="tasking-manager__action-btn tasking-manager__action-btn--icon"
-                          size="small"
-                          onClick={() => handleDelete(params.row)}
-                        >
-                          <img src={binIcon} alt="Delete" className="tasking-manager__action-icon" />
-                        </Button>
-                      </Tooltip>
-                    )}
-            </div>
+                  </div>
                 )
               },
             },
           ]
         : []),
     ],
-    [editingRows, canEditUsers, coyOptions, isDevMode],
+    [editingRows, canEditUsers, coyOptions],
   )
 
   useEffect(() => {
@@ -428,31 +269,6 @@ function UserPresenceTab({ userRole }) {
     return () => window.clearInterval(timerId)
   }, [hasPendingEdits])
 
-  const handleDelete = async (row) => {
-    if (!row.keycloakId) {
-      addNotification({ title: 'Cannot delete', meta: 'No Keycloak ID for this user' })
-      return
-    }
-    const isSelf = row.keycloakId === UserService.getTokenParsed()?.sub
-    const confirmMessage = isSelf
-      ? `You are about to delete your own account ("${row.user}"). You will be logged out immediately. Continue?`
-      : `Delete user "${row.user}"? This cannot be undone.`
-    const confirmed = window.confirm(confirmMessage)
-    if (!confirmed) return
-    try {
-      const result = await api.deleteUser({ user_id: row.keycloakId })
-      if (result?.error) throw new Error(result.error)
-      if (isSelf) {
-        UserService.doLogout()
-        return
-      }
-      addNotification({ title: 'User deleted', meta: `Just now · ${row.user}` })
-      setRefreshKey((prev) => prev + 1)
-    } catch (err) {
-      addNotification({ title: 'Delete failed', meta: getErrorMessage(err, 'Unable to delete user.') })
-    }
-  }
-
   const applyChanges = async () => {
     if (!hasPendingEdits) {
       addNotification({ title: 'Nothing to save', meta: 'Click Edit on a row first' })
@@ -469,20 +285,16 @@ function UserPresenceTab({ userRole }) {
     }
 
     const rowMap = Object.fromEntries(rows.map((r) => [r.id, r]))
-    const warnings = []
     const results = await Promise.allSettled(
       pendingIds.map(async (rowId) => {
         const original = rowMap[rowId]
         if (!original?.keycloakId) throw new Error(`No Keycloak ID for row ${rowId}`)
         const pending = editingRows[rowId]
         const payload = { user_id: original.keycloakId }
-        if (pending.user !== undefined && pending.user !== original.user) payload.username = pending.user
-        if (pending.role !== undefined && pending.role !== original.role) payload.role = pending.role
         if (pending.coy !== undefined && pending.coy !== original.coy) payload.coy = pending.coy
         if (pending.status !== undefined && pending.status !== original.status) payload.status = pending.status
         const result = await api.editUser(payload)
         if (result?.error) throw new Error(result.error)
-        if (result?.warning) warnings.push(result.warning)
       }),
     )
 
@@ -497,12 +309,6 @@ function UserPresenceTab({ userRole }) {
         title: 'Changes saved',
         meta: `Just now · ${pendingIds.length} user(s) updated`,
       })
-      if (warnings.length) {
-        addNotification({
-          title: 'Some fields were skipped',
-          meta: warnings.join('; '),
-        })
-      }
     }
     setRefreshKey((prev) => prev + 1)
   }
@@ -540,85 +346,63 @@ function UserPresenceTab({ userRole }) {
   }
 
   return (
-    <>
-      <CreateUserModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={() => {
-          setCreateModalOpen(false)
-          setRefreshKey((prev) => prev + 1)
-        }}
-        resetKey={modalKey}
-      />
-
-      <div className="admin-tab">
-        <div className="content__topbar">
-          <div className="content__heading">
-            <div className="content__title">Users</div>
-            <div className="content__subtitle">Manage system users and their roles.</div>
-          </div>
-          <div className="content__controls">
-            <div className="action-bar">
-              <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
-                Refresh
-              </Button>
-              {canCreateUsers && (
-                <Button
-                  className="tasking-summary__button"
-                  onClick={() => { setModalKey((prev) => prev + 1); setCreateModalOpen(true) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  <img src={addPng} alt="" style={{ width: 16, height: 16, filter: 'brightness(0) invert(1)', opacity: 0.8 }} />
-                  Create User
-                </Button>
-              )}
-            </div>
-          </div>
+    <div className="admin-tab">
+      <div className="content__topbar">
+        <div className="content__heading">
+          <div className="content__title">Users</div>
+          <div className="content__subtitle">View users and update their attendance and COY assignment.</div>
         </div>
-
-        {error ? <Typography className="admin-tab__error">{error}</Typography> : null}
-
-        {canEditUsers && (
-          <div>
-            <Button
-              className="tasking-summary__button"
-              disabled={!hasSelectedPendingEdits}
-              onClick={applyChanges}
-            >
-              Apply Change
+        <div className="content__controls">
+          <div className="action-bar">
+            <Button className="tasking-summary__button" onClick={() => setRefreshKey((prev) => prev + 1)}>
+              Refresh
             </Button>
-          </div>
-        )}
-
-        <div className="admin-tab__grid admin-tab__grid--with-footer">
-          <DataGridPro
-            rows={rows}
-            columns={columns}
-            loading={loading}
-            checkboxSelection
-            disableRowSelectionOnClick
-            rowSelectionModel={selectionModel}
-            onRowSelectionModelChange={(model) => {
-              if (model?.ids instanceof Set) { setSelectionModel(model); return }
-              if (model instanceof Set) { setSelectionModel({ type: 'include', ids: model }); return }
-              if (Array.isArray(model)) { setSelectionModel({ type: 'include', ids: new Set(model) }); return }
-              setSelectionModel({ type: 'include', ids: new Set() })
-            }}
-            scrollbarSize={0}
-            columnHeaderHeight={40}
-            rowHeight={52}
-            hideFooter
-            sx={gridSx}
-          />
-          <div className="admin-tab__grid-footer">
-            <div className="admin-tab__grid-footer-left">
-              {selectionModel.ids.size > 0 ? `${selectionModel.ids.size} row(s) selected` : ''}
-            </div>
-            <div className="admin-tab__grid-footer-right">Total Rows: {rows.length}</div>
           </div>
         </div>
       </div>
-    </>
+
+      {error ? <Typography className="admin-tab__error">{error}</Typography> : null}
+
+      {canEditUsers && (
+        <div>
+          <Button
+            className="tasking-summary__button"
+            disabled={!hasSelectedPendingEdits}
+            onClick={applyChanges}
+          >
+            Apply Change
+          </Button>
+        </div>
+      )}
+
+      <div className="admin-tab__grid admin-tab__grid--with-footer">
+        <DataGridPro
+          rows={rows}
+          columns={columns}
+          loading={loading}
+          checkboxSelection
+          disableRowSelectionOnClick
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(model) => {
+            if (model?.ids instanceof Set) { setSelectionModel(model); return }
+            if (model instanceof Set) { setSelectionModel({ type: 'include', ids: model }); return }
+            if (Array.isArray(model)) { setSelectionModel({ type: 'include', ids: new Set(model) }); return }
+            setSelectionModel({ type: 'include', ids: new Set() })
+          }}
+          scrollbarSize={0}
+          columnHeaderHeight={40}
+          rowHeight={52}
+          hideFooter
+          sx={gridSx}
+        />
+        <div className="admin-tab__grid-footer">
+          <div className="admin-tab__grid-footer-left">
+            {selectionModel.ids.size > 0 ? `${selectionModel.ids.size} row(s) selected` : ''}
+          </div>
+          <div className="admin-tab__grid-footer-right">Total Rows: {rows.length}</div>
+        </div>
+      </div>
+    </div>
   )
 }
 

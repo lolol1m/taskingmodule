@@ -14,6 +14,5 @@ client_secret: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
 admin_client_id: xbi-tasking-admin
 admin_client_secret: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
 allowed_client_ids: xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin
-roles_client_id: xbi-tasking-frontend
+roles_client_id: xbi-tasking-backend
 required_group: xbi-tasking-users
-mode: prod

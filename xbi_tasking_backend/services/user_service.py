@@ -1,9 +1,8 @@
 import logging
 from io import StringIO
 import csv
-from main_classes.EnumClasses import Role, ParadeStateStatus
+from main_classes.EnumClasses import ParadeStateStatus
 from main_classes.KeycloakClient import KeycloakClient
-from security import is_dev_mode
 
 
 logger = logging.getLogger("xbi_tasking_backend.user_service")
@@ -25,87 +24,27 @@ class UserService:
         self.keycloak.ensureUserCacheEntry(user_id, username=username, role=account_type)
 
     def get_users(self):
-        output = {}
-        if is_dev_mode():
-            users = self.keycloak.getUsers()
-        else:
-            users = self.keycloak.getUsersFromCache()
-
-        if not users:
-            output["Users"] = []
-            if is_dev_mode():
-                output["Warning"] = "No users available from Keycloak."
-            return output
-
-        output["Users"] = users
-        return output
-
-    def create_user(self, payload):
-        username = payload.get("username", "").strip()
-        password = payload.get("password", "").strip()
-        role = payload.get("role", "").strip()
-        coy = (payload.get("coy") or "").strip() or None
-
-        if not username or not password or not role:
-            return {"error": "username, password, and role are required"}
-
-        valid_roles = {r.value for r in Role}
-        if role not in valid_roles:
-            return {"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}
-
-        result = self.keycloak.createKeycloakUser(username, password, role, coy=coy)
-        return {"success": True, "user": result}
-
-    def delete_user(self, payload):
-        user_id = payload.get("user_id", "").strip()
-        if not user_id:
-            return {"error": "user_id is required"}
-        if self.tasking is not None:
-            try:
-                task_count = self.tasking.getUserAnyTaskCount(user_id)
-                if task_count and task_count > 0:
-                    return {"error": f"Cannot delete user: they are assigned to {task_count} task(s). Reassign all tasks before deleting this user."}
-            except Exception as e:
-                logger.exception("Could not check tasks for user_id=%s", user_id)
-                return {"error": "Failed to verify task assignments before deletion."}
-        try:
-            self.keycloak.deleteKeycloakUser(user_id)
-            return {"success": True}
-        except Exception as e:
-            logger.exception("deleteKeycloakUser failed for user_id=%s", user_id)
-            return {"error": str(e)}
+        users = self.keycloak.getUsersFromCache()
+        return {"Users": users or []}
 
     def edit_user(self, payload):
         user_id = payload.get("user_id", "").strip()
         if not user_id:
             return {"error": "user_id is required"}
-        new_username = payload.get("username") or None
-        new_role = payload.get("role") or None
         new_status = payload.get("status") or None
         new_coy = payload.get("coy")
 
-        if not is_dev_mode():
-            if new_username or new_role:
-                return {"error": "Username and role changes are not available in production mode"}
-            try:
-                self.keycloak.editUserCacheOnly(user_id, new_status=new_status, new_coy=new_coy)
-                return {"success": True}
-            except Exception as e:
-                logger.exception("editUserCacheOnly failed for user_id=%s", user_id)
-                return {"error": str(e)}
+        # Username and role are managed in Keycloak; edits here only update local
+        # presence/COY cache.
+        if payload.get("username") or payload.get("role"):
+            return {"error": "Username and role are managed in Keycloak; edit them there."}
 
         try:
-            result = self.keycloak.editKeycloakUser(user_id, new_username, new_role, new_status, new_coy=new_coy) or {}
-            response = {"success": True}
-            warnings = result.get("warnings")
-            if warnings:
-                response["warning"] = "; ".join(warnings)
-            return response
-        except ValueError as e:
-            return {"error": str(e)}
-        except Exception as e:
-            logger.exception("editKeycloakUser failed for user_id=%s", user_id)
-            return {"error": str(e)}
+            self.keycloak.editUserCacheOnly(user_id, new_status=new_status, new_coy=new_coy)
+            return {"success": True}
+        except Exception:
+            logger.exception("editUserCacheOnly failed for user_id=%s", user_id)
+            return {"error": "Failed to update user"}
 
     def update_users(self, csv_text):
         user_list = []
@@ -133,7 +72,7 @@ class UserService:
                 coy_value = (row.get("Coy") or "").strip()
                 if coy_value:
                     coy_list.append((name, coy_value))
-        
+
         user_list = tuple(user_list)
         present_list = tuple(present_list)
         with self.db.transaction():
@@ -142,80 +81,3 @@ class UserService:
             self.keycloak.updateExistingUsers(present_list)
             if coy_list:
                 self.keycloak.updateUserCoy(coy_list)
-
-    def change_password(self, user, current_password, new_password):
-        """
-        Change the current user's password.
-        
-        Args:
-            user: The current user dict from JWT token
-            current_password: The user's current password for verification
-            new_password: The new password to set
-        
-        Returns:
-            dict with success or error key
-        """
-        username = user.get("preferred_username")
-        user_id = user.get("sub")
-
-        if not username or not user_id:
-            logger.warning("Invalid user session: username=%s, user_id=%s", username, user_id)
-            return {"error": "Invalid user session"}
-
-        if not new_password or len(new_password) < 8:
-            return {"error": "New password must be at least 8 characters"}
-
-        # Verify current password
-        try:
-            is_valid = self.kc.verify_user_credentials(username, current_password)
-            if not is_valid:
-                logger.warning("Password verification failed for user %s", username)
-                return {"error": "Current password is incorrect"}
-        except Exception as e:
-            logger.exception("Error verifying credentials for user %s: %s", username, e)
-            return {"error": "Failed to verify current password"}
-
-        try:
-            # Get admin token and set new password
-            admin_token = self.kc.get_admin_token()
-            self.kc.set_user_password(admin_token, user_id, new_password, temporary=False)
-            logger.info("Password changed successfully for user %s", username)
-            return {"success": True}
-        except Exception as e:
-            logger.exception("Failed to change password for user %s: %s", username, e)
-            return {"error": "Failed to change password"}
-
-    def admin_reset_password(self, target_username, new_password):
-        """
-        Admin function to reset another user's password.
-        Does not require current password verification.
-        
-        Args:
-            target_username: The username of the user to reset password for
-            new_password: The new password to set
-        
-        Returns:
-            dict with success or error key
-        """
-        if not target_username:
-            return {"error": "Target username is required"}
-
-        if not new_password or len(new_password) < 8:
-            return {"error": "New password must be at least 8 characters"}
-
-        try:
-            # Get admin token
-            admin_token = self.kc.get_admin_token()
-            
-            # Find the user ID by username
-            user_id = self.kc.find_user_id(admin_token, target_username)
-            if not user_id:
-                return {"error": f"User '{target_username}' not found"}
-
-            # Set new password
-            self.kc.set_user_password(admin_token, user_id, new_password, temporary=False)
-            logger.info("Password reset successfully for user %s by admin", target_username)
-            return {"success": True}
-        except Exception as e:
-            logger.exception("Failed to reset password for user %s: %s", target_username, e)
-            return {"error": "Failed to reset password"}
