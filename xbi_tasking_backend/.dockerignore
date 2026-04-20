@@ -6,7 +6,6 @@ dev_server.config
 .gitignore
 .env
 demo_backend/
-certs/
 
 
 # Testing stuff

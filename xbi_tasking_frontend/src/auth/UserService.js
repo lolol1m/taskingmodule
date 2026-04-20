@@ -15,7 +15,11 @@ const _kc = new Keycloak({
 
 export async function initKeycloak() {
   try {
-    const authenticated = await _kc.init({ onLoad: 'login-required', pkceMethod:"S256"});
+    const authenticated = await _kc.init({
+      onLoad: 'login-required',
+      pkceMethod: 'S256',
+      checkLoginIframe: false,
+    });
     console.log(_kc, "Keycloak config loaded")
     if (authenticated) {
         console.log('User is authenticated');

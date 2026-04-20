@@ -11,6 +11,9 @@ xbi_tasking_backend/dev_server.config
 xbi_tasking_backend/testing.config
 xbi_tasking_backend/*.config
 !xbi_tasking_backend/*.config.example
+
+xbi_tasking_backend/certs/*
+!xbi_tasking_backend/certs/.gitkeep
 mockui/
 dev_server.config
 keycloak_stuff/start_keycloak.bat

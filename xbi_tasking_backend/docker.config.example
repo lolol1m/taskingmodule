@@ -1,0 +1,19 @@
+[Database]
+database_name: XBI_TASKING_3
+ip_address: postgres
+port: 5432
+user: postgres
+password: password
+auto_init_db: true
+
+[Keycloak]
+keycloak_url: https://tangy.auth.local:8443
+realm: xbi-tasking
+client_id: xbi-tasking-backend
+client_secret: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
+admin_client_id: xbi-tasking-admin
+admin_client_secret: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
+allowed_client_ids: xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin
+roles_client_id: xbi-tasking-frontend
+required_group: xbi-tasking-users
+mode: prod

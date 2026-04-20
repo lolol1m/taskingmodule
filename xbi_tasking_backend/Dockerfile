@@ -23,5 +23,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN if [ ! -f docker.config ] && [ -f docker.config.example ]; then \
+        cp docker.config.example docker.config; \
+    fi
+
 EXPOSE 5000
 CMD ["python", "main.py"]
