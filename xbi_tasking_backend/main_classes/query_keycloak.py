@@ -58,11 +58,13 @@ SQL_DELETE_USER_CACHE = "DELETE FROM user_cache WHERE keycloak_user_id = %s"
 SQL_UPDATE_USER_CACHE_COY = "UPDATE user_cache SET coy = %s WHERE keycloak_user_id = %s"
 
 SQL_UPSERT_USER_CACHE_LOGIN = """
-    INSERT INTO user_cache (keycloak_user_id, username, role, is_present, last_login)
-    VALUES (%s, %s, %s, FALSE, NOW())
+    INSERT INTO user_cache (keycloak_user_id, username, role, is_present, last_updated, last_login)
+    VALUES (%s, %s, %s, TRUE, NOW(), NOW())
     ON CONFLICT (keycloak_user_id) DO UPDATE SET
         username = EXCLUDED.username,
         role = EXCLUDED.role,
+        is_present = TRUE,
+        last_updated = NOW(),
         last_login = NOW()
 """
 

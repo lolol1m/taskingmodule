@@ -9,9 +9,32 @@ from formatters.tasking_formatter import (
     format_tasking_manager_area,
 )
 from constants import AssigneeLabel, TaskStatus
+from security import is_admin_user
 
 
 logger = logging.getLogger("xbi_tasking_backend.tasking_service")
+
+# Report types that contain an IIR component and therefore must be vetted by IA only.
+_IIR_REPORT_TYPES = {"IIR", "IIR+SF"}
+
+
+def _assert_ia_for_iir_tasks(submission_state, task_ids, user, action_label):
+    """Raise ValueError if any of the given tasks has an IIR report and the
+    user is not an IA. Only IA users may vet tasks whose Report is IIR or IIR+SF."""
+    if user is None or is_admin_user(user):
+        return
+    blocked = []
+    for task_id in task_ids:
+        state = submission_state.get(task_id)
+        if not state:
+            continue
+        report = (state.get("report") or "").strip().upper()
+        if report in _IIR_REPORT_TYPES:
+            blocked.append(task_id)
+    if blocked:
+        raise ValueError(
+            f"Only IA users can {action_label} IIR tasks. Blocked tasks: {blocked}"
+        )
 
 
 def _get_limit_offset(payload):
@@ -268,17 +291,24 @@ class TaskingService:
             self.tasking.completeTask(task_id)
         self._push_reported_notifications(task_ids, user, stage_label="Task completed")
     
-    def start_verification(self, payload, vetter_keycloak_id):
-        for task_id in payload.get("SCVU Task ID", []):
+    def start_verification(self, payload, vetter_keycloak_id, user=None):
+        task_ids = payload.get("SCVU Task ID", [])
+        submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
+        _assert_ia_for_iir_tasks(submission_state, task_ids, user, "start verification for")
+        for task_id in task_ids:
             self.tasking.startVerification(task_id, vetter_keycloak_id)
 
-    def unstart_verification(self, payload, vetter_keycloak_id):
-        for task_id in payload.get("SCVU Task ID", []):
+    def unstart_verification(self, payload, vetter_keycloak_id, user=None):
+        task_ids = payload.get("SCVU Task ID", [])
+        submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
+        _assert_ia_for_iir_tasks(submission_state, task_ids, user, "unstart verification for")
+        for task_id in task_ids:
             self.tasking.unstartVerification(task_id, vetter_keycloak_id)
 
     def verify_pass(self, payload, vetter_keycloak_id=None, user=None):
         task_ids = payload.get("SCVU Task ID", [])
         submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
+        _assert_ia_for_iir_tasks(submission_state, task_ids, user, "verify-pass")
         for task_id in task_ids:
             state = submission_state.get(task_id)
             if not state:
@@ -308,8 +338,11 @@ class TaskingService:
             return
         self._image_service.complete_images({"SCVU Image ID": image_ids}, vetter_keycloak_id)
     
-    def verify_fail(self, payload, vetter_keycloak_id=None):
-        for task_id in payload.get("SCVU Task ID", []):
+    def verify_fail(self, payload, vetter_keycloak_id=None, user=None):
+        task_ids = payload.get("SCVU Task ID", [])
+        submission_state = self.tasking.getTaskSubmissionStatusByIds(task_ids)
+        _assert_ia_for_iir_tasks(submission_state, task_ids, user, "verify-fail")
+        for task_id in task_ids:
             self.tasking.verifyFail(task_id)
 
     def update_tasking_summary(self, payload):

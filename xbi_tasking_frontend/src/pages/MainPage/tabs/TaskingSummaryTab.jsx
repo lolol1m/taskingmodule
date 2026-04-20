@@ -1282,6 +1282,36 @@ function TaskingSummaryTab({
     }
 
     const currentUserKeycloakId = UserService.getTokenParsed()?.sub
+    const currentUserRole = UserService.readUserRoleSingle()
+
+    const verificationPaths = [
+      '/tasking/startVerification',
+      '/tasking/unstartVerification',
+      '/tasking/verifyPass',
+      '/tasking/verifyFail',
+    ]
+    if (verificationPaths.includes(apiPath) && currentUserRole !== 'IA') {
+      const iirReports = new Set(['IIR', 'IIR+SF'])
+      const iirRows = eligibleRows.filter((row) =>
+        iirReports.has(String(row?.report || '').trim().toUpperCase()),
+      )
+      if (iirRows.length === eligibleRows.length) {
+        addNotification({
+          title: 'IA required',
+          meta: 'Only IA users can vet IIR tasks',
+        })
+        return
+      }
+      if (iirRows.length > 0) {
+        const iirRowIds = new Set(iirRows.map((row) => row.id))
+        eligibleRows = eligibleRows.filter((row) => !iirRowIds.has(row.id))
+        addNotification({
+          title: 'Some rows skipped',
+          meta: `${iirRows.length} IIR task(s) skipped — only IA users can vet IIR tasks`,
+        })
+      }
+    }
+
     if (apiPath === '/tasking/startVerification') {
       const alreadyClaimed = eligibleRows.filter((row) => row.vetterKeycloakId && row.vetterKeycloakId !== currentUserKeycloakId)
       if (alreadyClaimed.length > 0) {

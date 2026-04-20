@@ -83,6 +83,7 @@ function CompletedImagesTab({
   const { addNotification } = useNotifications()
 
   const role = UserService.readUserRoleSingle()
+  const canUncomplete = role === 'IA' || role === 'Senior II'
   const roundDownToHour = (value) => {
     if (!value || typeof value !== 'string') return value
     return value.replace(/(\d{2}):\d{2}:\d{2}$/, '$1:00:00')
@@ -324,13 +325,15 @@ function CompletedImagesTab({
       </div>
 
       <div className="completed-images__actions">
-        <Button
-          className="tasking-summary__button"
-          disabled={!selection.length}
-          onClick={handleUncomplete}
-        >
-          Uncomplete Image
-        </Button>
+        {canUncomplete && (
+          <Button
+            className="tasking-summary__button"
+            disabled={!selection.length}
+            onClick={handleUncomplete}
+          >
+            Uncomplete Image
+          </Button>
+        )}
         {error ? <Typography className="completed-images__error">{error}</Typography> : null}
         <Box sx={{ marginLeft: 'auto', display: 'flex', gap: 1, position: 'relative' }}>
           <Button className="tasking-summary__button" onClick={() => setColumnsPanelOpen((prev) => !prev)}>
@@ -413,7 +416,7 @@ function CompletedImagesTab({
           columns={orderedColumns}
           columnVisibilityModel={columnVisibilityModel}
           onColumnVisibilityModelChange={setColumnVisibilityModel}
-          checkboxSelection
+          checkboxSelection={canUncomplete}
           disableRowSelectionOnClick
           filterModel={filterModel}
           onFilterModelChange={setFilterModel}

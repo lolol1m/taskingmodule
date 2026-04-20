@@ -14,7 +14,7 @@ from schemas import (
     UpdateTaskingManagerPayload,
     UpdateTaskingSummaryPayload,
 )
-from security import can_assign_tasks, get_current_user, is_admin_user
+from security import can_assign_tasks, can_uncomplete_images, get_current_user, is_admin_user
 
 
 logger = logging.getLogger("xbi_tasking_backend.tasking")
@@ -380,7 +380,12 @@ async def complete_tasks(request: Request, payload: TaskIdsPayload, user: dict =
 async def start_verification(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     try:
         vetter_keycloak_id = user.get("sub")
-        await run_blocking(request.app.state.tasking_service.start_verification, model_to_dict(payload), vetter_keycloak_id)
+        await run_blocking(
+            request.app.state.tasking_service.start_verification,
+            model_to_dict(payload),
+            vetter_keycloak_id,
+            user,
+        )
         audit = getattr(request.app.state, "audit_service", None)
         if audit:
             audit.log_event(
@@ -390,6 +395,8 @@ async def start_verification(request: Request, payload: TaskIdsPayload, user: di
                 ip_address=request.client.host if request.client else None,
             )
         return StatusResponse(status="success", message="Verification started")
+    except ValueError as e:
+        return error_response(403, str(e), "vetter_role_forbidden")
     except Exception:
         logger.exception("startVerification failed")
         return error_response(500, "Failed to start verification", "start_verification_failed")
@@ -399,7 +406,12 @@ async def start_verification(request: Request, payload: TaskIdsPayload, user: di
 async def unstart_verification(request: Request, payload: TaskIdsPayload, user: dict = Depends(get_current_user)) -> StatusResponse:
     try:
         vetter_keycloak_id = user.get("sub")
-        await run_blocking(request.app.state.tasking_service.unstart_verification, model_to_dict(payload), vetter_keycloak_id)
+        await run_blocking(
+            request.app.state.tasking_service.unstart_verification,
+            model_to_dict(payload),
+            vetter_keycloak_id,
+            user,
+        )
         audit = getattr(request.app.state, "audit_service", None)
         if audit:
             audit.log_event(
@@ -409,6 +421,8 @@ async def unstart_verification(request: Request, payload: TaskIdsPayload, user: 
                 ip_address=request.client.host if request.client else None,
             )
         return StatusResponse(status="success", message="Verification unstarted")
+    except ValueError as e:
+        return error_response(403, str(e), "vetter_role_forbidden")
     except Exception:
         logger.exception("unstartVerification failed")
         return error_response(500, "Failed to unstart verification", "unstart_verification_failed")
@@ -475,7 +489,12 @@ async def verify_fail(request: Request, payload: TaskIdsPayload, user: dict = De
         }
     '''
     try:
-        result = await run_blocking(request.app.state.tasking_service.verify_fail, model_to_dict(payload))
+        result = await run_blocking(
+            request.app.state.tasking_service.verify_fail,
+            model_to_dict(payload),
+            user.get("sub"),
+            user,
+        )
         if result is None:
             audit = getattr(request.app.state, "audit_service", None)
             if audit:
@@ -487,6 +506,8 @@ async def verify_fail(request: Request, payload: TaskIdsPayload, user: dict = De
                 )
             return StatusResponse(status="success", message="Tasks updated")
         return result
+    except ValueError as e:
+        return error_response(403, str(e), "vetter_role_forbidden")
     except Exception:
         logger.exception("verifyFail failed")
         return error_response(500, "Failed to verify tasks", "verify_fail_failed")
@@ -547,7 +568,7 @@ async def uncomplete_images(request: Request, payload: ImageIdsPayload, user: di
         }
     '''
     try:
-        if not is_admin_user(user):
+        if not can_uncomplete_images(user):
             return error_response(403, "Insufficient permissions", "insufficient_permissions")
         result = await run_blocking(request.app.state.tasking_service.uncomplete_images, model_to_dict(payload))
         if result is None:

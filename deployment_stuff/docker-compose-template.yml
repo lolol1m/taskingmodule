@@ -16,6 +16,7 @@ services:
       # VITE_KEYCLOAK_URL: http://keycloak:8080
       VITE_KEYCLOAK_REALM: xbi-tasking
       VITE_CLIENT_ID: xbi-tasking-frontend
+      VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     ports:
       - "5173:5173"
 

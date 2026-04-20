@@ -53,15 +53,37 @@ const updateToken = (successCallback) =>
 const getUsername = () => _kc.tokenParsed?.preferred_username;
 
 const _clientId = import.meta.env.VITE_CLIENT_ID
+// Client where the II / Senior II / IA client roles are defined.
+// Falls back to the frontend client if not set.
+const _rolesClientId = import.meta.env.VITE_ROLES_CLIENT_ID || _clientId
 
-const hasRole = (roles) => roles.some((role) => _kc.hasResourceRole(role, _clientId));
+const _hasAnyRole = (role) => {
+  if (_kc.hasResourceRole(role, _rolesClientId)) return true
+  if (_rolesClientId !== _clientId && _kc.hasResourceRole(role, _clientId)) return true
+  if (_kc.hasRealmRole(role)) return true
+  return false
+}
+
+const hasRole = (roles) => roles.some(_hasAnyRole);
 
 const readUserRoleSingle = () => {
   try {
-    if (UserService.hasRole(['IA'])) return 'IA'
-    if (UserService.hasRole(['Senior II'])) return 'Senior II'
-    if (UserService.hasRole(['II'])) return 'II'
-    return null
+    let resolved = null
+    if (_hasAnyRole('IA')) resolved = 'IA'
+    else if (_hasAnyRole('Senior II')) resolved = 'Senior II'
+    else if (_hasAnyRole('II')) resolved = 'II'
+
+    if (import.meta.env.DEV) {
+      console.log(
+        '[UserService] readUserRoleSingle -> %o (user=%s) rolesClient=%s resource_access=%o realm_access=%o',
+        resolved,
+        _kc.tokenParsed?.preferred_username,
+        _rolesClientId,
+        _kc.tokenParsed?.resource_access,
+        _kc.tokenParsed?.realm_access,
+      )
+    }
+    return resolved
   } catch (error) {
     console.warn('Unable to read user role', error)
     return null
