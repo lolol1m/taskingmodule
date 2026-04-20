@@ -1,232 +1,322 @@
-# Keycloak Setup
+# Keycloak Setup (Docker deployment)
 
-## Keycloak Configuration
+This guide covers the Keycloak realm/clients/roles configuration for the **Docker Compose deployment** (hostnames `tangy.local` / `tangy.auth.local`).
 
-### 1. Create/Update Realm
+> If you haven't run the stack yet, start with [`SETUP.md`](../SETUP.md) first. You need Keycloak running on `https://tangy.auth.local:8443` before the steps below work.
 
-1. Go to Keycloak Admin Console: http://localhost:8080/admin
-2. Select or create realm: `xbi-tasking`
-3. Click **Create** (if new) or select existing realm
+---
 
-### 1.5. Configure Frontend Client
-**This is the REQUIRED client for authentication.**
+## Prerequisites
 
-1. Go to **Clients** → **Create client** (or edit existing `xbi-tasking-frontend`)
-2. Fill in:
-   - **Client type**: OpenID Connect
-   - **Client ID**: `xbi-tasking-frontend`
-   - Click **Next**
-3. In **Capability config**:
-   - **DISABLE Client authentication** (makes it public)
-   - **Enable Standard flow** (Authorization Code Flow) - 
-   - Click **Next**
-4. In **Login settings**:
-   - **Root URL**: Leave empty | http://localhost:5173
-   - **Home URL**: Leave empty | http://localhost:5173
-   - **Valid redirect URIs**: 
+- `docker compose up -d` is running and `docker compose ps` shows `xbi-keycloak-trial-2` as **Up**
+- `tangy.auth.local` resolves to `127.0.0.1` (handled by `setup.ps1`)
+- Self-signed certificate accepted: visit `https://tangy.auth.local:8443` once and click **Advanced** → **Proceed**
+- Bootstrap admin credentials (see `docker-compose.yml`):
+  - Username: `admin`
+  - Password: `admin`
+
+URLs referenced in this doc:
+
+| What | URL |
+|---|---|
+| Keycloak admin console | `https://tangy.auth.local:8443/admin` |
+| Frontend | `http://tangy.local:5173` |
+| Backend | `http://tangy.local:5000` |
+
+---
+
+## 1. Create / select the realm
+
+1. Open `https://tangy.auth.local:8443/admin` and sign in as `admin` / `admin`.
+2. In the realm dropdown (top-left), click **Create realm** (or select it if it already exists).
+3. **Realm name**: `xbi-tasking` → **Create**.
+
+All remaining steps are done **inside the `xbi-tasking` realm**.
+
+---
+
+## 2. Configure the frontend client (public)
+
+The frontend uses the Keycloak JavaScript adapter directly (login-required + PKCE). It is a **public** client — no client secret.
+
+1. **Clients** → **Create client**.
+2. **General settings**:
+   - Client type: `OpenID Connect`
+   - Client ID: `xbi-tasking-frontend`
+   - → **Next**
+3. **Capability config**:
+   - Client authentication: **OFF** (public client)
+   - Authentication flow: **Standard flow** ON, **Direct access grants** OFF
+   - → **Next**
+4. **Login settings**:
+   - Root URL: `http://tangy.local:5173`
+   - Home URL: `http://tangy.local:5173`
+   - Valid redirect URIs:
      ```
-     http://localhost:5000/auth/callback |*
+     http://tangy.local:5173/*
      ```
-   - **Valid post logout redirect URIs**:
+   - Valid post logout redirect URIs:
      ```
-     http://localhost:3000/* | *
+     http://tangy.local:5173/*
      ```
-   - **Web origins**: 
+   - Web origins:
      ```
-     http://localhost:5000 | *
+     http://tangy.local:5173
      ```
-   - Click **Save**
+   - → **Save**
+5. Open the **Advanced** tab → scroll to **Advanced Settings**:
+   - **Proof Key for Code Exchange Code Challenge Method**: `S256` (the adapter sends PKCE with `S256`)
+   - → **Save**
 
+---
 
-### 2. Configure Backend Client
+## 3. Configure the backend client (confidential)
 
-**This is the REQUIRED client for authentication.**
+The backend uses this client to introspect tokens. It does **not** run a browser redirect flow.
 
-1. Go to **Clients** → **Create client** (or edit existing `xbi-tasking-backend`)
-2. Fill in:
-   - **Client type**: OpenID Connect
-   - **Client ID**: `xbi-tasking-backend`
-   - Click **Next**
-3. In **Capability config**:
-   - **Enable Client authentication** (makes it confidential)
-   - **Enable Standard flow** (Authorization Code Flow) - **REQUIRED**
-   - **Disable Direct access grants** (using redirect flow, not ROPC)
-   - Click **Next**
-4. In **Login settings**:
-   - **Root URL**: Leave empty
-   - **Home URL**: Leave empty
-   - **Valid redirect URIs**: 
-     ```
-     http://localhost:5000/auth/callback
-     ```
-   - **Valid post logout redirect URIs**:
-     ```
-     http://localhost:3000/*
-     ```
-   - **Web origins**: 
-     ```
-     http://localhost:5000
-     ```
-   - Click **Save**
-5. Go to **Credentials** tab
-6. Copy the **Client secret** - you'll need this for backend config
+1. **Clients** → **Create client**.
+2. **General settings**:
+   - Client type: `OpenID Connect`
+   - Client ID: `xbi-tasking-backend`
+   - → **Next**
+3. **Capability config**:
+   - Client authentication: **ON** (confidential)
+   - Standard flow: **OFF** (token introspection only)
+   - Direct access grants: **OFF**
+   - Service accounts roles: **OFF** (not needed here — admin is a separate client)
+   - → **Next**
+4. **Login settings**: leave everything blank → **Save**.
+5. **Credentials** tab → copy **Client secret**.
+6. Paste it into `xbi_tasking_backend/docker.config` under `[Keycloak] → client_secret`, AND into `docker-compose.yml` under `KEYCLOAK_CLIENT_SECRET`. (Environment variables in compose override the config file.)
 
-### 3. Create Realm Roles
+---
 
-1. Go to **Realm roles**
-2. Create roles:
-   - `II`
-   - `Senior II`
-   - `IA`
+## 4. Configure the admin client (service account)
 
-### 4. Create Users
+Required for the `/getUsers` endpoint and password management via the Keycloak admin API.
 
-1. Go to **Users** → **Create new user**
-2. Set username, email (optional)
-3. Go to **Credentials** tab → Set password
-4. Go to **Role mapping** tab → Assign appropriate realm role (II, Senior II, or IA)
+1. **Clients** → **Create client**.
+2. **General settings**:
+   - Client type: `OpenID Connect`
+   - Client ID: `xbi-tasking-admin`
+   - → **Next**
+3. **Capability config**:
+   - Client authentication: **ON**
+   - Standard flow: **OFF**
+   - Direct access grants: **ON** (needed for password reset)
+   - Service accounts roles: **ON**
+   - → **Next**
+4. **Login settings**: leave blank → **Save**.
+5. **Credentials** tab → copy **Client secret** into `docker.config` (`admin_client_secret`) and `docker-compose.yml` (`KEYCLOAK_ADMIN_CLIENT_SECRET`).
+6. **Service account roles** tab → **Assign role** → filter **Clients** = `realm-management` → assign:
+   - `view-users`
+   - `query-users`
+   - `view-realm`
+   - `manage-users`
 
-### 5. (Optional) Configure Admin Client for User Listing
+---
 
-**Note**: This client is required if you want the `/getUsers` endpoint to query Keycloak for users with specific roles. The legacy database users table has been removed, so `/getUsers` depends on Keycloak.
+## 5. Realm roles
 
-If you don't need Keycloak user listing, you can skip this section and leave `admin_client_secret` as `your_admin_client_secret` in the config file.
+**Realm roles** → **Create role** — create each of:
 
-1. Go to **Clients** → **Create client**
-2. Fill in:
-   - **Client type**: OpenID Connect
-   - **Client ID**: `xbi-tasking-admin`
-   - Click **Next**
-3. In **Capability config**:
-   - **Enable Client authentication** (makes it confidential)
-   - **Disable Standard flow** (not needed for service account)
-   - **Enable Service accounts roles** (required for admin API access)
-   - **Enable Direct Access Grant** (required for changing user passwords)
-   - Click **Next**
-4. In **Login settings**:
-   - **Valid redirect URIs**: Leave empty
-   - Click **Save**
-5. Go to **Credentials** tab
-6. Copy the **Client secret** - you'll need this for backend config
-7. Go to **Service accounts roles** tab
-8. Click **Assign role** → **Filter by clients** → Select `realm-management`
-9. Assign these roles:
-   - `view-users` (to view users)
-   - `query-users` (to query users by role)
-   - `view-realm` (to access realm info)
-   - `manage-users` (to manage users info)
+- `II`
+- `Senior II`
+- `IA`
 
-##5. Edit Username Settings
-1. Realm Settings -> Login -> Enable Edit Username
+These are used by `UserService.hasRole([...])` on the frontend.
 
-   
-   
-## Backend Configuration
+---
 
-### Environment Variables
+## 6. Required group (`xbi-tasking-users`)
 
-Set in `dev_server.config` or as environment variables:
+The backend enforces `required_group: xbi-tasking-users` — every user must belong to this group or the backend returns 401.
+
+### 6a. Create the group
+
+1. **Groups** → **Create group**
+2. Name: `xbi-tasking-users` → **Create**
+
+### 6b. Add the `groups` claim to the frontend token
+
+The backend reads the group list from the JWT `groups` claim. That claim is not emitted by default — you need a mapper on the frontend client's dedicated scope:
+
+1. **Clients** → `xbi-tasking-frontend` → **Client scopes** tab
+2. Open `xbi-tasking-frontend-dedicated`
+3. **Add mapper** → **By configuration** → **Group Membership**
+4. Configure:
+   - Name: `groups`
+   - Token Claim Name: `groups`
+   - Full group path: **OFF** (so the claim is `xbi-tasking-users`, not `/xbi-tasking-users`)
+   - Add to ID token: **ON**
+   - Add to access token: **ON**
+   - Add to userinfo: **ON**
+5. → **Save**
+
+### 6c. Verify the claim appears
+
+1. **Clients** → `xbi-tasking-frontend` → **Client scopes** tab → **Evaluate**
+2. Select a user who is in `xbi-tasking-users`
+3. Click **Generated access token** → confirm `"groups": ["xbi-tasking-users"]` is present
+
+---
+
+## 7. Create users
+
+1. **Users** → **Create new user**
+2. Username, email (optional)
+3. **Credentials** tab → set a password (uncheck *Temporary* for dev)
+4. **Groups** tab → **Join Group** → `xbi-tasking-users`
+5. **Role mapping** tab → **Assign role** → filter **Realm roles** → assign one of `II`, `Senior II`, or `IA`
+
+Repeat for every user that should access the app.
+
+---
+
+## 8. Realm settings
+
+**Realm settings** → **Login** tab:
+
+- **Edit username**: **ON** (required if you want to change usernames later)
+- **Forgot password**, **Remember me**, etc.: optional
+
+→ **Save**
+
+---
+
+## Backend configuration
+
+The backend reads `xbi_tasking_backend/docker.config` inside the container (set via `CONFIG_PATH=docker.config` in `docker-compose.yml`). Start from the tracked template:
 
 ```ini
 [Keycloak]
-keycloak_url: http://localhost:8080
+keycloak_url: https://tangy.auth.local:8443
 realm: xbi-tasking
 client_id: xbi-tasking-backend
-client_secret: <your-client-secret-from-keycloak>
-# Optional: Only needed if you want /getUsers endpoint to query Keycloak
+client_secret: <paste from xbi-tasking-backend → Credentials>
 admin_client_id: xbi-tasking-admin
-admin_client_secret: <your-admin-client-secret>  # Leave as 'your_admin_client_secret' if not using admin client
+admin_client_secret: <paste from xbi-tasking-admin → Credentials>
+allowed_client_ids: xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin
+roles_client_id: xbi-tasking-frontend
+required_group: xbi-tasking-users
+mode: prod
 ```
 
-Or set environment variable:
+`docker-compose.yml` also sets these as environment variables (which take precedence):
+
+- `KEYCLOAK_PUBLIC_URL=https://tangy.auth.local:8443`
+- `KEYCLOAK_INTERNAL_URL=https://keycloak:8443` (service-to-service name on the Docker network)
+- `KEYCLOAK_CLIENT_SECRET`, `KEYCLOAK_ADMIN_CLIENT_SECRET`
+
+After any change, rebuild the backend:
+
 ```powershell
-$env:FRONTEND_URL="http://localhost:3000"
+docker compose up -d --build backend
 ```
 
-## Frontend Configuration
+---
 
-### Environment Variables
+## Frontend configuration
 
-Create `.env` file in `xbi-ui/`:
+The frontend reads Keycloak details from Vite env vars set in `docker-compose.yml`:
 
-```env
-REACT_APP_DB_API_URL=http://localhost:5000
+```yaml
+VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
+VITE_KEYCLOAK_REALM: xbi-tasking
+VITE_CLIENT_ID: xbi-tasking-frontend
+VITE_BACKEND_URL: http://tangy.local:5000
 ```
 
-**Note**: Frontend does NOT need Keycloak URL, realm, or client ID - it never talks to Keycloak directly.
+After changing any `VITE_*` value, rebuild:
 
-## How Authentication Works
+```powershell
+docker compose up -d --build frontend
+```
 
-### Frontend Authentication
+---
 
-1. **On page load**: `AuthGuard.js` checks for `access_token` in localStorage
-2. **If no token**: Redirects to `http://localhost:5000/auth/login`
-3. **After redirect**: Extracts tokens from URL fragment (`#access_token=...`)
-4. **Stores tokens**: Saves to localStorage
-5. **API calls**: Automatically includes `Authorization: Bearer <token>` header via axios interceptor
+## How authentication works (current implementation)
 
-### Backend Authentication
+1. Browser loads `http://tangy.local:5173`.
+2. `UserService.initKeycloak()` calls the Keycloak JS adapter with `onLoad: 'login-required'` + `pkceMethod: 'S256'`.
+3. Adapter redirects the browser to `https://tangy.auth.local:8443/realms/xbi-tasking/protocol/openid-connect/auth?...`.
+4. User logs in; Keycloak redirects back to `http://tangy.local:5173/?code=...` (allowed by the client's redirect URIs).
+5. Adapter exchanges the code for tokens (PKCE — no client secret needed).
+6. Frontend calls the backend with `Authorization: Bearer <access_token>`.
+7. Backend middleware introspects the token at Keycloak (using the `xbi-tasking-backend` client credentials), checks:
+   - Token signature / expiry
+   - `azp` (authorized party) is in `allowed_client_ids`
+   - `groups` contains `required_group` (`xbi-tasking-users`)
+   - Realm roles → mapped to account type (`II`, `Senior II`, `IA`)
+8. If anything fails → 401.
 
-1. **Token validation**: Middleware validates every request (except `/auth/*` endpoints)
-2. **Token introspection**: Backend calls Keycloak to verify token is valid
-3. **User info**: Extracts user roles and account type from token
-4. **Protected routes**: Require valid token or return 401
+`checkLoginIframe` is disabled on the frontend — browsers increasingly block third-party cookies in iframes, which breaks Keycloak's session-check iframe when frontend (`http://`) and Keycloak (`https://`) are on different schemes. Token renewal uses `updateToken(5)` instead.
 
-### Token Flow
+---
 
-- **Access Token**: Short-lived (typically 5 minutes), used for API calls
-- **Refresh Token**: Long-lived, used to get new access tokens via `/auth/refresh`
-- **Storage**: Tokens stored in browser localStorage
-- **Security**: Tokens sent in HTTP headers, never in URL query params (except during redirect)
+## Testing
 
-## Testing the Flow
+```powershell
+.\setup.ps1
+docker compose up -d --build
 
-1. **Start Keycloak**: Run `start_keycloak.bat` or manually start Keycloak
-2. **Start Backend**: Run `start_backend.bat`
-3. **Start Frontend**: Run `npm start` in `xbi-ui/`
-4. **Visit**: http://localhost:3000
-5. **Expected**: 
-   - Redirects to Keycloak login
-   - After login, redirects back to frontend
-   - Frontend shows main application
+# Accept the self-signed cert once
+Start-Process "https://tangy.auth.local:8443"
+
+# Then open the app
+Start-Process "http://tangy.local:5173"
+```
+
+Expected:
+
+1. Frontend briefly shows a loader, then redirects to Keycloak.
+2. Login as a user in `xbi-tasking-users` with a realm role.
+3. Keycloak redirects back to `http://tangy.local:5173`.
+4. App loads; network tab shows calls to `http://tangy.local:5000` with an `Authorization` header, all returning `200`.
+
+---
 
 ## Troubleshooting
 
-### "Invalid redirect URI" error
-- Check that `http://localhost:5000/auth/callback` is in Keycloak client's "Valid redirect URIs"
-- Make sure there are no trailing slashes
+### "Invalid parameter: redirect_uri"
+The URL the adapter is sending doesn't match `Valid redirect URIs` on `xbi-tasking-frontend`. Make sure it includes `http://tangy.local:5173/*` (trailing `*` matters).
 
-### "Client authentication failed"
-- Verify client secret matches in `dev_server.config`
-- Check that client is set to "confidential" (Client authentication enabled)
+### CORS error in browser console
+Add `http://tangy.local:5173` to **Web origins** on `xbi-tasking-frontend`. `+` is also valid (copies allowed origins from redirect URIs).
 
-### "Token validation failed"
-- Check that backend can reach Keycloak
-- Verify `KEYCLOAK_URL` and `KEYCLOAK_REALM` are correct
-- Check token hasn't expired
+### Frontend stuck on "Initialising..."
+Most commonly the Keycloak cert hasn't been trusted yet. Open `https://tangy.auth.local:8443` manually and accept the warning. Also confirm `checkLoginIframe: false` is set in `xbi_tasking_frontend/src/auth/UserService.js`.
 
-### "401 Client Error: Unauthorized" when calling `/getUsers`
-- This is expected if the admin client is not configured
-- The endpoint will return users from the database only
-- To enable Keycloak user listing, configure the admin client (see section 5)
-- If you see this error but don't need Keycloak user listing, you can ignore it
+### Backend returns 401 on every request
+- User missing from `xbi-tasking-users` group → add them (step 7).
+- `groups` claim missing from token → re-check the mapper (step 6b), then click **Evaluate** (step 6c).
+- Client secret mismatch → re-copy from **Credentials** tab into both `docker.config` and `docker-compose.yml`, then `docker compose up -d --build backend`.
 
-### Frontend stuck in redirect loop
-- Clear localStorage: `localStorage.clear()` in browser console
-- Check browser console for errors
-- Verify backend is running and `/auth/login` endpoint is accessible
+### `401 Client Error: Unauthorized` when calling `/getUsers`
+- `xbi-tasking-admin` client is missing or missing service account roles. Redo step 4 and verify **Service account roles** includes `view-users`, `query-users`, `view-realm`, `manage-users`.
 
-## Security Notes
+### "Token validation failed" in backend logs
+- Backend can't reach Keycloak. Compose uses `KEYCLOAK_INTERNAL_URL=https://keycloak:8443` (service DNS) for introspection. Check `docker compose logs keycloak` is healthy.
+- Backend trust store doesn't contain the Keycloak cert: it's copied in by the backend `Dockerfile` from `certs/keycloak.crt`. If you regenerated the Keycloak cert, re-run `setup.ps1` and rebuild: `docker compose up -d --build backend`.
 
-1. **Tokens in URL fragment**: More secure than query params (fragments aren't sent to server)
-2. **HTTPS in production**: Always use HTTPS in production
-3. **Token expiration**: Implement refresh token logic for long sessions
-4. **CSRF protection**: State parameter is stored in an HttpOnly cookie and validated on callback
-5. **HttpOnly cookies**: State stored in HttpOnly cookie (can't be accessed by JavaScript)
+### Redirect loop between frontend and Keycloak
+Clear browser storage for both `http://tangy.local:5173` and `https://tangy.auth.local:8443`, then reload. Also check browser console for adapter errors.
 
-## Additional Resources
+---
+
+## Security notes
+
+1. **HTTPS in production**: the current stack serves the frontend over plain `http://`. For anything beyond local dev, put Vite behind a reverse proxy with a proper TLS cert.
+2. **Self-signed cert**: `deployment_stuff/xbi-keycloak/ca_certs/keycloak.crt` is checked into git for portability. In production, replace it with a cert from a real CA.
+3. **Client secrets in compose**: `KEYCLOAK_CLIENT_SECRET` and `KEYCLOAK_ADMIN_CLIENT_SECRET` are currently hard-coded in `docker-compose.yml`. Move them to a `.env` file (and add `.env` to `.gitignore`) before pushing anywhere shared.
+4. **PKCE (`S256`)** is enforced on the frontend client — there is no `implicit` flow.
+5. **Token storage**: the JS adapter keeps tokens in memory; they're not persisted to `localStorage`, which is the Keycloak-recommended default.
+
+---
+
+## Additional resources
 
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
-- [Keycloak JavaScript Adapter](https://www.keycloak.org/docs/latest/securing_apps/#_javascript_adapter)
+- [Keycloak JavaScript Adapter](https://www.keycloak.org/securing-apps/javascript-adapter)
 - [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
-
+- Stack setup on a new machine: [`SETUP.md`](../SETUP.md)
