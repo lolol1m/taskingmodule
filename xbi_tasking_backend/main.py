@@ -141,7 +141,6 @@ async def keycloak_auth_middleware(request: Request, call_next):
         rate_limit_response = _rate_limit_auth_failure("missing_or_invalid_header")
         if rate_limit_response:
             return rate_limit_response
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
             content={"detail": "Not authenticated. Missing or invalid Authorization header."},
@@ -153,7 +152,6 @@ async def keycloak_auth_middleware(request: Request, call_next):
         rate_limit_response = _rate_limit_auth_failure("empty_token")
         if rate_limit_response:
             return rate_limit_response
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=401,
             content={"detail": "Not authenticated. Empty token."},
@@ -257,4 +255,21 @@ async def index():
 
 
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
+    ssl_keyfile = os.getenv("SSL_KEYFILE")
+    ssl_certfile = os.getenv("SSL_CERTFILE")
+    # Uvicorn's auto-reload doesn't pass SSL settings to reloaded workers
+    # reliably, so only enable reload when SSL is off.
+    reload_enabled = os.getenv("UVICORN_RELOAD", "false").lower() == "true"
+    if ssl_keyfile and ssl_certfile and os.path.exists(ssl_keyfile) and os.path.exists(ssl_certfile):
+        logger.info("Starting backend with HTTPS (cert=%s)", ssl_certfile)
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=5000,
+            reload=False,
+            ssl_keyfile=ssl_keyfile,
+            ssl_certfile=ssl_certfile,
+        )
+    else:
+        logger.info("Starting backend with plain HTTP (set SSL_KEYFILE/SSL_CERTFILE to enable HTTPS)")
+        uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=reload_enabled)

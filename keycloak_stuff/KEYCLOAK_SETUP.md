@@ -64,9 +64,8 @@ The frontend uses the Keycloak JavaScript adapter directly (login-required + PKC
      http://tangy.local:5173
      ```
    - → **Save**
-5. Open the **Advanced** tab → scroll to **Advanced Settings**:
-   - **Proof Key for Code Exchange Code Challenge Method**: `S256` (the adapter sends PKCE with `S256`)
-   - → **Save**
+
+> **About PKCE**: the Keycloak JS adapter on the frontend always sends `code_challenge_method=S256`, so the Authorization Code flow is PKCE-protected out of the box — no server-side toggle required. Recent Keycloak versions have even removed the "enforce PKCE" dropdown from the UI. If your version *does* expose a **Proof Key for Code Exchange Code Challenge Method** field (Advanced tab), you can set it to `S256` to also block any future non-PKCE client, but this is optional.
 
 ---
 
@@ -143,7 +142,7 @@ The backend reads the group list from the JWT `groups` claim. That claim is not 
 
 1. **Clients** → `xbi-tasking-frontend` → **Client scopes** tab
 2. Open `xbi-tasking-frontend-dedicated`
-3. **Add mapper** → **By configuration** → **Group Membership**
+3. **Configure New mapper** → **Group Membership**
 4. Configure:
    - Name: `groups`
    - Token Claim Name: `groups`
@@ -155,9 +154,11 @@ The backend reads the group list from the JWT `groups` claim. That claim is not 
 
 ### 6c. Verify the claim appears
 
+> **Do this after section 7** — you need at least one user who is a member of `xbi-tasking-users` before the check is meaningful.
+
 1. **Clients** → `xbi-tasking-frontend` → **Client scopes** tab → **Evaluate**
 2. Select a user who is in `xbi-tasking-users`
-3. Click **Generated access token** → confirm `"groups": ["xbi-tasking-users"]` is present
+3. Click **Generated access token** → confirm `"groups": ["xbi-tasking-users"]` is present (without a leading `/`)
 
 ---
 

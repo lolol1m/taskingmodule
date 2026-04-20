@@ -12,13 +12,27 @@ Layer 3 - Authorization:
   Reads client roles from resource_access.<roles_client_id>.roles.
 """
 from jose import jwt, JWTError
+import os
 import time
 import logging
-from typing import Optional
+from typing import Optional, Union
 import httpx
 from config import get_config
 
 logger = logging.getLogger("xbi_tasking_backend.keycloak_auth")
+
+
+def _httpx_verify() -> Union[str, bool]:
+    """
+    httpx defaults to certifi's CA bundle, which doesn't include our self-signed
+    Keycloak cert. Respect SSL_CERT_FILE / REQUESTS_CA_BUNDLE / KEYCLOAK_CA_BUNDLE
+    if set, so the backend can trust the Keycloak container's cert.
+    """
+    for env_var in ("KEYCLOAK_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"):
+        path = os.getenv(env_var)
+        if path and os.path.exists(path):
+            return path
+    return True
 
 
 class GroupAccessDeniedError(Exception):
@@ -49,7 +63,7 @@ class KeycloakAuth:
 
     def _load_public_key(self):
         try:
-            with httpx.Client() as client:
+            with httpx.Client(verify=_httpx_verify()) as client:
                 response = client.get(self.well_known_url, timeout=5.0)
                 if response.status_code == 200:
                     config = response.json()
@@ -64,7 +78,7 @@ class KeycloakAuth:
             self._load_public_key()
         if not self.jwks_url:
             return None
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=_httpx_verify()) as client:
             response = await client.get(self.jwks_url, timeout=5.0)
             if response.status_code == 200:
                 self.jwks_cache = response.json()

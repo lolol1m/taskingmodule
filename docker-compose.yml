@@ -11,14 +11,12 @@ services:
       - backend
     environment:
       VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
-      # VITE_BACKEND_URL: https://localhost:5000
-      # VITE_KEYCLOAK_URL: https://localhost:8443
-      # VITE_BACKEND_URL: https://127.0.0.1:5000
-      VITE_BACKEND_URL: http://tangy.local:5000
+      VITE_BACKEND_URL: https://tangy.local:5000
       VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
-      # VITE_KEYCLOAK_URL: http://keycloak:8080
       VITE_KEYCLOAK_REALM: xbi-tasking
       VITE_CLIENT_ID: xbi-tasking-frontend
+    volumes:
+      - ./xbi_tasking_backend/certs:/certs:ro
     ports:
       - "5173:5173"
 
@@ -39,6 +37,17 @@ services:
     environment:
       FRONTEND_URL: https://tangy.local:5173      
       CONFIG_PATH: docker.config
+      # TLS for backend HTTPS
+      SSL_CERTFILE: /certs/server.crt
+      SSL_KEYFILE: /certs/server.key
+      # Trust the self-signed Keycloak cert for outgoing JWKS/HTTPS calls.
+      # httpx uses certifi by default, which doesn't include this cert.
+      KEYCLOAK_CA_BUNDLE: /certs/keycloak.crt
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      # CORS — browsers block calls from https://... to http://... (mixed content),
+      # and also block cross-origin without these headers.
+      CORS_ORIGINS: "https://tangy.local:5173,http://tangy.local:5173,http://localhost:5173"
       # FRONTEND_URL: https://localhost:5173
       # Database
       DB_HOST: postgres
@@ -56,15 +65,15 @@ services:
       KEYCLOAK_REALM: xbi-tasking
       KEYCLOAK_CLIENT_ID: xbi-tasking-backend
       # KEYCLOAK_CLIENT_SECRET: Zj7CYgoGf7pOuW18fEcmNFwI7HIK1k0K
-      KEYCLOAK_CLIENT_SECRET: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
+      KEYCLOAK_CLIENT_SECRET: vHNSocx85k31E1ezq8b72TVbdwMfHxJP
       KEYCLOAK_ADMIN_CLIENT_ID: xbi-tasking-admin
       # KEYCLOAK_ADMIN_CLIENT_SECRET: 9YMbyTXVTpjPErz8jGwmWtjwfsNDnont
-      KEYCLOAK_ADMIN_CLIENT_SECRET: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
+      KEYCLOAK_ADMIN_CLIENT_SECRET: pxpSs03q4FevmKArauf0Y2HEoKALbZWK
       KEYCLOAK_ENABLED: "true"
       ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
     
     volumes:
-      - ./xbi_tasking_backend/general_certs:/certs
+      - ./xbi_tasking_backend/certs:/certs:ro
 
     ports:
       - "5000:5000"
