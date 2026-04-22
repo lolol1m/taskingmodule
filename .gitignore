@@ -17,3 +17,5 @@ xbi_tasking_backend/certs/*
 mockui/
 dev_server.config
 keycloak_stuff/start_keycloak.bat
+*.crt
+*.key

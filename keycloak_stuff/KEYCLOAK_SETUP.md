@@ -69,7 +69,7 @@ The frontend uses the Keycloak JavaScript adapter directly (login-required + PKC
 
 ---
 
-## 3. Configure the backend client (confidential)
+## 3a. Configure the backend client (confidential)
 
 The backend uses this client to introspect tokens. It does **not** run a browser redirect flow.
 
@@ -87,6 +87,13 @@ The backend uses this client to introspect tokens. It does **not** run a browser
 4. **Login settings**: leave everything blank → **Save**.
 5. **Credentials** tab → copy **Client secret**.
 6. Paste it into `xbi_tasking_backend/docker.config` under `[Keycloak] → client_secret`, AND into `docker-compose.yml` under `KEYCLOAK_CLIENT_SECRET`. (Environment variables in compose override the config file.)
+7. **Roles** → **Create role** — create each of:
+
+   - `II`
+   - `Senior II`
+   - `IA`
+
+   These are used by `UserService.hasRole([...])` on the frontend.
 
 ---
 
@@ -115,28 +122,17 @@ Required for the `/getUsers` endpoint and password management via the Keycloak a
 
 ---
 
-## 5. Realm roles
 
-**Realm roles** → **Create role** — create each of:
-
-- `II`
-- `Senior II`
-- `IA`
-
-These are used by `UserService.hasRole([...])` on the frontend.
-
----
-
-## 6. Required group (`xbi-tasking-users`)
+## 5. Required group (`xbi-tasking-users`)
 
 The backend enforces `required_group: xbi-tasking-users` — every user must belong to this group or the backend returns 401.
 
-### 6a. Create the group
+### 5a. Create the group
 
 1. **Groups** → **Create group**
 2. Name: `xbi-tasking-users` → **Create**
 
-### 6b. Add the `groups` claim to the frontend token
+### 5b. Add the `groups` claim to the frontend token
 
 The backend reads the group list from the JWT `groups` claim. That claim is not emitted by default — you need a mapper on the frontend client's dedicated scope:
 
@@ -152,7 +148,7 @@ The backend reads the group list from the JWT `groups` claim. That claim is not 
    - Add to userinfo: **ON**
 5. → **Save**
 
-### 6c. Verify the claim appears
+### 5c. Verify the claim appears
 
 > **Do this after section 7** — you need at least one user who is a member of `xbi-tasking-users` before the check is meaningful.
 
@@ -162,7 +158,7 @@ The backend reads the group list from the JWT `groups` claim. That claim is not 
 
 ---
 
-## 7. Create users
+## 6. Create users
 
 1. **Users** → **Create new user**
 2. Username, email (optional)
@@ -174,7 +170,7 @@ Repeat for every user that should access the app.
 
 ---
 
-## 8. Realm settings
+## 7. Realm settings
 
 **Realm settings** → **Login** tab:
 
