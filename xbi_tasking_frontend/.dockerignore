@@ -4,3 +4,4 @@ outdated_cert/
 
 .gitignore
 .env
+.scannerwork/
