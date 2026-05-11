@@ -9,7 +9,8 @@ spec:
   ports:
     - name: "8443"
     # port is hardcoded to 8443 to access keycloak directly
-      port: {{ .Values.keycloak.port }}
+      port: {{ .Values.ingress.keycloak.port }}
       targetPort: {{ .Values.keycloak.port }}
+      protocol: TCP
   selector:
     app: {{ .Values.keycloak.serviceName }}

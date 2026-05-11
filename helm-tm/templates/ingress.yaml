@@ -7,8 +7,11 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     # This allows Nginx to talk to a Vite/Keycloak backend that is ALSO using HTTPS
-    # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "off"
+    nginx.ingress.kubernetes.io/x-forwarded-port: "443"
+    nginx.ingress.kubernetes.io/x-forwarded-proto: "https"
+    # nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 
     # Optional: Disable the forced redirect if you want to allow HTTP for testing
     # nginx.ingress.kubernetes.io/ssl-redirect: "false"
@@ -18,6 +21,7 @@ spec:
     - hosts:
       - {{ .Values.ingress.frontendHost }}
       - {{ .Values.ingress.keycloakHost }}
+      secretName: tangy-tls-secret
   rules:
     - host: {{ .Values.ingress.frontendHost | quote }}
       http:
@@ -28,8 +32,7 @@ spec:
               service:
                 name: {{ .Values.frontend.serviceName }}
                 port:
-                  number: {{ .Values.frontend.port }}
-
+                  number: {{ .Values.ingress.frontend.port }}
     - host: {{ .Values.ingress.keycloakHost | quote }}
       http:
         paths:
@@ -39,5 +42,5 @@ spec:
               service:
                 name: {{ .Values.keycloak.serviceName }}
                 port:
-                  number: {{ .Values.keycloak.port }}
+                  number: {{ .Values.ingress.keycloak.port }}
 {{- end }}

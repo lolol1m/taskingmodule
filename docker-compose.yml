@@ -3,29 +3,39 @@ version: "1.0"
 services:
 
   frontend:
-    build: ./xbi_tasking_frontend
+    # build: ./xbi_tasking_frontend
+    build:
+      context: ./xbi_tasking_frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_BACKEND_URL: https://tangy.local:5000
+        VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
+        VITE_KEYCLOAK_REALM: xbi-tasking
+        VITE_CLIENT_ID: xbi-tasking-frontend
+        VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-frontend
-    container_name: xbi-frontend-v3
+    container_name: xbi-frontend-test
     depends_on:
       - backend
-    environment:
-      VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
-      VITE_BACKEND_URL: https://tangy.local:5000
-      VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
-      VITE_KEYCLOAK_REALM: xbi-tasking
-      VITE_CLIENT_ID: xbi-tasking-frontend
-      VITE_ROLES_CLIENT_ID: xbi-tasking-backend
+    # environment:
+    #   VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
+    #   VITE_BACKEND_URL: https://tangy.local:5000
+    #   VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
+    #   VITE_KEYCLOAK_REALM: xbi-tasking
+    #   VITE_CLIENT_ID: xbi-tasking-frontend
+    #   VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     volumes:
-      - ./xbi_tasking_backend/certs:/certs:ro
+      - ./xbi_tasking_frontend/certs:/certs:ro
     ports:
-      - "5173:5173"
+      # - "5173:5173"
+      - "4173:4173"
 
   backend:
     build: ./xbi_tasking_backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-backend
-    container_name: xbi-backend-v3
+    container_name: xbi-backend-test
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,8 +46,10 @@ services:
       # - "tangy.local:host-gateway"
       - "tangy.auth.local:host-gateway"
     environment:
-      FRONTEND_URL: https://tangy.local:5173      
+      # FRONTEND_URL: https://tangy.local:5173      
+      FRONTEND_URL: https://tangy.local:4173      
       CONFIG_PATH: docker.config
+      HOST: 0.0.0.0
       # TLS for backend HTTPS
       SSL_CERTFILE: /certs/server.crt
       SSL_KEYFILE: /certs/server.key
@@ -48,7 +60,8 @@ services:
       REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
       # CORS — browsers block calls from https://... to http://... (mixed content),
       # and also block cross-origin without these headers.
-      CORS_ORIGINS: "https://tangy.local:5173,http://tangy.local:5173,http://localhost:5173"
+      # CORS_ORIGINS: "https://tangy.local:5173,http://tangy.local:4173,http://localhost:4173"
+      CORS_ORIGINS: "https://tangy.local:4173,http://tangy.local:4173,http://localhost:4173"
       # FRONTEND_URL: https://localhost:5173
       # Database
       DB_HOST: postgres
@@ -72,6 +85,8 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
       KEYCLOAK_ENABLED: "true"
       ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
+      ROLES_CLIENT_ID: xbi-tasking-backend
+      REQUIRED_GROUP: xbi-tasking-users
     
     volumes:
       - ./xbi_tasking_backend/certs:/certs:ro
@@ -82,7 +97,7 @@ services:
 
   postgres:
     image: postgres:15.6
-    container_name: xbi-postgres-v3
+    container_name: xbi-postgres-test
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -103,7 +118,7 @@ services:
     build: ./deployment_stuff/xbi-keycloak/
 
     # image: xbi-keycloak:2.7
-    container_name: xbi-keycloak-v3
+    container_name: xbi-keycloak-test
     # command: 
     # - start-dev
     # - --import-realm

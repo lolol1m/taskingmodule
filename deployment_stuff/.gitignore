@@ -1,6 +1,7 @@
 xbi-keycloak/openssl_certs
-xbi-keycloak/ca_certs
+xbi-keycloak/ca_certs_old
 xbi-keycloak/demo_certs
 xbi-keycloak/ca_certs
+scans/
 *.crt
 *.key

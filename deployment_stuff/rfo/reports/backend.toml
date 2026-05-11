@@ -1,0 +1,125 @@
+ # SCVU Frontend Software Evaluation Report
+# STARLAB RFO Submission - TOML Format
+# Classification: RESTRICTED SENSITIVE NORMAL
+
+[report.details]
+name = "xbi-tasking-backend"
+type = "self-built"  # self-built | opensource | closedsource
+date = "2026-05-11"  # YYYY-MM-DD
+
+[report.software.image]
+image_source = "self-built"  # vendor-official | bitnami | chainguard | third-party | self-built opensource | self-built closedsource | self-built
+full_image_tag = "registry.starlab.gov.sg/tm-backend:v1.0.0"
+
+[report.software.general]
+language = "python"
+works_offline = "yes"
+add_scripting_capabilities = "no"
+require_elevated_cluster_privileges = "no"
+external_dependencies = "postgresql, keycloak"
+support_prometheus_monitoring = "yes"
+configuration_mgmt_requirements = "no"
+others = "Backend API service connecting frontend with keycloak and postgresql"
+
+# Vulnerability Assessment Section
+[report.software.va.python]
+cve-2022-0000 = "NA. No critical Python vulnerabilities in version 3.13"
+cve-2023-0000 = "NA. All Python dependencies updated to latest secure versions"
+
+[report.software.va.pip]
+high_severity_cves = "0"
+medium_severity_cves = "0"
+low_severity_cves = "0"
+vulnerability_summary = "View more in vulnerability-report.json"
+
+# Static Application Security Testing
+[report.software.sast]
+tool = "sonarqube"
+scan_date = "2026-04-29"
+quality_gate = "passed"
+coverage = ""
+security_hotspots = "6"
+bugs = "0"
+vulnerabilities = "6"
+technical_debt = "6D1h"
+maintainability_rating = "A"
+reliability_rating = "A"
+security_rating = "A"
+issues = "see backend-justifications.toml"
+compliance = "passed"
+
+# Dynamic Application Security Testing
+[report.software.dast]
+tool = "owasp-zap"
+scan_date = "2026-04-30"
+scan_type = "full"
+high_risk_issues = "0"
+medium_risk_issues = "0"
+low_risk_issues = "0"
+informational_issues = "2"
+issues = "no high, medium or low vulnerabilities"
+compliance = "passed"
+
+# Container Security Scan
+[report.software.vulnerability_scan]
+tool = "trivy"
+scan_date = "2025-01-15"
+base_image = "python:3.13-alpine"
+critical_cves = "0"
+high_cves = "1"
+medium_cves = "171"
+low_cves = "337"
+negligible_cves = "0"
+total_vulnerabilities = "565"
+scan_summary = "View backend-container-report.json"
+
+# Security Configuration
+[report.software.security]
+runs_as_root = "no"
+user_id = "1010"
+group_id = "1010"
+read_only_filesystem = "yes"
+capabilities_dropped = "ALL"
+security_context_enforced = "yes"
+network_policies = "yes"
+pod_security_standards = "restricted"
+
+# Compliance and Certifications
+[report.software.compliance]
+data_classification = "RESTRICTED SENSITIVE NORMAL"
+audit_logging = "yes"
+data_retention_policy = "yes"
+encryption_at_rest = "yes"
+encryption_in_transit = "yes"
+access_controls = "RBAC implemented"
+
+# Resource Requirements
+[report.software.resources]
+cpu_request = "100m"
+cpu_limit = "200m"
+memory_request = "128Mi"
+memory_limit = "256Mi"
+storage_required = "1Gi"
+network_policies = "yes"
+
+# Backup and Recovery
+[report.software.backup]
+backup_required = "yes"
+backup_frequency = "daily"
+recovery_time_objective = "4h"
+recovery_point_objective = "24h"
+
+# Monitoring and Observability
+[report.software.monitoring]
+health_checks = "yes"
+metrics_endpoint = "/metrics"
+logging_structured = "yes"
+tracing_supported = "yes"
+alerting_configured = "yes"
+
+# Additional Notes
+[report.software.notes]
+deployment_notes = "Requires HTTPS ingress with valid TLS certificate. Configured for STARLAB container registry."
+security_notes = "All security best practices implemented including CSP headers, secure cookies, and XSS protection."
+operational_notes = "Supports graceful shutdown, rolling updates, and horizontal pod autoscaling."
+maintenance_notes = "Regular security updates following React LTS release cycle. Automated dependency scanning in CI/CD." 

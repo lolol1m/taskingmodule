@@ -15,6 +15,13 @@ export default defineConfig({
     host: true,
     port: 5173,
     https: httpsConfig,
-    allowedHosts: ['tangy.local', 'tangy.auth.local', 'localhost', '127.0.0.1'],
+    allowedHosts: ['tangy.local', 'localhost', '127.0.0.1'],
+  },
+
+  preview: {
+    host: true,
+    port: 4173,
+    https: httpsConfig,
+    allowedHosts: ['tangy.local', 'localhost', '127.0.0.1']
   },
 })

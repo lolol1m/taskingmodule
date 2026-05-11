@@ -2,19 +2,19 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ .Values.frontend.serviceName }}
-  name: {{ .Values.frontend.serviceName }}
+    app: {{ .Values.backend.serviceName }}
+  name: {{ .Values.backend.serviceName }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
-      app: {{ .Values.frontend.serviceName }}
+      app: {{ .Values.backend.serviceName }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: {{ .Values.frontend.serviceName }}
+        app: {{ .Values.backend.serviceName }}
     spec:
       containers:
         - env:
@@ -50,7 +50,7 @@ spec:
             #   value: https://172.1.2.3:8443
             # - name: KEYCLOAK_REALM
             #   value: xbi-tasking
-          {{- range $key, $value := .Values.frontend.env }}
+          {{- range $key, $value := .Values.backend.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
           {{- end }}
@@ -61,10 +61,24 @@ spec:
             - containerPort: {{ .Values.backend.port }}
               protocol: TCP
           volumeMounts:
-            - mountPath: /certs
-              name: backend-cm0
+            - name: keycloak-ca
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              subPath: keycloak.crt
+            - name: keycloak-ca
+              mountPath: /etc/ssl/certs/keycloak.crt
+              subPath: keycloak.crt
+            # TLS certs for backend HTTPS
+            - name: server-tls
+              mountPath: /certs/server.crt
+              subPath: tls.crt
+            - name: server-tls
+              mountPath: /certs/server.key
+              subPath: tls.key
       restartPolicy: Always
       volumes:
-        - configMap:
-            name: backend-cm0
-          name: backend-cm0
+        - name: keycloak-ca
+          secret: 
+            secretName: keycloak-ca
+        - name: server-tls
+          secret:
+            secretName: server-tls

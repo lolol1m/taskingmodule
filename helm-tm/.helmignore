@@ -1,0 +1,9 @@
+templates/httproute-frontend.yaml
+templates/httproute-backend.yaml
+templates/httproute-keycloak.yaml
+templates/gateway.yaml
+templates/backend-cm0-configmap.yaml
+templates/backend-cm0-configmap-template.yaml
+templates/nginx-deployment.yaml
+templates/nginx-service.yaml
+templates/nginx-configmap.yaml

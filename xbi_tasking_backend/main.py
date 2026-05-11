@@ -20,22 +20,23 @@ from api_utils import error_response
 from security import KEYCLOAK_ENABLED
 import os
 
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+# logging.basicConfig(
+#     level=os.getenv("LOG_LEVEL", "INFO"),
+#     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+# )
 logger = logging.getLogger("xbi_tasking_backend")
 
-parser = argparse.ArgumentParser(description="runs xbi tasking backend server")
-parser.add_argument(
-    "config_path",
-    nargs="?",
-    default=os.getenv("CONFIG_PATH", "testing.config"),
-    help="file path of the config file to be used",
-)
-args, _ = parser.parse_known_args()
+# parser = argparse.ArgumentParser(description="runs xbi tasking backend server")
+# parser.add_argument(
+#     "config_path",
+#     nargs="?",
+#     default=os.getenv("CONFIG_PATH", "testing.config"),
+#     help="file path of the config file to be used",
+# )
+# args, _ = parser.parse_known_args()
 
-config = load_config(args.config_path)
+# config = load_config(args.config_path)
+config = load_config()
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.state.config = config
@@ -48,10 +49,9 @@ if raw_origins:
     origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 else:
     origins = [
+        os.getenv("FRONTEND_URL"),
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
     ]
 
 raw_methods = os.getenv("CORS_ALLOW_METHODS")
@@ -264,7 +264,7 @@ if __name__ == '__main__':
         logger.info("Starting backend with HTTPS (cert=%s)", ssl_certfile)
         uvicorn.run(
             "main:app",
-            host="0.0.0.0",
+            host=os.getenv("HOST"),
             port=5000,
             reload=False,
             ssl_keyfile=ssl_keyfile,
@@ -272,4 +272,4 @@ if __name__ == '__main__':
         )
     else:
         logger.info("Starting backend with plain HTTP (set SSL_KEYFILE/SSL_CERTFILE to enable HTTPS)")
-        uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=reload_enabled)
+        uvicorn.run("main:app", host=os.getenv("HOST"), port=5000, reload=reload_enabled)

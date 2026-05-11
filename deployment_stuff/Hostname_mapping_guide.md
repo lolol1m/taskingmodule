@@ -3,5 +3,5 @@
 3. add mapping above docker ips
 ```
 127.0.0.1   tangy.local
-192.168.1.50   tangy.auth.local
+127.0.0.1   tangy.auth.local
 ```

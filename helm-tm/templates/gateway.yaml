@@ -1,0 +1,24 @@
+{{- if .Values.gateway.enabled -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+spec:
+  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  listeners:
+{{- range .Values.gateway.listeners }}
+    - name: {{ .name }}
+      protocol: {{ .protocol }}
+      port: {{ .port }}
+      hostname: {{ .hostname | quote }}
+{{- if .tls }}
+      tls:
+        mode: {{ .tls.mode }}
+        certificateRefs:
+{{- range .tls.certificateRefs }}
+          - kind: Secret
+            name: {{ .name }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

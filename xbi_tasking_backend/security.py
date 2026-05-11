@@ -45,7 +45,8 @@ def is_basic_ii_user(user: dict) -> bool:
     return "II" in roles and "Senior II" not in roles and "IA" not in roles
 
 
-async def get_current_user(request: Request):
+# async def get_current_user(request: Request):
+def get_current_user(request: Request):
     """
     Dependency to get current authenticated user from request state
     (set by middleware)

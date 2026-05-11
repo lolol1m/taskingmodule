@@ -1,0 +1,32 @@
+Processed,Method,URI,Flags
+true,GET,https://tangy.local:4173/,Seed
+true,GET,https://tangy.local:4173/robots.txt,Seed
+true,GET,https://tangy.local:4173/sitemap.xml,Seed
+true,GET,https://tangy.local:4173/vite.svg,
+true,GET,https://tangy.local:4173/assets/index-CcBFZBp0.css,
+true,GET,https://tangy.local:4173/assets/index-Czsl4Xgm.js,
+false,GET,http://www.w3.org/2000/svg,Out of Scope
+false,GET,http://www.w3.org/1999/xlink,Out of Scope
+false,GET,https://react.dev/errors/,Out of Scope
+false,GET,http://www.w3.org/1998/Math/MathML,Out of Scope
+false,GET,http://www.w3.org/XML/1998/namespace,Out of Scope
+false,GET,http://localhost/,Out of Scope
+false,GET,https://reactrouter.com/en/main/routers/picking-a-router.%60,Out of Scope
+false,GET,https://mui.com/production-error/?code=$,Out of Scope
+false,GET,http://fb.me/use-check-prop-types,Out of Scope
+false,GET,https://mui.com/system/display/,Out of Scope
+false,GET,https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts%60,Out of Scope
+false,GET,https://www.keycloak.org/securing-apps/javascript-adapter,Out of Scope
+false,GET,https://tangy.auth.local:8443/,Out of Scope
+true,GET,https://tangy.local:5000/users/verify,
+false,GET,https://mui.com/x/react-date-pickers/quickstart/,Out of Scope
+false,GET,https://mui.com/x/react-date-pickers/timezone/,Out of Scope
+false,GET,https://mui.com/r/x-license-key-installation.,Out of Scope
+false,GET,https://mui.com/r/x-get-license?scope=premium.,Out of Scope
+false,GET,https://mui.com/r/x-get-license,Out of Scope
+false,GET,https://mui.com/r/x-license-trial.,Out of Scope
+false,GET,https://mui.com/r/x-license-annual,Out of Scope
+false,GET,https://github.com/mui/mui-x/issues/new/choose,Out of Scope
+false,GET,https://mui.com/x/react-date-pickers/fields/,Out of Scope
+true,GET,https://tangy.local:5000/,
+false,GET,https://css-tricks.com/the-css-custom-property-toggle-trick/,Out of Scope

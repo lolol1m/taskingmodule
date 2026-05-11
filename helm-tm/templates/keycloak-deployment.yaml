@@ -21,7 +21,7 @@ spec:
           name: {{ .Values.keycloak.containerName}}
           imagePullPolicy: {{ .Values.keycloak.imagePullPolicy }}
           ports:
-            - containerPort: {{ .Values.keycloak.port }}
+            - containerPort: {{ .Values.keycloak.targetPort }}
               protocol: TCP
           env:
           {{- range $key, $value := .Values.keycloak.env }}
@@ -30,10 +30,22 @@ spec:
           {{- end }}
           
           volumeMounts:
-            - mountPath: /opt/keycloak/data
-              name: keycloak-data
+            # - name: keycloak-data
+            #   mountPath: /opt/keycloak/data
+            - name: keycloak-tls
+              mountPath: /opt/keycloak/conf/keycloak.crt
+              subPath: tls.crt
+            - name: keycloak-tls
+              mountPath: /opt/keycloak/conf/keycloak.key
+              subPath: tls.key
+
       restartPolicy: Always
+
       volumes:
-        - name: keycloak-data
-          persistentVolumeClaim:
-            claimName: keycloak-data
+        # - name: keycloak-data
+        #   persistentVolumeClaim:
+        #     claimName: keycloak-data
+
+        - name: keycloak-tls
+          secret:
+            secretName: keycloak-tls

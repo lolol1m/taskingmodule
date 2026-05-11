@@ -1,0 +1,40 @@
+# Static Application Security Testing
+[report.software.sast]
+tool = "sonarqube"
+scan_date = "2025-09-15"
+quality_gate = "passed"
+coverage = ""
+security_hotspots = "6"
+vulnerabilities = "6"
+
+[Security issue justifications]
+file = "main_classes/KeycloakAuth.py"
+line = "L154, L165"
+issue = "Don't use a JWT token without verifying its signature."
+justification = "get_unverified_claims is used to in L154 to invalidate expired tokens as a suboptimisation. get_unverified_headers in L165 is called in a function which is made to verify the token"
+
+file = "services/keycloak_service.py"
+line = "L20"
+issue = "Don't use a JWT token without verifying its signature."
+justification = "get_unverified_claims is used only to read metadata (exp) from a token that was already cryptographically issued by trusted authority (Keycloak) immediately after retrieval."
+
+file = "routers/auth.py"
+line = "L205"
+issue = "Don't use a JWT token without verifying its signature."
+justification = "get_unverified_claims only used to access the "preferred_username" from the token directly issued by Keycloak."
+
+
+# Container Security Scan
+[report.software.vulnerability_scan]
+tool = "trivy"
+scan_date = "2025-01-15"
+base_image = "python:3.13-alpine"
+critical_cves = "0"
+high_cves = "1"
+[CVE-2024-23342]
+package = "python-ecdsa"
+Description = "A timing side-channel vulnerability in the python-ecdsa library allows for the recovery of private keys during ECDSA signing operations (specifically the P-256 curve). "
+This is a "Minerva" style attack where non-constant-time arithmetic leaks sensitive nonce information.
+Impact: High. While the theoretical risk is private key compromise, the attack requires the ability to perform high-precision timing measurements of a large number of signing operations.
+Why it cannot be remedied: The maintainers of the python-ecdsa project have categorized constant-time execution as "out of scope" for a pure-Python implementation and have stated no official patch will be released. As the base image is python:3.13-alpine (latest stable), and the upstream PyPI package remains unpatched by design, no updated version is available for deployment within the current package ecosystem.
+Application Impact: None. The container uses this dependency (via the JWT library) exclusively for signature verification and data parsing. The vulnerability is strictly confined to signature generation (signing) and key creation; the verification code path is not affected by this timing side-channel. The isolated JPE environment precludes the possibility of an external actor performing the millisecond-accurate network latency analysis required to exploit timing side-channels.

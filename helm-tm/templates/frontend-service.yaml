@@ -7,8 +7,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: "5173"
-      port: {{ .Values.frontend.port }}
+    - name: "4173"
+      port: {{ .Values.ingress.frontend.port }}
       targetPort: {{ .Values.frontend.targetPort }}
       protocol: TCP
   selector:

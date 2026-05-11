@@ -5,9 +5,14 @@ from main_classes.ConfigClass import ConfigClass
 _config: Optional[ConfigClass] = None
 
 
-def load_config(config_file_path: str) -> ConfigClass:
+# def load_config(config_file_path: str) -> ConfigClass:
+#     global _config
+#     _config = ConfigClass(config_file_path)
+#     return _config
+
+def load_config() -> ConfigClass:
     global _config
-    _config = ConfigClass(config_file_path)
+    _config = ConfigClass()
     return _config
 
 

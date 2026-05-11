@@ -113,6 +113,10 @@ class KeycloakAuth:
 
         aud = claims.get("aud")
         azp = claims.get("azp")
+
+        if not aud and not azp:
+            logger.warning("Token missing both aud and azp")
+            return False
         if aud:
             if isinstance(aud, list):
                 if not (self.allowed_client_ids.intersection(set(aud)) or azp in self.allowed_client_ids):
@@ -173,7 +177,8 @@ class KeycloakAuth:
             decoded = jwt.decode(
                 token,
                 key,
-                algorithms=[alg],
+                # algorithms=[alg],
+                algorithms=["RS256"],
                 options={"verify_aud": False}
             )
 

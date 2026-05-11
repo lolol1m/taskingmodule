@@ -26,6 +26,14 @@ spec:
             ports:
               - containerPort: {{ .Values.frontend.targetPort }}
                 protocol: TCP
+            volumeMounts:
+            # TLS certs for backend HTTPS
+              - name: server-tls
+                mountPath: /certs/server.crt
+                subPath: tls.crt
+              - name: server-tls
+                mountPath: /certs/server.key
+                subPath: tls.key
             env:
             {{- range $key, $value := .Values.frontend.env }}
               - name: {{ $key }}
@@ -49,5 +57,8 @@ spec:
               initialDelaySeconds: 5
               periodSeconds: 5
             {{- end }}
-
+      volumes:
+        - name: server-tls
+          secret:
+            secretName: server-tls
       restartPolicy: Always

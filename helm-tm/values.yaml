@@ -1,21 +1,29 @@
 replicas: 1
-host: 172.1.2.3
+host: 127.0.0.1
 
 ingress:
   enabled: true
   frontendHost: tangy.local
   keycloakHost: tangy.auth.local
 
+  frontend:
+    serviceName: frontend
+    port: 443
+
+  keycloak:
+    serviceName: keycloak
+    port: 443
+
 frontend:
   serviceName: frontend
-  image: tangy_trial-frontend:latest
+  image: tm-test-frontend:latest
   imagePullPolicy: IfNotPresent
   containerName: xbi-frontend-trial
 
   # port: 443
   # targetPort: 5173
-  port: 5173
-  targetPort: 5173
+  port: 4173
+  targetPort: 4173
   probes:
     enabled: true
 
@@ -26,20 +34,32 @@ frontend:
     VITE_KEYCLOAK_REALM: xbi-tasking
     # VITE_KEYCLOAK_URL: {{printf "https://" .Values.host .Values.keycloak.port}}
     # VITE_KEYCLOAK_URL: {{printf "https://" .Values.ingress.keycloakHost .Values.keycloak.port}}
-    VITE_KEYCLOAK_URL: "https://tangy.auth.local:8443"
+    # VITE_KEYCLOAK_URL: "https://tangy.auth.local:8443"
+    VITE_KEYCLOAK_URL: "https://tangy.auth.local:443"
     VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
 
 backend:
   serviceName: backend
-  image: tangy_trial-backend:latest
+  image: tm-test-backend:latest
   imagePullPolicy: IfNotPresent
   containerName: xbi-backend-trial
+  # gateway:
+  #   enabled: true
+  #   hostnames: 
 
   port: 5000
 
   env:
     ALLOWED_CLIENT_IDS: xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin
     AUTO_INIT_DB: "true"
+    HOST: 0.0.0.0
+    SSL_CERTFILE: /certs/server.crt
+    SSL_KEYFILE: /certs/server.key
+    KEYCLOAK_CA_BUNDLE: /certs/keycloak.crt
+    SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+    REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+    # CORS_ORIGINS: "https://tangy.local:4173,http://tangy.local:4173,http://localhost:4173"
+    CORS_ORIGINS: "https://tangy.local,http://tangy.local:4173,http://localhost:4173"
     # DB_HOST: {{ .Values.postgres.serviceName }}
     # DB_NAME: {{ .Values.postgres.env.POSTGRES_DB }}
     # DB_PASSWORD: {{ .Values.postgres.env.POSTGRES_PASSWORD }}
@@ -51,24 +71,28 @@ backend:
     DB_PORT: 5432
     DB_USER: postgres
     # FRONTEND_URL: https://172.1.2.3:5173
-    FRONTEND_URL: https://tangy.local:5173
+    # FRONTEND_URL: https://tangy.local:4173
+    FRONTEND_URL: https://tangy.local:443
     KEYCLOAK_ADMIN_CLIENT_ID: xbi-tasking-admin
     KEYCLOAK_ADMIN_CLIENT_SECRET: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
     KEYCLOAK_CLIENT_ID: xbi-tasking-backend
     KEYCLOAK_CLIENT_SECRET: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
     KEYCLOAK_ENABLED: "true"
-    KEYCLOAK_INTERNAL_URL: https://keycloak:8443
+    # KEYCLOAK_INTERNAL_URL: https://keycloak:8443
     # KEYCLOAK_PUBLIC_URL: https://172.1.2.3:8443
-    KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:8443
+    # KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:8443
+    KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:443
     KEYCLOAK_REALM: xbi-tasking
 
 keycloak:
   serviceName: keycloak
-  image: tangy_trial-keycloak:latest
+  # image: tm_v3-keycloak:latest
+  image: xbi-keycloak:test
   imagePullPolicy: IfNotPresent
   containerName: xbi-keycloak-trial
 
   port: 8443
+  targetPort: 8443
 
   storage:
     size: 1Gi
@@ -93,3 +117,6 @@ postgres:
     POSTGRES_PASSWORD: password
     POSTGRES_DB: XBI_TASKING_3
 
+# gateway:
+#   enabled: true
+#   name

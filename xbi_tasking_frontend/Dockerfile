@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -8,14 +8,28 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
-
-RUN update-ca-certificates || true
-
 ENV VITE_MUI_X_LICENSE_KEY=e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
 # ENV VITE_BACKEND_URL=http://localhost:5000
 # ENV VITE_KEYCLOAK_URL=http://localhost:8080
 # ENV VITE_KEYCLOAK_REALM=xbi-tasking
 # ENV VITE_CLIENT_ID=xbi-tasking-frontend
+ARG VITE_BACKEND_URL
+ARG VITE_KEYCLOAK_URL
+ARG VITE_KEYCLOAK_REALM
+ARG VITE_CLIENT_ID
+ARG VITE_ROLES_CLIENT_ID
 
-EXPOSE 5173
-CMD ["npm", "run", "dev", "--", "--host"]
+# --- CONVERT ARGS TO ENVS FOR VITE ---
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
+ENV VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM
+ENV VITE_CLIENT_ID=$VITE_CLIENT_ID
+ENV VITE_ROLES_CLIENT_ID=$VITE_ROLES_CLIENT_ID
+
+
+RUN npm run build
+
+# EXPOSE 5173
+EXPOSE 4173
+CMD ["update-ca-certificates", "||", "true"]
+CMD ["npm", "run", "preview", "--", "--host"]
