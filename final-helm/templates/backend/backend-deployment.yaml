@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.backend.serviceName }}
+  name: {{ .Values.backend.serviceName }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.backend.serviceName }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.backend.serviceName }}
+    spec:
+      containers:
+        - env:
+            # - name: ALLOWED_CLIENT_IDS
+            #   value: xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin
+            # - name: AUTO_INIT_DB
+            #   value: "true"
+            # - name: DB_HOST
+            #   value: postgres
+            # - name: DB_NAME
+            #   value: XBI_TASKING_3
+            # - name: DB_PASSWORD
+            #   value: password
+            # - name: DB_PORT
+            #   value: "5432"
+            # - name: DB_USER
+            #   value: postgres
+            # - name: FRONTEND_URL
+            #   value: https://172.1.2.3:5173
+            # - name: KEYCLOAK_ADMIN_CLIENT_ID
+            #   value: xbi-tasking-admin
+            # - name: KEYCLOAK_ADMIN_CLIENT_SECRET
+            #   value: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
+            # - name: KEYCLOAK_CLIENT_ID
+            #   value: xbi-tasking-backend
+            # - name: KEYCLOAK_CLIENT_SECRET
+            #   value: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
+            # - name: KEYCLOAK_ENABLED
+            #   value: "true"
+            # - name: KEYCLOAK_INTERNAL_URL
+            #   value: https://keycloak:8443
+            # - name: KEYCLOAK_PUBLIC_URL
+            #   value: https://172.1.2.3:8443
+            # - name: KEYCLOAK_REALM
+            #   value: xbi-tasking
+          {{- range $key, $value := .Values.backend.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+          {{- end }}
+          image: {{ .Values.backend.image }}
+          name: {{ .Values.backend.containerName }}
+          imagePullPolicy: {{ .Values.backend.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: keycloak-ca
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              subPath: keycloak.crt
+            - name: keycloak-ca
+              mountPath: /etc/ssl/certs/keycloak.crt
+              subPath: keycloak.crt
+            # TLS certs for backend HTTPS
+            - name: server-tls
+              mountPath: /certs/server.crt
+              subPath: tls.crt
+            - name: server-tls
+              mountPath: /certs/server.key
+              subPath: tls.key
+      restartPolicy: Always
+      volumes:
+        - name: keycloak-ca
+          secret: 
+            secretName: keycloak-ca
+        - name: server-tls
+          secret:
+            secretName: server-tls

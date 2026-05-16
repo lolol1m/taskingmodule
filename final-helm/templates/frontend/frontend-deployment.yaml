@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.frontend.serviceName }}
+  name: {{ .Values.frontend.serviceName }}
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.serviceName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.serviceName }}
+    spec:
+      containers:
+          - image: {{ .Values.frontend.image }}
+            name: {{ .Values.frontend.containerName }}
+            imagePullPolicy: {{ .Values.frontend.imagePullPolicy }}
+            ports:
+              - containerPort: {{ .Values.frontend.targetPort }}
+                protocol: TCP
+            volumeMounts:
+            # TLS certs for backend HTTPS
+              - name: server-tls
+                mountPath: /certs/server.crt
+                subPath: tls.crt
+              - name: server-tls
+                mountPath: /certs/server.key
+                subPath: tls.key
+            env:
+            {{- range $key, $value := .Values.frontend.env }}
+              - name: {{ $key }}
+                value: {{ $value | quote }}
+            {{- end }}
+
+            {{- if .Values.frontend.probes.enabled }}
+            livenessProbe:
+              httpGet:
+                path: /
+                port: {{ .Values.frontend.targetPort }}
+                scheme: HTTPS
+              initialDelaySeconds: 10
+              periodSeconds: 10
+
+            readinessProbe:
+              httpGet:
+                path: /
+                port: {{ .Values.frontend.targetPort }}
+                scheme: HTTPS
+              initialDelaySeconds: 5
+              periodSeconds: 5
+            {{- end }}
+      volumes:
+        - name: server-tls
+          secret:
+            secretName: server-tls
+      restartPolicy: Always

@@ -2,21 +2,29 @@ replicas: 1
 host: 127.0.0.1
 
 ingress:
-  enabled: true
+  enabled: false
   frontendHost: tangy.local
-  keycloakHost: tangy.auth.local
+  backendHost: tangy.local
 
-  frontend:
-    serviceName: frontend
-    port: 443
+  
 
-  keycloak:
-    serviceName: keycloak
-    port: 443
+proxy:
+  enabled: true
+  serviceName: nginx-proxy
+  image: nginx:1.26
+  imagePullPolicy: IfNotPresent
+  containerName: nginx-proxy
+  containerPort: 443
+  host: tangy.local
+  tlsSecretName: server-tls
+  frontendService: frontend
+  frontendPort: 4173
+  backendService: backend
+  backendPort: 5000
 
 frontend:
   serviceName: frontend
-  image: tm-test-frontend:latest
+  image: tm-rfo-frontend:test
   imagePullPolicy: IfNotPresent
   containerName: xbi-frontend-trial
 
@@ -29,22 +37,23 @@ frontend:
 
   env:
     # VITE_BACKEND_URL: {{printf "https://backend:%d" .Values.backend.port}}
-    VITE_BACKEND_URL: "https://backend:5000"
+    VITE_BACKEND_URL: "https://tangy.local/api"
     VITE_CLIENT_ID: xbi-tasking-frontend
     VITE_KEYCLOAK_REALM: xbi-tasking
     # VITE_KEYCLOAK_URL: "https://tangy.auth.local:8443"
-    VITE_KEYCLOAK_URL: "https://tangy.auth.local"
+    VITE_KEYCLOAK_URL: "https://tangy.auth.local:8443"
     VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
 
 backend:
   serviceName: backend
-  image: tm-test-backend:latest
+  image: tm-rfo-backend:latest
   imagePullPolicy: IfNotPresent
   containerName: xbi-backend-trial
   # gateway:
   #   enabled: true
   #   hostnames: 
 
+  # port: 5000
   port: 5000
 
   env:
@@ -78,30 +87,33 @@ backend:
     KEYCLOAK_ENABLED: "true"
     # KEYCLOAK_INTERNAL_URL: https://keycloak:8443
     # KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:8443
-    KEYCLOAK_PUBLIC_URL: https://tangy.auth.local
+    KEYCLOAK_PUBLIC_URL: https://tangy.auth.local:8443
     KEYCLOAK_REALM: xbi-tasking
+    ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
+    ROLES_CLIENT_ID: xbi-tasking-backend
+    REQUIRED_GROUP: xbi-tasking-users
 
-keycloak:
-  serviceName: keycloak
-  # image: tm_v3-keycloak:latest
-  image: xbi-keycloak:test
-  imagePullPolicy: IfNotPresent
-  containerName: xbi-keycloak-trial
+# keycloak:
+#   serviceName: keycloak
+#   # image: tm_v3-keycloak:latest
+#   image: xbi-keycloak:test
+#   imagePullPolicy: IfNotPresent
+#   containerName: xbi-keycloak-trial
 
-  port: 8443
-  targetPort: 8443
+#   port: 8443
+#   targetPort: 8443
 
-  storage:
-    size: 1Gi
+#   storage:
+#     size: 1Gi
 
-  env:
-    KC_BOOTSTRAP_ADMIN_USERNAME: admin
-    KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-    # KC_PROXY_HEADERS: xforwarded
-    KC_PROXY: edge
-    KC_HOSTNAME: tangy.auth.local
-    KC_HOSTNAME_STRICT: false
-    KC_HTTP_ENABLED: true
+#   env:
+#     KC_BOOTSTRAP_ADMIN_USERNAME: admin
+#     KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+#     # KC_PROXY_HEADERS: xforwarded
+#     KC_PROXY: edge
+#     KC_HOSTNAME: tangy.auth.local
+#     KC_HOSTNAME_STRICT: false
+#     KC_HTTP_ENABLED: true
 
 
 postgres:

@@ -1,0 +1,13 @@
+# templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-internal-proxy
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443      # Other pods connect to this port
+      targetPort: 443 # Matches NGINX containerPort
+      protocol: TCP
+  selector:
+    app: nginx-proxy

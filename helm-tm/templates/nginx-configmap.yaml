@@ -1,0 +1,39 @@
+# templates/configmap.yaml
+data:
+  default.conf: |
+    server {
+        listen 443 ssl;
+        server_name tangy.auth.local;
+
+        ssl_certificate     /etc/nginx/certs/tls.crt;
+        ssl_certificate_key /etc/nginx/certs/tls.key;
+
+        # Increase buffer size for large Keycloak Cookies/Tokens
+        proxy_buffer_size   128k;
+        proxy_buffers       4 256k;
+        proxy_busy_buffers_size 256k;
+
+        location / {
+            proxy_pass https://keycloak:8443;
+            
+            # The "Magic" headers to fix your redirect
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port 443; # Forces Keycloak to use 443 in redirects
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name tangy.local;
+
+        ssl_certificate     /etc/nginx/certs/tls.crt;
+        ssl_certificate_key /etc/nginx/certs/tls.key;
+
+        location / {
+            proxy_pass http://frontend:4173;
+            proxy_set_header Host $host;
+        }
+    }

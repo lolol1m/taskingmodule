@@ -15,7 +15,7 @@ services:
         VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-frontend
-    container_name: xbi-frontend-test
+    container_name: xbi-frontend-rfo
     depends_on:
       - backend
     # environment:
@@ -26,7 +26,7 @@ services:
     #   VITE_CLIENT_ID: xbi-tasking-frontend
     #   VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     volumes:
-      - ./xbi_tasking_frontend/certs:/certs:ro
+      - ./general_certs/frontend:/certs:ro
     ports:
       # - "5173:5173"
       - "4173:4173"
@@ -35,7 +35,7 @@ services:
     build: ./xbi_tasking_backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-backend
-    container_name: xbi-backend-test
+    container_name: xbi-backend-rfo
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,7 +89,9 @@ services:
       REQUIRED_GROUP: xbi-tasking-users
     
     volumes:
-      - ./xbi_tasking_backend/certs:/certs:ro
+      - ./general_certs/backend/server:/certs:ro
+      - ./general_certs/backend/keycloak.crt:/etc/ssl/certs/keycloak.crt:ro
+      - ./general_certs/backend/keycloak.crt:/usr/local/share/ca-certificates/keycloak.crt:ro
 
     ports:
       - "5000:5000"
@@ -97,7 +99,7 @@ services:
 
   postgres:
     image: postgres:15.6
-    container_name: xbi-postgres-test
+    container_name: xbi-postgres-rfo
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -118,25 +120,24 @@ services:
     build: ./deployment_stuff/xbi-keycloak/
 
     # image: xbi-keycloak:2.7
-    container_name: xbi-keycloak-test
-    # command: 
-    # - start-dev
-    # - --import-realm
-    # - --hostname=localhost
-    # - --hostname-strict=false
-    # - --https-certificate-file=/opt/keycloak/conf/keycloak.crt
-    # - --https-certificate-key-file=/opt/keycloak/conf/keycloak.key
+    container_name: xbi-keycloak-rfo
     environment:
       # KEYCLOAK_ADMIN: admin
       # KEYCLOAK_ADMIN_PASSWORD: admin
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: tangy.auth.local
+      KC_PROXY: edge
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+
 
     ports:
       # - "8080:8080"
       - "8443:8443"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ./general_certs/keycloak:/opt/keycloak/conf:ro
 
 volumes:
   pgdata:

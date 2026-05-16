@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ .Values.frontend.serviceName }}
+  name: {{ .Values.frontend.serviceName }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: "4173"
+      port: {{ .Values.frontend.port }}
+      targetPort: {{ .Values.frontend.targetPort }}
+      protocol: TCP
+  selector:
+    app: {{ .Values.frontend.serviceName }}

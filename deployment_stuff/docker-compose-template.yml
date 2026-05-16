@@ -17,6 +17,8 @@ services:
       VITE_KEYCLOAK_REALM: xbi-tasking
       VITE_CLIENT_ID: xbi-tasking-frontend
       VITE_ROLES_CLIENT_ID: xbi-tasking-backend
+    volumes:
+      - ./general_certs/frontend:/certs:ro
     ports:
       - "5173:5173"
 
@@ -52,7 +54,10 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: 
       KEYCLOAK_ENABLED: "true"
       ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
-
+    volumes:
+      - ./general_certs/backend/server:/certs:ro
+      - ./general_certs/backend/keycloak.crt:/etc/ssl/certs/keycloak.crt:ro
+      - ./general_certs/backend/keycloak.crt:/usr/local/share/ca-certificates/keycloak.crt:ro
     ports:
       - "5000:5000"
 
@@ -100,6 +105,7 @@ services:
       - "8443:8443"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ./general_certs/keycloak:/opt/keycloak/conf:ro
 
 volumes:
   pgdata:

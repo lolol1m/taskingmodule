@@ -1,0 +1,43 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.proxy.serviceName }}
+  labels:
+    app: {{ .Values.proxy.serviceName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.proxy.serviceName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.proxy.serviceName }}
+      annotations:
+        checksum/nginx-proxy-config: {{ .Release.Revision | quote }}
+    spec:
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Values.proxy.serviceName }}-config
+        - name: server-tls
+          secret:
+            secretName: {{ .Values.proxy.tlsSecretName }}
+      containers:
+        - name: {{ .Values.proxy.containerName }}
+          image: {{ .Values.proxy.image }}
+          imagePullPolicy: {{ .Values.proxy.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.proxy.containerPort }}
+              hostPort: {{ .Values.proxy.containerPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: server-tls
+              mountPath: /etc/nginx/certs
+              readOnly: true
+{{- end }}
+

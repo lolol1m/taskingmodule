@@ -32,7 +32,7 @@ justification = "placeholder password for local postgres database"
 # Container Security Scan
 [report.software.vulnerability_scan]
 tool = "trivy"
-scan_date = "2025-01-15"
+scan_date = "2026-04-29"
 base_image = "python:3.13-alpine"
 critical_cves = "0"
 high_cves = "1"

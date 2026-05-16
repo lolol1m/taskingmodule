@@ -1,0 +1,6 @@
+templates/extra/httproute-frontend.yaml
+templates/extra/httproute-backend.yaml
+templates/extra/httproute-keycloak.yaml
+templates/extra/gateway.yaml
+keycloak/
+backend-image/
