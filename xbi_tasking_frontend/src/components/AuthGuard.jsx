@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react'
 import { Box, Button, CircularProgress, Container, CssBaseline, Typography } from '@mui/material'
 import { jwtDecode } from 'jwt-decode'
 import UserService from '../auth/UserService'
+import config from '../config'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
-
+// const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+const BACKEND_URL = config.backendUrl || 'http://localhost:5000'
 const storeTokensFromHash = () => {
   const hash = window.location.hash.replace(/^#/, '')
   if (!hash) return null
@@ -141,7 +142,8 @@ export function KeycloakAuthGuard({ children }) {
           return;
         }
 
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        // const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        const backendUrl = config.backendUrl || 'http://localhost:5000';
         const res = await fetch(`${backendUrl}/users/verify`, {
           headers: { Authorization: `Bearer ${token}` },
         });

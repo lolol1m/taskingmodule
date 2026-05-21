@@ -1,9 +1,13 @@
 import Keycloak from "keycloak-js";
+import config from '../config'
 
 const _kc = new Keycloak({
-  url: import.meta.env.VITE_KEYCLOAK_URL,
-  realm: import.meta.env.VITE_KEYCLOAK_REALM,
-  clientId: import.meta.env.VITE_CLIENT_ID
+  // url: import.meta.env.VITE_KEYCLOAK_URL,
+  // realm: import.meta.env.VITE_KEYCLOAK_REALM,
+  // clientId: import.meta.env.VITE_CLIENT_ID
+  url: config.keycloak.url,
+  realm: config.keycloak.realm,
+  clientId: config.keycloak.clientId
 });
 
 /**
@@ -52,10 +56,12 @@ const updateToken = (successCallback) =>
 
 const getUsername = () => _kc.tokenParsed?.preferred_username;
 
-const _clientId = import.meta.env.VITE_CLIENT_ID
+// const _clientId = import.meta.env.VITE_CLIENT_ID
+const _clientId = config.keycloak.clientId
 // Client where the II / Senior II / IA client roles are defined.
 // Falls back to the frontend client if not set.
-const _rolesClientId = import.meta.env.VITE_ROLES_CLIENT_ID || _clientId
+// const _rolesClientId = import.meta.env.VITE_ROLES_CLIENT_ID || _clientId
+const _rolesClientId = config.keycloak.rolesClientId || _clientId
 
 const _hasAnyRole = (role) => {
   if (_kc.hasResourceRole(role, _rolesClientId)) return true

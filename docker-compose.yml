@@ -15,7 +15,7 @@ services:
         VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-frontend
-    container_name: xbi-frontend-rfo
+    container_name: xbi-frontend-v5
     depends_on:
       - backend
     # environment:
@@ -27,15 +27,16 @@ services:
     #   VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     volumes:
       - ./general_certs/frontend:/certs:ro
+      - ./general_certs/configs/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       # - "5173:5173"
-      - "4173:4173"
+      - "3000:8080"
 
   backend:
     build: ./xbi_tasking_backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-backend
-    container_name: xbi-backend-rfo
+    container_name: xbi-backend-v5
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,7 +48,7 @@ services:
       - "tangy.auth.local:host-gateway"
     environment:
       # FRONTEND_URL: https://tangy.local:5173      
-      FRONTEND_URL: https://tangy.local:4173      
+      FRONTEND_URL: https://tangy.local:3000      
       CONFIG_PATH: docker.config
       HOST: 0.0.0.0
       # TLS for backend HTTPS
@@ -99,7 +100,7 @@ services:
 
   postgres:
     image: postgres:15.6
-    container_name: xbi-postgres-rfo
+    container_name: xbi-postgres-v5
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -120,7 +121,7 @@ services:
     build: ./deployment_stuff/xbi-keycloak/
 
     # image: xbi-keycloak:2.7
-    container_name: xbi-keycloak-rfo
+    container_name: xbi-keycloak-v5
     environment:
       # KEYCLOAK_ADMIN: admin
       # KEYCLOAK_ADMIN_PASSWORD: admin
@@ -129,7 +130,9 @@ services:
       KC_HOSTNAME: tangy.auth.local
       KC_PROXY: edge
       KC_HOSTNAME_STRICT: false
-      KC_HTTP_ENABLED: true
+      KC_HTTP_ENABLED: false
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/keycloak.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/keycloak.key
 
 
     ports:
