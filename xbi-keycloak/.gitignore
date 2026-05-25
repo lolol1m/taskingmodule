@@ -1,0 +1,7 @@
+openssl_certs/
+ca_certs_old/
+demo_certs/
+ca_certs/
+scans/
+*.crt
+*.key

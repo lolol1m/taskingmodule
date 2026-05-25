@@ -1,0 +1,149 @@
+version: "1.0"
+
+services:
+
+  frontend:
+    # build: ./xbi_tasking_frontend
+    build:
+      context: ./xbi_tasking_frontend
+      dockerfile: Dockerfile
+      args:
+        # VITE_BACKEND_URL: https://tangy.local:5000
+        # VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
+        VITE_BACKEND_URL: http://localhost:5000
+        VITE_KEYCLOAK_URL: http://localhost:8080
+        VITE_KEYCLOAK_REALM: xbi-tasking
+        VITE_CLIENT_ID: xbi-tasking-frontend
+        VITE_ROLES_CLIENT_ID: xbi-tasking-backend
+    # Use image instead of build once you have image loaded
+    # image: taskingmodule-frontend
+    container_name: tm-frontend:demo
+    depends_on:
+      - backend
+    # environment:
+    #   VITE_MUI_X_LICENSE_KEY: e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y
+    #   VITE_BACKEND_URL: https://tangy.local:5000
+    #   VITE_KEYCLOAK_URL: https://tangy.auth.local:8443
+    #   VITE_KEYCLOAK_REALM: xbi-tasking
+    #   VITE_CLIENT_ID: xbi-tasking-frontend
+    #   VITE_ROLES_CLIENT_ID: xbi-tasking-backend
+    volumes:
+      # - ./general_certs/frontend:/certs:ro
+      - ./volume-mounts/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      # - "5173:5173"
+      - "5173:8080"
+
+  backend:
+    build: ./xbi_tasking_backend
+    # Use image instead of build once you have image loaded
+    # image: taskingmodule-backend
+    container_name: tm-backend:demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+    # extra_hosts:
+      # - "tangy.local:host-gateway"
+      # - "tangy.auth.local:host-gateway"
+    environment:
+      # FRONTEND_URL: https://tangy.local:5173      
+      FRONTEND_URL: http://localhost:5173    
+      CONFIG_PATH: docker.config
+      HOST: 0.0.0.0
+      # TLS for backend HTTPS
+      # SSL_CERTFILE: /certs/server.crt
+      # SSL_KEYFILE: /certs/server.key
+      # Trust the self-signed Keycloak cert for outgoing JWKS/HTTPS calls.
+      # httpx uses certifi by default, which doesn't include this cert.
+      # KEYCLOAK_CA_BUNDLE: /certs/keycloak.crt
+      # SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      # CORS — browsers block calls from https://... to http://... (mixed content),
+      # and also block cross-origin without these headers.
+      # CORS_ORIGINS: "https://tangy.local:5173,http://tangy.local:4173,http://localhost:4173"
+      CORS_ORIGINS: "http://localhost:4173,http://tangy.local:4173,http://localhost:4173"
+      # FRONTEND_URL: https://localhost:5173
+      # Database
+      DB_HOST: postgres
+      DB_NAME: XBI_TASKING_3
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      AUTO_INIT_DB: true
+
+      # Keycloak 
+      # KEYCLOAK_PUBLIC_URL: https://localhost:8443
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+
+      KEYCLOAK_REALM: xbi-tasking
+      KEYCLOAK_CLIENT_ID: xbi-tasking-backend
+      # KEYCLOAK_CLIENT_SECRET: Zj7CYgoGf7pOuW18fEcmNFwI7HIK1k0K
+      KEYCLOAK_CLIENT_SECRET: xyaImNvxSnD8lgQ3qK2yyKuCuZG3ZbvM
+      KEYCLOAK_ADMIN_CLIENT_ID: xbi-tasking-admin
+      # KEYCLOAK_ADMIN_CLIENT_SECRET: 9YMbyTXVTpjPErz8jGwmWtjwfsNDnont
+      KEYCLOAK_ADMIN_CLIENT_SECRET: cj5bXh8YM42AJlLiozwlxGFNLLhwbzr3
+      KEYCLOAK_ENABLED: "true"
+      ALLOWED_CLIENT_IDS: "xbi-tasking-frontend, xbi-tasking-backend, xbi-tasking-admin"
+      ROLES_CLIENT_ID: xbi-tasking-backend
+      REQUIRED_GROUP: xbi-tasking-users
+    
+    # volumes:
+    #   - ./general_certs/backend/server:/certs:ro
+    #   - ./general_certs/backend/keycloak.crt:/etc/ssl/certs/keycloak.crt:ro
+    #   - ./general_certs/backend/keycloak.crt:/usr/local/share/ca-certificates/keycloak.crt:ro
+
+    ports:
+      - "5000:5000"
+
+
+  postgres:
+    image: postgres:15.6
+    container_name: tm-postgres:demo
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: XBI_TASKING_3
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres "]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+
+
+  keycloak:
+    build: ./xbi-keycloak/
+
+    # image: xbi-keycloak:2.7
+    container_name: tm-keycloak:demo
+    environment:
+      # KEYCLOAK_ADMIN: admin
+      # KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_PROXY: edge
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: false
+      # KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/keycloak.crt
+      # KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/keycloak.key
+
+
+    ports:
+      # - "8080:8080"
+      - "8080:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      # - ./general_certs/keycloak:/opt/keycloak/conf:ro
+
+volumes:
+  pgdata:
+  keycloak_data:

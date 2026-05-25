@@ -1,0 +1,24 @@
+venv/
+code/
+*.bat
+dev_server.config
+docker.config
+docker.config.example
+
+.gitignore
+.env
+demo_backend/
+.sonar/
+
+
+# Testing stuff
+testing/
+testing.config
+unittesting.py
+
+# Extra
+*.json
+start_backend.bat
+migrate_to_keycloak_users.py
+server_template.cnf
+start_backend.bat
