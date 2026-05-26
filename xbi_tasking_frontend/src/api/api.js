@@ -1,10 +1,11 @@
 import axios from 'axios'
 import UserService from '../auth/UserService';
+import config from '../config'
 /*
 There is no need to stringy the body as axios will do it automatically 
 */
 class API {
-    constructor(api_link = import.meta.env.VITE_BACKEND_URL) {
+    constructor(api_link = config.backendUrl) {
         this.client =  axios.create({
             baseURL: api_link,
             timeout: 5000,

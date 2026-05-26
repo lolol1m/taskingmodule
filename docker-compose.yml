@@ -17,7 +17,7 @@ services:
         VITE_ROLES_CLIENT_ID: xbi-tasking-backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-frontend
-    container_name: tm-frontend:demo
+    container_name: tm-frontend-official-demo
     depends_on:
       - backend
     # environment:
@@ -38,16 +38,16 @@ services:
     build: ./xbi_tasking_backend
     # Use image instead of build once you have image loaded
     # image: taskingmodule-backend
-    container_name: tm-backend:demo
+    container_name: tm-backend-official-demo
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
         condition: service_started
 
-    # extra_hosts:
+    extra_hosts:
       # - "tangy.local:host-gateway"
-      # - "tangy.auth.local:host-gateway"
+      - "localhost:host-gateway"
     environment:
       # FRONTEND_URL: https://tangy.local:5173      
       FRONTEND_URL: http://localhost:5173    
@@ -64,7 +64,7 @@ services:
       # CORS — browsers block calls from https://... to http://... (mixed content),
       # and also block cross-origin without these headers.
       # CORS_ORIGINS: "https://tangy.local:5173,http://tangy.local:4173,http://localhost:4173"
-      CORS_ORIGINS: "http://localhost:4173,http://tangy.local:4173,http://localhost:4173"
+      CORS_ORIGINS: "http://localhost:5173,http://tangy.local:5173,http://localhost:4173"
       # FRONTEND_URL: https://localhost:5173
       # Database
       DB_HOST: postgres
@@ -102,7 +102,7 @@ services:
 
   postgres:
     image: postgres:15.6
-    container_name: tm-postgres:demo
+    container_name: tm-postgres-official-demo
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -123,7 +123,7 @@ services:
     build: ./xbi-keycloak/
 
     # image: xbi-keycloak:2.7
-    container_name: tm-keycloak:demo
+    container_name: tm-keycloak-official-demo
     environment:
       # KEYCLOAK_ADMIN: admin
       # KEYCLOAK_ADMIN_PASSWORD: admin

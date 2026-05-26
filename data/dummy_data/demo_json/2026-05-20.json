@@ -1,0 +1,97 @@
+{
+  "images": [
+    {
+      "imgId": 5040,
+      "imageFileName": "travel.gif",
+      "sensorName": "sensor39",
+      "uploadDate": "2026-05-20T05:05:01Z",
+      "imageDateTime": "2026-05-20T05:05:01Z",
+      "areas": [
+        {
+          "areaId": 59,
+          "areaName": "area_59"
+        },
+        {
+          "areaId": 19,
+          "areaName": "area_19"
+        },
+        {
+          "areaId": 34,
+          "areaName": "area_34"
+        }
+      ]
+    },
+    {
+      "imgId": 4593,
+      "imageFileName": "nature.gif",
+      "sensorName": "sensor38",
+      "uploadDate": "2026-05-20T13:10:47Z",
+      "imageDateTime": "2026-05-20T13:10:47Z",
+      "areas": [
+        {
+          "areaId": 75,
+          "areaName": "area_75"
+        },
+        {
+          "areaId": 52,
+          "areaName": "area_52"
+        }
+      ]
+    },
+    {
+      "imgId": 2796,
+      "imageFileName": "nature.gif",
+      "sensorName": "sensor32",
+      "uploadDate": "2026-05-20T01:42:55Z",
+      "imageDateTime": "2026-05-20T01:42:55Z",
+      "areas": [
+        {
+          "areaId": 12,
+          "areaName": "area_12"
+        },
+        {
+          "areaId": 97,
+          "areaName": "area_97"
+        }
+      ]
+    },
+    {
+      "imgId": 7252,
+      "imageFileName": "event.gif",
+      "sensorName": "sensor38",
+      "uploadDate": "2026-05-20T14:00:32Z",
+      "imageDateTime": "2026-05-20T14:00:32Z",
+      "areas": [
+        {
+          "areaId": 55,
+          "areaName": "area_55"
+        },
+        {
+          "areaId": 77,
+          "areaName": "area_77"
+        },
+        {
+          "areaId": 9,
+          "areaName": "area_9"
+        }
+      ]
+    },
+    {
+      "imgId": 9797,
+      "imageFileName": "travel.gif",
+      "sensorName": "sensor35",
+      "uploadDate": "2026-05-20T04:10:14Z",
+      "imageDateTime": "2026-05-20T04:10:14Z",
+      "areas": [
+        {
+          "areaId": 71,
+          "areaName": "area_71"
+        },
+        {
+          "areaId": 2,
+          "areaName": "area_2"
+        }
+      ]
+    }
+  ]
+}

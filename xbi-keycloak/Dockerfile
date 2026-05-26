@@ -1,5 +1,5 @@
 # FROM xbi-keycloak:prod-groups-hostname
-FROM xbi-keycloak:ingress
+FROM tm-keycloak:demo
 
 # COPY ca_certs /opt/keycloak/conf/
 

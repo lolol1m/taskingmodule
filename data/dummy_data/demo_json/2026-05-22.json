@@ -1,0 +1,101 @@
+{
+  "images": [
+    {
+      "imgId": 3060,
+      "imageFileName": "nature.gif",
+      "sensorName": "sensor37",
+      "uploadDate": "2026-05-22T19:23:42Z",
+      "imageDateTime": "2026-05-22T19:23:42Z",
+      "areas": [
+        {
+          "areaId": 98,
+          "areaName": "area_98"
+        }
+      ]
+    },
+    {
+      "imgId": 7932,
+      "imageFileName": "office.gif",
+      "sensorName": "sensor38",
+      "uploadDate": "2026-05-22T22:05:07Z",
+      "imageDateTime": "2026-05-22T22:05:07Z",
+      "areas": [
+        {
+          "areaId": 22,
+          "areaName": "area_22"
+        },
+        {
+          "areaId": 34,
+          "areaName": "area_34"
+        },
+        {
+          "areaId": 68,
+          "areaName": "area_68"
+        }
+      ]
+    },
+    {
+      "imgId": 7537,
+      "imageFileName": "friends.gif",
+      "sensorName": "sensor37",
+      "uploadDate": "2026-05-22T11:20:57Z",
+      "imageDateTime": "2026-05-22T11:20:57Z",
+      "areas": [
+        {
+          "areaId": 89,
+          "areaName": "area_89"
+        },
+        {
+          "areaId": 26,
+          "areaName": "area_26"
+        },
+        {
+          "areaId": 92,
+          "areaName": "area_92"
+        }
+      ]
+    },
+    {
+      "imgId": 2049,
+      "imageFileName": "friends.gif",
+      "sensorName": "sensor30",
+      "uploadDate": "2026-05-22T08:10:51Z",
+      "imageDateTime": "2026-05-22T08:10:51Z",
+      "areas": [
+        {
+          "areaId": 58,
+          "areaName": "area_58"
+        },
+        {
+          "areaId": 16,
+          "areaName": "area_16"
+        },
+        {
+          "areaId": 32,
+          "areaName": "area_32"
+        }
+      ]
+    },
+    {
+      "imgId": 1117,
+      "imageFileName": "family.gif",
+      "sensorName": "sensor30",
+      "uploadDate": "2026-05-22T08:01:04Z",
+      "imageDateTime": "2026-05-22T08:01:04Z",
+      "areas": [
+        {
+          "areaId": 71,
+          "areaName": "area_71"
+        },
+        {
+          "areaId": 30,
+          "areaName": "area_30"
+        },
+        {
+          "areaId": 76,
+          "areaName": "area_76"
+        }
+      ]
+    }
+  ]
+}

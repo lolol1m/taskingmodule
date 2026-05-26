@@ -2,7 +2,6 @@ venv/
 code/
 *.bat
 dev_server.config
-docker.config
 docker.config.example
 
 .gitignore

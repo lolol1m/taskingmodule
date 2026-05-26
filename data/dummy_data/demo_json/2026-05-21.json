@@ -1,0 +1,97 @@
+{
+  "images": [
+    {
+      "imgId": 3591,
+      "imageFileName": "event.gif",
+      "sensorName": "sensor30",
+      "uploadDate": "2026-05-21T15:49:45Z",
+      "imageDateTime": "2026-05-21T15:49:45Z",
+      "areas": [
+        {
+          "areaId": 38,
+          "areaName": "area_38"
+        }
+      ]
+    },
+    {
+      "imgId": 9317,
+      "imageFileName": "family.gif",
+      "sensorName": "sensor34",
+      "uploadDate": "2026-05-21T06:30:16Z",
+      "imageDateTime": "2026-05-21T06:30:16Z",
+      "areas": [
+        {
+          "areaId": 93,
+          "areaName": "area_93"
+        },
+        {
+          "areaId": 34,
+          "areaName": "area_34"
+        },
+        {
+          "areaId": 65,
+          "areaName": "area_65"
+        }
+      ]
+    },
+    {
+      "imgId": 7126,
+      "imageFileName": "nature.gif",
+      "sensorName": "sensor38",
+      "uploadDate": "2026-05-21T05:33:52Z",
+      "imageDateTime": "2026-05-21T05:33:52Z",
+      "areas": [
+        {
+          "areaId": 65,
+          "areaName": "area_65"
+        },
+        {
+          "areaId": 78,
+          "areaName": "area_78"
+        },
+        {
+          "areaId": 26,
+          "areaName": "area_26"
+        }
+      ]
+    },
+    {
+      "imgId": 1319,
+      "imageFileName": "family.gif",
+      "sensorName": "sensor35",
+      "uploadDate": "2026-05-21T17:47:22Z",
+      "imageDateTime": "2026-05-21T17:47:22Z",
+      "areas": [
+        {
+          "areaId": 1,
+          "areaName": "area_1"
+        },
+        {
+          "areaId": 77,
+          "areaName": "area_77"
+        },
+        {
+          "areaId": 42,
+          "areaName": "area_42"
+        }
+      ]
+    },
+    {
+      "imgId": 2290,
+      "imageFileName": "family.gif",
+      "sensorName": "sensor37",
+      "uploadDate": "2026-05-21T08:46:11Z",
+      "imageDateTime": "2026-05-21T08:46:11Z",
+      "areas": [
+        {
+          "areaId": 31,
+          "areaName": "area_31"
+        },
+        {
+          "areaId": 8,
+          "areaName": "area_8"
+        }
+      ]
+    }
+  ]
+}

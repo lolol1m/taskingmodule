@@ -3,7 +3,7 @@ FROM python:3.13-alpine AS builder
 
 WORKDIR /app
 
-RUN apk update && 
+RUN apk update 
     # apk add --no-cache ca-certificates && \
     # update-ca-certificates
 
@@ -42,9 +42,9 @@ RUN mkdir -p /app/app/{./model_path, ./static/gallery}
 
 COPY . .
 
-# RUN if [ ! -f docker.config ] && [ -f docker.config.example ]; then \
-# cp docker.config.example docker.config; \
-# fi
+RUN if [ ! -f docker.config ] && [ -f docker.config.example ]; then \
+cp docker.config.example docker.config; \
+fi
 
 RUN adduser -D app && chown -R app:app /app
 # USER app

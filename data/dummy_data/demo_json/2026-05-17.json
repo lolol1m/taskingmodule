@@ -1,0 +1,89 @@
+{
+  "images": [
+    {
+      "imgId": 5012,
+      "imageFileName": "office.gif",
+      "sensorName": "sensor32",
+      "uploadDate": "2026-05-17T10:00:48Z",
+      "imageDateTime": "2026-05-17T10:00:48Z",
+      "areas": [
+        {
+          "areaId": 15,
+          "areaName": "area_15"
+        },
+        {
+          "areaId": 4,
+          "areaName": "area_4"
+        },
+        {
+          "areaId": 95,
+          "areaName": "area_95"
+        }
+      ]
+    },
+    {
+      "imgId": 2424,
+      "imageFileName": "sunset.gif",
+      "sensorName": "sensor30",
+      "uploadDate": "2026-05-17T19:51:22Z",
+      "imageDateTime": "2026-05-17T19:51:22Z",
+      "areas": [
+        {
+          "areaId": 14,
+          "areaName": "area_14"
+        },
+        {
+          "areaId": 87,
+          "areaName": "area_87"
+        },
+        {
+          "areaId": 95,
+          "areaName": "area_95"
+        }
+      ]
+    },
+    {
+      "imgId": 4811,
+      "imageFileName": "holiday.gif",
+      "sensorName": "sensor38",
+      "uploadDate": "2026-05-17T07:57:37Z",
+      "imageDateTime": "2026-05-17T07:57:37Z",
+      "areas": [
+        {
+          "areaId": 12,
+          "areaName": "area_12"
+        }
+      ]
+    },
+    {
+      "imgId": 9928,
+      "imageFileName": "sunset.gif",
+      "sensorName": "sensor33",
+      "uploadDate": "2026-05-17T23:39:41Z",
+      "imageDateTime": "2026-05-17T23:39:41Z",
+      "areas": [
+        {
+          "areaId": 92,
+          "areaName": "area_92"
+        }
+      ]
+    },
+    {
+      "imgId": 3615,
+      "imageFileName": "sunset.gif",
+      "sensorName": "sensor35",
+      "uploadDate": "2026-05-17T00:14:11Z",
+      "imageDateTime": "2026-05-17T00:14:11Z",
+      "areas": [
+        {
+          "areaId": 76,
+          "areaName": "area_76"
+        },
+        {
+          "areaId": 36,
+          "areaName": "area_36"
+        }
+      ]
+    }
+  ]
+}
