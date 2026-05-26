@@ -22,16 +22,16 @@ dates = [
 
 sensor_names = [f"sensor{i}" for i in range(30, 40)]
 
-file_names = [
-    "holiday.gif",
-    "family.gif",
-    "nature.gif",
-    "office.gif",
-    "travel.gif",
-    "friends.gif",
-    "sunset.gif",
-    "event.gif",
-]
+# file_names = [
+#     "holiday.gif",
+#     "family.gif",
+#     "nature.gif",
+#     "office.gif",
+#     "travel.gif",
+#     "friends.gif",
+#     "sunset.gif",
+#     "event.gif",
+# ]
 
 used_img_ids = set()
 
@@ -55,7 +55,7 @@ for current_date in dates:
     images = []
 
     # Generate 5 images for the current day
-    for _ in range(5):
+    for count in range(5):
 
         area_count = random.randint(1, 3)
 
@@ -77,10 +77,11 @@ for current_date in dates:
             })
         
         timestamp = random_time_for_day(current_date)
+        img_name = f"image_{current_date.strftime('%Y-%m-%d')}_{count+1:02d}.gif"
 
         image_obj = {
             "imgId": generate_unique_img_id(),
-            "imageFileName": random.choice(file_names),
+            "imageFileName": img_name,
             "sensorName": random.choice(sensor_names),
             "uploadDate": timestamp.isoformat() + "Z",
             "imageDateTime": timestamp.isoformat() + "Z",

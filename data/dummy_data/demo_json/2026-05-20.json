@@ -1,95 +1,71 @@
 {
   "images": [
     {
-      "imgId": 5040,
-      "imageFileName": "travel.gif",
-      "sensorName": "sensor39",
-      "uploadDate": "2026-05-20T05:05:01Z",
-      "imageDateTime": "2026-05-20T05:05:01Z",
+      "imgId": 1916,
+      "imageFileName": "image_2026-05-20_01.gif",
+      "sensorName": "sensor33",
+      "uploadDate": "2026-05-20T11:48:24Z",
+      "imageDateTime": "2026-05-20T11:48:24Z",
       "areas": [
+        {
+          "areaId": 88,
+          "areaName": "area_88"
+        }
+      ]
+    },
+    {
+      "imgId": 5386,
+      "imageFileName": "image_2026-05-20_02.gif",
+      "sensorName": "sensor31",
+      "uploadDate": "2026-05-20T14:36:21Z",
+      "imageDateTime": "2026-05-20T14:36:21Z",
+      "areas": [
+        {
+          "areaId": 41,
+          "areaName": "area_41"
+        }
+      ]
+    },
+    {
+      "imgId": 4483,
+      "imageFileName": "image_2026-05-20_03.gif",
+      "sensorName": "sensor37",
+      "uploadDate": "2026-05-20T11:27:25Z",
+      "imageDateTime": "2026-05-20T11:27:25Z",
+      "areas": [
+        {
+          "areaId": 73,
+          "areaName": "area_73"
+        }
+      ]
+    },
+    {
+      "imgId": 5339,
+      "imageFileName": "image_2026-05-20_04.gif",
+      "sensorName": "sensor32",
+      "uploadDate": "2026-05-20T05:12:06Z",
+      "imageDateTime": "2026-05-20T05:12:06Z",
+      "areas": [
+        {
+          "areaId": 83,
+          "areaName": "area_83"
+        },
         {
           "areaId": 59,
           "areaName": "area_59"
-        },
-        {
-          "areaId": 19,
-          "areaName": "area_19"
-        },
-        {
-          "areaId": 34,
-          "areaName": "area_34"
         }
       ]
     },
     {
-      "imgId": 4593,
-      "imageFileName": "nature.gif",
-      "sensorName": "sensor38",
-      "uploadDate": "2026-05-20T13:10:47Z",
-      "imageDateTime": "2026-05-20T13:10:47Z",
+      "imgId": 9830,
+      "imageFileName": "image_2026-05-20_05.gif",
+      "sensorName": "sensor34",
+      "uploadDate": "2026-05-20T20:26:19Z",
+      "imageDateTime": "2026-05-20T20:26:19Z",
       "areas": [
         {
-          "areaId": 75,
-          "areaName": "area_75"
-        },
-        {
-          "areaId": 52,
-          "areaName": "area_52"
-        }
-      ]
-    },
-    {
-      "imgId": 2796,
-      "imageFileName": "nature.gif",
-      "sensorName": "sensor32",
-      "uploadDate": "2026-05-20T01:42:55Z",
-      "imageDateTime": "2026-05-20T01:42:55Z",
-      "areas": [
-        {
-          "areaId": 12,
-          "areaName": "area_12"
-        },
-        {
-          "areaId": 97,
-          "areaName": "area_97"
-        }
-      ]
-    },
-    {
-      "imgId": 7252,
-      "imageFileName": "event.gif",
-      "sensorName": "sensor38",
-      "uploadDate": "2026-05-20T14:00:32Z",
-      "imageDateTime": "2026-05-20T14:00:32Z",
-      "areas": [
-        {
-          "areaId": 55,
-          "areaName": "area_55"
-        },
-        {
-          "areaId": 77,
-          "areaName": "area_77"
-        },
-        {
-          "areaId": 9,
-          "areaName": "area_9"
-        }
-      ]
-    },
-    {
-      "imgId": 9797,
-      "imageFileName": "travel.gif",
-      "sensorName": "sensor35",
-      "uploadDate": "2026-05-20T04:10:14Z",
-      "imageDateTime": "2026-05-20T04:10:14Z",
-      "areas": [
-        {
-          "areaId": 71,
-          "areaName": "area_71"
-        },
-        {
-          "areaId": 2,
-          "areaName": "area_2"
+          "areaId": 96,
+          "areaName": "area_96"
         }
       ]
     }

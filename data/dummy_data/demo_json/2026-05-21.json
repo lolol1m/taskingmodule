@@ -1,95 +1,95 @@
 {
   "images": [
     {
-      "imgId": 3591,
-      "imageFileName": "event.gif",
-      "sensorName": "sensor30",
-      "uploadDate": "2026-05-21T15:49:45Z",
-      "imageDateTime": "2026-05-21T15:49:45Z",
+      "imgId": 4593,
+      "imageFileName": "image_2026-05-21_01.gif",
+      "sensorName": "sensor32",
+      "uploadDate": "2026-05-21T13:10:47Z",
+      "imageDateTime": "2026-05-21T13:10:47Z",
       "areas": [
         {
-          "areaId": 38,
-          "areaName": "area_38"
+          "areaId": 75,
+          "areaName": "area_75"
+        },
+        {
+          "areaId": 55,
+          "areaName": "area_55"
+        },
+        {
+          "areaId": 52,
+          "areaName": "area_52"
         }
       ]
     },
     {
-      "imgId": 9317,
-      "imageFileName": "family.gif",
-      "sensorName": "sensor34",
-      "uploadDate": "2026-05-21T06:30:16Z",
-      "imageDateTime": "2026-05-21T06:30:16Z",
+      "imgId": 2796,
+      "imageFileName": "image_2026-05-21_02.gif",
+      "sensorName": "sensor32",
+      "uploadDate": "2026-05-21T01:42:55Z",
+      "imageDateTime": "2026-05-21T01:42:55Z",
       "areas": [
         {
-          "areaId": 93,
-          "areaName": "area_93"
+          "areaId": 64,
+          "areaName": "area_64"
         },
         {
-          "areaId": 34,
-          "areaName": "area_34"
+          "areaId": 12,
+          "areaName": "area_12"
         },
         {
-          "areaId": 65,
-          "areaName": "area_65"
+          "areaId": 97,
+          "areaName": "area_97"
         }
       ]
     },
     {
-      "imgId": 7126,
-      "imageFileName": "nature.gif",
+      "imgId": 2040,
+      "imageFileName": "image_2026-05-21_03.gif",
+      "sensorName": "sensor36",
+      "uploadDate": "2026-05-21T21:42:52Z",
+      "imageDateTime": "2026-05-21T21:42:52Z",
+      "areas": [
+        {
+          "areaId": 21,
+          "areaName": "area_21"
+        },
+        {
+          "areaId": 88,
+          "areaName": "area_88"
+        },
+        {
+          "areaId": 55,
+          "areaName": "area_55"
+        }
+      ]
+    },
+    {
+      "imgId": 5119,
+      "imageFileName": "image_2026-05-21_04.gif",
       "sensorName": "sensor38",
-      "uploadDate": "2026-05-21T05:33:52Z",
-      "imageDateTime": "2026-05-21T05:33:52Z",
+      "uploadDate": "2026-05-21T19:15:52Z",
+      "imageDateTime": "2026-05-21T19:15:52Z",
       "areas": [
-        {
-          "areaId": 65,
-          "areaName": "area_65"
-        },
-        {
-          "areaId": 78,
-          "areaName": "area_78"
-        },
-        {
-          "areaId": 26,
-          "areaName": "area_26"
-        }
-      ]
-    },
-    {
-      "imgId": 1319,
-      "imageFileName": "family.gif",
-      "sensorName": "sensor35",
-      "uploadDate": "2026-05-21T17:47:22Z",
-      "imageDateTime": "2026-05-21T17:47:22Z",
-      "areas": [
-        {
-          "areaId": 1,
-          "areaName": "area_1"
-        },
         {
           "areaId": 77,
           "areaName": "area_77"
         },
         {
-          "areaId": 42,
-          "areaName": "area_42"
+          "areaId": 60,
+          "areaName": "area_60"
         }
       ]
     },
     {
-      "imgId": 2290,
-      "imageFileName": "family.gif",
-      "sensorName": "sensor37",
-      "uploadDate": "2026-05-21T08:46:11Z",
-      "imageDateTime": "2026-05-21T08:46:11Z",
+      "imgId": 9797,
+      "imageFileName": "image_2026-05-21_05.gif",
+      "sensorName": "sensor34",
+      "uploadDate": "2026-05-21T04:10:14Z",
+      "imageDateTime": "2026-05-21T04:10:14Z",
       "areas": [
         {
-          "areaId": 31,
-          "areaName": "area_31"
-        },
-        {
-          "areaId": 8,
-          "areaName": "area_8"
+          "areaId": 88,
+          "areaName": "area_88"
         }
       ]
     }
